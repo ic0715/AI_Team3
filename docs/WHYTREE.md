@@ -1,1 +1,1 @@
-<img width="1338" height="531" alt="image" src="https://github.com/user-attachments/assets/4557d46b-c6da-44ac-bc79-124a9723ac35" />
+<img width="1013" height="575" alt="Why Tree 수정안" src="https://github.com/user-attachments/assets/91b91c00-2782-46b6-a1d8-004963123426" />
