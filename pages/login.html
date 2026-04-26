@@ -252,7 +252,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
       <div class="consent-wrap" id="consent-wrap">
 
         <!-- 전체 동의 -->
-        <div class="consent-all-row" onclick="toggleAll()">
+        <div class="consent-all-row" role="checkbox" aria-checked="false" aria-label="전체 동의" tabindex="0" id="row-all" onclick="toggleAll()" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleAll()}">
           <div class="consent-check" id="check-all">
             <svg viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="1.5,5 4,7.5 8.5,2.5"/>
@@ -264,7 +264,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
         <div class="consent-divider"></div>
 
         <!-- 필수: 개인정보 수집 이용 -->
-        <div class="consent-row" onclick="toggleConsent('privacy')">
+        <div class="consent-row" role="checkbox" aria-checked="false" aria-label="개인정보 수집 및 이용 동의 (필수)" tabindex="0" id="row-privacy" onclick="toggleConsent('privacy')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleConsent('privacy')}">
           <div class="consent-check" id="check-privacy">
             <svg viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="1.5,5 4,7.5 8.5,2.5"/>
@@ -277,7 +277,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
         </div>
 
         <!-- 선택: 마케팅 수신 -->
-        <div class="consent-row" onclick="toggleConsent('marketing')">
+        <div class="consent-row" role="checkbox" aria-checked="false" aria-label="마케팅 정보 수신 동의 (선택)" tabindex="0" id="row-marketing" onclick="toggleConsent('marketing')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleConsent('marketing')}">
           <div class="consent-check" id="check-marketing">
             <svg viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="1.5,5 4,7.5 8.5,2.5"/>
@@ -428,8 +428,11 @@ const consent = { privacy: false, marketing: false }
 function toggleConsent(key) {
   consent[key] = !consent[key]
   document.getElementById('check-' + key).classList.toggle('checked', consent[key])
+  document.getElementById('row-' + key).setAttribute('aria-checked', String(consent[key]))
   // 전체 동의 체크는 둘 다 체크됐을 때만
-  document.getElementById('check-all').classList.toggle('checked', consent.privacy && consent.marketing)
+  const allChecked = consent.privacy && consent.marketing
+  document.getElementById('check-all').classList.toggle('checked', allChecked)
+  document.getElementById('row-all').setAttribute('aria-checked', String(allChecked))
 }
 
 function toggleAll() {
@@ -440,6 +443,9 @@ function toggleAll() {
   document.getElementById('check-privacy').classList.toggle('checked', next)
   document.getElementById('check-marketing').classList.toggle('checked', next)
   document.getElementById('check-all').classList.toggle('checked', next)
+  document.getElementById('row-privacy').setAttribute('aria-checked', String(next))
+  document.getElementById('row-marketing').setAttribute('aria-checked', String(next))
+  document.getElementById('row-all').setAttribute('aria-checked', String(next))
 }
 
 async function handleSignup() {
