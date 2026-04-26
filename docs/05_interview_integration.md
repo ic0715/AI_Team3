@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 커스터마이징 전략
+##  커스터마이징 전략
 
 ### 기본 질문 세트 (10개)
 
@@ -78,7 +78,7 @@ const DEFAULT_QUESTIONS = [
 
 ---
 
-## 🔄 시나리오 A: 질문 건너뛰기
+##  시나리오 A: 질문 건너뛰기
 
 ### 건너뛰기 조건
 
@@ -130,7 +130,7 @@ const customized = DEFAULT_QUESTIONS.filter(q => {
 
 ---
 
-## 🎨 시나리오 B: 질문 내용 맞춤화
+##  시나리오 B: 질문 내용 맞춤화
 
 ### 맞춤화 패턴
 
@@ -217,7 +217,7 @@ function addGapQuestions(questions, resume) {
 
 ---
 
-## 🧩 강점-경력 교차 검증 기반
+##  강점-경력 교차 검증 기반
 
 ### 검증 부족 시 질문 추가
 
@@ -250,7 +250,7 @@ function addValidationQuestions(questions, validation) {
 
 ---
 
-## 🔧 통합 커스터마이징 함수
+##  통합 커스터마이징 함수
 
 ```javascript
 function generateCustomQuestions(analysisResults) {
@@ -296,7 +296,7 @@ function generateCustomQuestions(analysisResults) {
 
 ---
 
-## 📊 커스터마이징 결과 예시
+##  커스터마이징 결과 예시
 
 ### 입력
 
@@ -380,7 +380,7 @@ const customizedQuestions = [
 
 ---
 
-## 💾 저장 및 불러오기
+##  저장 및 불러오기
 
 ### LocalStorage 저장
 
@@ -422,7 +422,7 @@ function loadCustomQuestions() {
 
 ---
 
-## 🎭 UI 표시
+##  UI 표시
 
 ### S2 → S3 전환 시 안내
 
@@ -471,7 +471,7 @@ function loadCustomQuestions() {
 
 ---
 
-## 📊 커스터마이징 통계
+##  커스터마이징 통계
 
 ### 추적 지표
 
@@ -508,7 +508,7 @@ console.log(stats);
 
 ---
 
-## 🧪 테스트 케이스
+##  테스트 케이스
 
 ### 케이스 1: 갤럽만 있음
 
