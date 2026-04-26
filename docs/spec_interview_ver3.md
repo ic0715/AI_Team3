@@ -913,12 +913,3 @@ function renderAnalysisResults(results) {
 ```
 
 ---
-
-## 📋 다음 단계
-
-1. **프론트엔드 코드** (HTML/CSS/JS) 완전 구현
-2. **백엔드 API** (Node.js/Python) 구현
-3. **Claude 프롬프트 최적화** (각 파일 타입별)
-4. **UI 목업** (Figma 스타일 프로토타입)
-
-어떤 것부터 만들어드릴까요? 🚀
