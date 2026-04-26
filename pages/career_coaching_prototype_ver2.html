@@ -968,6 +968,11 @@ textarea.field-input{min-height:72px;resize:none;line-height:1.6}
     <div class="roadmap-item"><div class="roadmap-line-wrap"><div class="roadmap-dot future"></div><div class="roadmap-line"></div></div><div class="roadmap-body"><div class="roadmap-year">3년 후 · 2028</div><div class="roadmap-text">팀 리드 역할 수행, 도메인 전문성 심화</div><div style="margin-top:6px"><span class="badge badge-gray">예정</span></div></div></div>
     <div class="roadmap-item"><div class="roadmap-line-wrap"><div class="roadmap-dot future"></div></div><div class="roadmap-body"><div class="roadmap-year">5년 후 · 2030</div><div class="roadmap-text">독립적 프로덕트 오너십, 외부 영향력 확장</div><div style="margin-top:6px"><span class="badge badge-gray">예정</span></div></div></div>
     <div class="gap"></div>
+    <div style="margin:0 20px 32px">
+      <button onclick="handleLogout()" style="width:100%;padding:13px;background:none;border:1.5px solid #E4E4DF;border-radius:12px;font-size:14px;font-weight:600;color:#6B6B65;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor='#DC2626';this.style.color='#DC2626'" onmouseout="this.style.borderColor='#E4E4DF';this.style.color='#6B6B65'">
+        로그아웃
+      </button>
+    </div>
   </div>
 
 
@@ -1312,6 +1317,18 @@ function addTask(){
   document.querySelectorAll('#modal-add .tag').forEach(t=>t.classList.remove('active'));
   document.getElementById('modal-add').classList.remove('open');
   showToast('✓ 할 일이 추가됐어요');
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script>
+const { createClient } = supabase
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+async function handleLogout() {
+  await sb.auth.signOut()
+  window.location.href = 'login.html'
 }
 </script>
 </body>

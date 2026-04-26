@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CareerPT - 로그인</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<style>
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface2: #F0F0EC;
+  --border: #E4E4DF;
+  --text-primary: #1A1A18;
+  --text-secondary: #6B6B65;
+  --text-muted: #A8A8A0;
+  --accent: #2D5BFF;
+  --accent-light: #EEF2FF;
+  --green: #16A34A;
+  --green-light: #DCFCE7;
+  --red: #DC2626;
+  --red-light: #FEE2E2;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: 'Pretendard',-apple-system,sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-height:100vh;display:flex;justify-content:center;align-items:flex-start}
+::-webkit-scrollbar{width:0}
+
+.phone{
+  width:390px;min-height:100vh;
+  background:var(--surface);
+  display:flex;flex-direction:column;
+}
+
+/* Header */
+.auth-header{padding:60px 24px 28px}
+.auth-logo{
+  width:48px;height:48px;border-radius:14px;
+  background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:24px;
+}
+.auth-logo svg{width:26px;height:26px}
+.auth-title{font-size:26px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
+.auth-sub{font-size:14px;color:var(--text-secondary);line-height:1.6}
+
+/* Tabs */
+.tab-row{
+  display:flex;margin:0 24px 24px;
+  background:var(--surface2);border-radius:var(--radius-sm);padding:3px;
+}
+.tab-btn{
+  flex:1;padding:9px;text-align:center;
+  border-radius:6px;font-size:14px;font-weight:600;
+  cursor:pointer;border:none;font-family:var(--font);
+  color:var(--text-secondary);background:none;transition:all .15s;
+}
+.tab-btn.active{
+  background:var(--surface);color:var(--text-primary);
+  box-shadow:0 1px 4px rgba(0,0,0,.1);
+}
+
+/* Form */
+.auth-body{flex:1;padding:0 24px 40px}
+.form-panel{display:none}
+.form-panel.active{display:block}
+
+.field-row{margin-bottom:14px}
+.field-label{font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+.field-input{
+  width:100%;font-size:14px;padding:12px 14px;
+  border-radius:var(--radius-sm);border:1.5px solid var(--border);
+  background:var(--surface);color:var(--text-primary);
+  outline:none;font-family:var(--font);transition:border-color .15s;
+}
+.field-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,91,255,.1)}
+.field-input::placeholder{color:var(--text-muted)}
+
+.auth-btn{
+  width:100%;padding:14px;margin-top:6px;
+  background:var(--accent);color:#fff;
+  border:none;border-radius:var(--radius);
+  font-size:15px;font-weight:700;font-family:var(--font);
+  cursor:pointer;transition:all .15s;
+  box-shadow:0 4px 16px rgba(45,91,255,.3);
+}
+.auth-btn:active{opacity:.85;transform:scale(.99)}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.divider{display:flex;align-items:center;gap:12px;margin:20px 0}
+.divider-line{flex:1;height:1px;background:var(--border)}
+.divider-text{font-size:12px;color:var(--text-muted)}
+
+.google-btn{
+  width:100%;padding:12px 16px;
+  background:var(--surface);color:var(--text-primary);
+  border:1.5px solid var(--border);border-radius:var(--radius);
+  font-size:14px;font-weight:600;font-family:var(--font);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:all .15s;
+}
+.google-btn:active{background:var(--surface2)}
+
+/* Messages */
+.error-msg{
+  background:var(--red-light);border:1px solid rgba(220,38,38,.2);
+  border-radius:var(--radius-sm);padding:10px 14px;
+  font-size:13px;color:var(--red);margin-bottom:14px;display:none;
+}
+.success-msg{
+  background:var(--green-light);border:1px solid rgba(22,163,74,.2);
+  border-radius:var(--radius-sm);padding:10px 14px;
+  font-size:13px;color:var(--green);margin-bottom:14px;display:none;
+}
+
+.terms{font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;line-height:1.7}
+
+/* 개인정보 동의 */
+.consent-wrap{margin-top:18px;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.consent-all-row{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 14px;background:var(--surface2);
+  cursor:pointer;
+}
+.consent-divider{height:1px;background:var(--border)}
+.consent-row{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:11px 14px;cursor:pointer;
+}
+.consent-row:not(:last-child){border-bottom:1px solid var(--border)}
+.consent-check{
+  width:18px;height:18px;border-radius:4px;
+  border:1.5px solid var(--border);
+  background:var(--surface);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;transition:all .15s;
+}
+.consent-check.checked{background:var(--accent);border-color:var(--accent)}
+.consent-check.checked svg{display:block}
+.consent-check svg{display:none;width:10px;height:10px}
+.consent-text{flex:1;font-size:13px;line-height:1.5;color:var(--text-secondary)}
+.consent-text strong{font-weight:600;color:var(--text-primary)}
+.consent-text .badge{
+  font-size:10px;font-weight:700;
+  padding:1px 5px;border-radius:3px;
+  margin-right:4px;
+}
+.badge-required{background:#FEE2E2;color:var(--red)}
+.badge-optional{background:var(--surface2);color:var(--text-muted)}
+.consent-detail{font-size:11px;color:var(--text-muted);margin-top:2px}
+.consent-link{color:var(--accent);text-decoration:underline;background:none;border:none;font-size:11px;font-family:var(--font);cursor:pointer;padding:0}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="auth-header">
+    <div class="auth-logo">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div class="auth-title">CareerPT</div>
+    <div class="auth-sub">방향이 없는 당신을 위한<br>AI 커리어 코치</div>
+  </div>
+
+  <div class="tab-row" id="tab-row">
+    <button class="tab-btn active" onclick="switchTab('login')">로그인</button>
+    <button class="tab-btn" onclick="switchTab('signup')">회원가입</button>
+  </div>
+
+  <div class="auth-body">
+
+    <!-- 로그인 패널 -->
+    <div class="form-panel active" id="panel-login">
+      <div class="error-msg" id="login-error"></div>
+
+      <div class="field-row">
+        <div class="field-label">이메일</div>
+        <input class="field-input" type="email" id="login-email" placeholder="example@email.com">
+      </div>
+      <div class="field-row">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="field-label" style="margin-bottom:0">비밀번호</div>
+          <button onclick="switchTab('forgot')" style="font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0">비밀번호를 잊으셨나요?</button>
+        </div>
+        <input class="field-input" type="password" id="login-password" placeholder="비밀번호 입력">
+      </div>
+
+      <button class="auth-btn" id="login-btn" onclick="handleLogin()">로그인</button>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <div class="divider-text">또는</div>
+        <div class="divider-line"></div>
+      </div>
+
+      <button class="google-btn" onclick="handleGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
+          <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/>
+        </svg>
+        Google로 계속하기
+      </button>
+    </div>
+
+    <!-- 회원가입 패널 -->
+    <div class="form-panel" id="panel-signup">
+      <div class="error-msg" id="signup-error"></div>
+      <div class="success-msg" id="signup-success"></div>
+
+      <div class="field-row">
+        <div class="field-label">이름</div>
+        <input class="field-input" type="text" id="signup-name" placeholder="홍길동">
+      </div>
+      <div class="field-row">
+        <div class="field-label">이메일</div>
+        <input class="field-input" type="email" id="signup-email" placeholder="example@email.com">
+      </div>
+      <div class="field-row">
+        <div class="field-label">비밀번호</div>
+        <input class="field-input" type="password" id="signup-password" placeholder="8자 이상">
+      </div>
+
+      <button class="auth-btn" id="signup-btn" onclick="handleSignup()">시작하기 →</button>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <div class="divider-text">또는</div>
+        <div class="divider-line"></div>
+      </div>
+
+      <button class="google-btn" onclick="handleGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
+          <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/>
+        </svg>
+        Google로 시작하기
+      </button>
+
+      <!-- 개인정보 동의 -->
+      <div class="consent-wrap" id="consent-wrap">
+
+        <!-- 전체 동의 -->
+        <div class="consent-all-row" role="checkbox" aria-checked="false" aria-label="전체 동의" tabindex="0" id="row-all" onclick="toggleAll()" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleAll()}">
+          <div class="consent-check" id="check-all">
+            <svg viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1.5,5 4,7.5 8.5,2.5"/>
+            </svg>
+          </div>
+          <span style="font-size:13px;font-weight:700;color:var(--text-primary)">전체 동의</span>
+        </div>
+
+        <div class="consent-divider"></div>
+
+        <!-- 필수: 개인정보 수집 이용 -->
+        <div class="consent-row" role="checkbox" aria-checked="false" aria-label="개인정보 수집 및 이용 동의 (필수)" tabindex="0" id="row-privacy" onclick="toggleConsent('privacy')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleConsent('privacy')}">
+          <div class="consent-check" id="check-privacy">
+            <svg viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1.5,5 4,7.5 8.5,2.5"/>
+            </svg>
+          </div>
+          <div class="consent-text">
+            <span class="badge badge-required">필수</span><strong>개인정보 수집 및 이용 동의</strong>
+            <div class="consent-detail">이름, 이메일, 직무 정보를 커리어 코칭 서비스 제공 목적으로 수집합니다. 보유 기간: 회원 탈퇴 시까지. <button class="consent-link" onclick="event.stopPropagation();alert('개인정보처리방침 준비 중이에요.')">자세히 보기</button></div>
+          </div>
+        </div>
+
+        <!-- 선택: 마케팅 수신 -->
+        <div class="consent-row" role="checkbox" aria-checked="false" aria-label="마케팅 정보 수신 동의 (선택)" tabindex="0" id="row-marketing" onclick="toggleConsent('marketing')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleConsent('marketing')}">
+          <div class="consent-check" id="check-marketing">
+            <svg viewBox="0 0 10 10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1.5,5 4,7.5 8.5,2.5"/>
+            </svg>
+          </div>
+          <div class="consent-text">
+            <span class="badge badge-optional">선택</span><strong>마케팅 정보 수신 동의</strong>
+            <div class="consent-detail">커리어 성장 팁, 서비스 업데이트를 이메일로 받아요. 언제든지 수신 거부 가능.</div>
+          </div>
+        </div>
+
+      </div><!-- /consent-wrap -->
+    </div>
+
+    <!-- 비밀번호 찾기 패널 -->
+    <div class="form-panel" id="panel-forgot">
+      <button onclick="switchTab('login')" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);background:none;border:none;cursor:pointer;font-family:var(--font);padding:0;margin-bottom:24px">
+        ← 로그인으로 돌아가기
+      </button>
+      <div style="margin-bottom:24px">
+        <div style="font-size:20px;font-weight:700;margin-bottom:6px">비밀번호 재설정</div>
+        <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">가입하신 이메일 주소를 입력하시면<br>재설정 링크를 보내드려요.</div>
+      </div>
+
+      <div class="error-msg" id="forgot-error"></div>
+      <div class="success-msg" id="forgot-success"></div>
+
+      <div class="field-row">
+        <div class="field-label">이메일</div>
+        <input class="field-input" type="email" id="forgot-email" placeholder="가입하신 이메일 주소">
+      </div>
+
+      <button class="auth-btn" id="forgot-btn" onclick="handleForgotPassword()">재설정 링크 보내기</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const APP_URL = 'career_coaching_prototype_ver2.html' // 메인 앱 URL — 파일명 바뀌면 여기만 수정
+const { createClient } = supabase
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+console.log('✅ Supabase client 생성됨:', sb)
+
+// 이미 로그인된 경우 바로 이동
+sb.auth.getSession().then(({ data: { session } }) => {
+  console.log('현재 세션:', session)
+  if (session) window.location.href = APP_URL
+})
+
+function switchTab(tab) {
+  const tabRow = document.getElementById('tab-row')
+  const isForgot = tab === 'forgot'
+
+  // 비밀번호 찾기일 때 탭 숨김
+  tabRow.style.display = isForgot ? 'none' : 'flex'
+
+  document.getElementById('panel-login').classList.toggle('active', tab === 'login')
+  document.getElementById('panel-signup').classList.toggle('active', tab === 'signup')
+  document.getElementById('panel-forgot').classList.toggle('active', isForgot)
+
+  if (!isForgot) {
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', tab === 'login' ? i === 0 : i === 1)
+    })
+  }
+}
+
+async function handleForgotPassword() {
+  hideMsg('forgot-error')
+  hideMsg('forgot-success')
+  const email = document.getElementById('forgot-email').value.trim()
+  const btn = document.getElementById('forgot-btn')
+
+  if (!email) return showError('forgot-error', '이메일을 입력해주세요.')
+
+  btn.disabled = true
+  btn.textContent = '전송 중...'
+
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset_password.html'
+    })
+
+    if (error) {
+      showError('forgot-error', '등록되지 않은 이메일입니다.')
+    } else {
+      const el = document.getElementById('forgot-success')
+      el.textContent = '✓ 재설정 링크를 이메일로 보냈어요. 메일함을 확인해주세요.'
+      el.style.display = 'block'
+    }
+  } catch (e) {
+    showError('forgot-error', '등록되지 않은 이메일입니다.')
+  }
+
+  btn.disabled = false
+  btn.textContent = '재설정 링크 보내기'
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id)
+  el.textContent = msg
+  el.style.display = 'block'
+}
+function hideMsg(id) {
+  document.getElementById(id).style.display = 'none'
+}
+
+async function handleLogin() {
+  hideMsg('login-error')
+  const email = document.getElementById('login-email').value.trim()
+  const password = document.getElementById('login-password').value
+  const btn = document.getElementById('login-btn')
+
+  if (!email || !password) {
+    return showError('login-error', '이메일과 비밀번호를 입력해주세요.')
+  }
+
+  if (window.location.protocol === 'file:') {
+    return showError('login-error', '⚠️ file://로 열면 작동하지 않아요. python3 -m http.server 3000 으로 열어주세요.')
+  }
+
+  btn.disabled = true
+  btn.textContent = '로그인 중...'
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password })
+    console.log('signIn result:', { data, error })
+
+    if (error) {
+      showError('login-error', '이메일 또는 비밀번호가 올바르지 않아요. 다시 확인해주세요.')
+      btn.disabled = false
+      btn.textContent = '로그인'
+    } else {
+      window.location.href = APP_URL
+    }
+  } catch (e) {
+    console.error('login exception:', e)
+    showError('login-error', `연결 오류: ${e.message}`)
+    btn.disabled = false
+    btn.textContent = '로그인'
+  }
+}
+
+// ── 동의 체크박스 상태 ──
+const consent = { privacy: false, marketing: false }
+
+function toggleConsent(key) {
+  consent[key] = !consent[key]
+  document.getElementById('check-' + key).classList.toggle('checked', consent[key])
+  document.getElementById('row-' + key).setAttribute('aria-checked', String(consent[key]))
+  // 전체 동의 체크는 둘 다 체크됐을 때만
+  const allChecked = consent.privacy && consent.marketing
+  document.getElementById('check-all').classList.toggle('checked', allChecked)
+  document.getElementById('row-all').setAttribute('aria-checked', String(allChecked))
+}
+
+function toggleAll() {
+  const allChecked = consent.privacy && consent.marketing
+  const next = !allChecked
+  consent.privacy = next
+  consent.marketing = next
+  document.getElementById('check-privacy').classList.toggle('checked', next)
+  document.getElementById('check-marketing').classList.toggle('checked', next)
+  document.getElementById('check-all').classList.toggle('checked', next)
+  document.getElementById('row-privacy').setAttribute('aria-checked', String(next))
+  document.getElementById('row-marketing').setAttribute('aria-checked', String(next))
+  document.getElementById('row-all').setAttribute('aria-checked', String(next))
+}
+
+async function handleSignup() {
+  hideMsg('signup-error')
+  hideMsg('signup-success')
+  const name = document.getElementById('signup-name').value.trim()
+  const email = document.getElementById('signup-email').value.trim()
+  const password = document.getElementById('signup-password').value
+  const btn = document.getElementById('signup-btn')
+
+  if (!name || !email || !password) {
+    return showError('signup-error', '모든 항목을 입력해주세요.')
+  }
+  if (password.length < 8) {
+    return showError('signup-error', '비밀번호는 8자 이상이어야 합니다.')
+  }
+  // 필수 동의 체크
+  if (!consent.privacy) {
+    document.getElementById('consent-wrap').style.border = '1.5px solid var(--red)'
+    return showError('signup-error', '개인정보 수집 및 이용 동의(필수)에 체크해주세요.')
+  }
+  document.getElementById('consent-wrap').style.border = '1.5px solid var(--border)'
+
+  // file:// 프로토콜 체크
+  if (window.location.protocol === 'file:') {
+    return showError('signup-error', '⚠️ 파일을 직접 열면 작동하지 않아요. 아래 안내대로 서버로 열어주세요.\n터미널에서: python3 -m http.server 3000')
+  }
+
+  btn.disabled = true
+  btn.textContent = '가입 중...'
+
+  try {
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin + '/login.html',
+        data: {
+          name,
+          consent_privacy: true,              // 필수 동의 (체크하지 않으면 이 지점 못 옴)
+          consent_privacy_at: new Date().toISOString(),
+          consent_marketing: consent.marketing,
+          consent_marketing_at: consent.marketing ? new Date().toISOString() : null,
+        }
+      }
+    })
+
+    console.log('signUp result:', { data, error })
+
+    btn.disabled = false
+    btn.textContent = '시작하기 →'
+
+    if (error) {
+      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+        showError('signup-error', '이미 사용 중인 이메일이에요. 로그인을 시도해보세요.')
+      } else {
+        showError('signup-error', `오류: ${error.message}`)
+      }
+    } else {
+      const el = document.getElementById('signup-success')
+      el.textContent = '✓ 가입 완료! 받은 편지함(스팸함도 확인)의 인증 이메일을 클릭해주세요.'
+      el.style.display = 'block'
+    }
+  } catch (e) {
+    console.error('signup exception:', e)
+    btn.disabled = false
+    btn.textContent = '시작하기 →'
+    showError('signup-error', `연결 오류: ${e.message}. 파일을 file://로 열지 말고 서버로 열어주세요.`)
+  }
+}
+
+async function handleGoogleLogin() {
+  await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + '/career_coaching_prototype_ver2.html' }
+  })
+}
+
+// Enter 키로 제출
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return
+  const isLogin = document.getElementById('panel-login').classList.contains('active')
+  if (isLogin) handleLogin()
+  else handleSignup()
+})
+</script>
+</body>
+</html>
