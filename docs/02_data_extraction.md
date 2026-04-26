@@ -5,7 +5,7 @@
 
 ---
 
-## 📄 이력서 데이터 추출
+##  이력서 데이터 추출
 
 ### Level 1: 기본 식별 정보 (필수)
 
@@ -166,7 +166,7 @@ score = min(10, (keyword_count * 2) + (evidence_quality_bonus))
 
 ---
 
-## 🎯 갤럽 CliftonStrengths 추출
+##  갤럽 CliftonStrengths 추출
 
 ### 추출 목표
 ```json
@@ -218,7 +218,7 @@ const themePattern = /([EIRT])\s+(\S+)\s+([A-Z]+)®/g;
 
 ---
 
-## 🧩 MBTI 추출
+##  MBTI 추출
 
 ### 추출 목표
 ```json
@@ -272,7 +272,7 @@ function extractMBTI(text) {
 
 ---
 
-## 🔗 강점-경력 교차 검증
+##  강점-경력 교차 검증
 
 ### 매핑 테이블
 
@@ -351,7 +351,7 @@ function validateStrengthsWithResume(gallupTop5, resume) {
 
 ---
 
-## 🚨 경력 공백 탐지
+##  경력 공백 탐지
 
 ### 로직
 ```javascript
@@ -391,7 +391,7 @@ function detectCareerGaps(careers) {
 
 ---
 
-## 📊 최종 추출 데이터 스키마
+##  최종 추출 데이터 스키마
 
 ```typescript
 interface ExtractedData {
