@@ -491,7 +491,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
   <!-- SCREEN 1: 업로드 -->
   <div class="ob-screen active" id="screen-upload">
     <div class="ob-section-head">
-      <h2>내 정보를<br>업로드해주세요</h2>
+      <h2>내 정보를 업로드해주세요</h2>
       <p>이력서, 강점·흥미·이키가이 등 진단 결과를 AI가 함께 분석합니다. 없으면 건너뛰어도 됩니다.</p>
     </div>
 
@@ -509,7 +509,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
     <input type="file" id="file-input" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.docx" onchange="handleFileUpload(event)">
 
     <div class="ob-card">
-      <div class="card-title">업로드 가능한 자료</div>
+      <div class="card-title">업로드 가능한 자료(선택사항)</div>
       <ul class="card-list">
         <li>이력서</li>
         <li>강점 진단 결과 (갤럽, 버크만 등)</li>
@@ -525,7 +525,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
         oninput="handleManualInput()">
     </div>
 
-    <div class="info-box">
+    <div class="info-box"style="background-color: #E6E6FA;">
       <div class="info-box-text">
         <strong>진단 결과나 이력서가 없다면?</strong><br>
         없어도 AI 코치와 대화할 수 있어요.
@@ -571,11 +571,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
     </div>
   </div>
 
-  <!-- SCREEN 4: 준비 완료 -->
+  <!-- SCREEN 4: 확인 완료 -->
   <div class="ob-screen" id="screen-ready">
     <div class="ready-wrap">
-      <div class="ready-icon">🎉</div>
-      <div class="ready-title">준비 완료!</div>
+      <div class="ready-icon">✅</div>
+      <div class="ready-title">정보 확인 완료!</div>
+      <div class="ready-subtitle">이제 AI 코치와 대화 할 준비가 됐어요.</div>
 
       <div class="ready-check-list" id="ready-checklist">
         <!-- JavaScript로 동적 생성 -->
@@ -584,8 +585,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-
       <div class="ready-divider"></div>
 
       <div class="ready-message">
-        <strong>AI 코치는 답을 주지 않습니다.</strong><br>
-        막연한 고민을 또렷한 언어로 정리하고,<br>
+        <strong>AI 코치는 당신을 먼저 판단하고 정의하지 않습니다.</strong><br>
+        당신의 막연한 고민을 또렷한 언어로 정리하고<br>
         방향을 찾을 수 있도록 돕습니다.
       </div>
     </div>
