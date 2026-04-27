@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>내 정보 업로드 - 커리어 코칭</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════
+   DESIGN TOKENS (기존 프로토타입 그대로)
+══════════════════════════════════════ */
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface2: #F0F0EC;
+  --border: #E4E4DF;
+  --text-primary: #1A1A18;
+  --text-secondary: #6B6B65;
+  --text-muted: #A8A8A0;
+  --accent: #2D5BFF;
+  --accent-light: #EEF2FF;
+  --accent-dim: rgba(45,91,255,0.12);
+  --green: #16A34A;
+  --green-light: #DCFCE7;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+  --font: 'Pretendard',-apple-system,sans-serif;
+}
+
+/* ── RESET ── */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text-primary);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:0}
+::-webkit-scrollbar{width:0}
+
+/* ══════════════════════════════════════
+   PHONE CONTAINER
+══════════════════════════════════════ */
+.phone {
+  width: 390px;
+  height: 820px;
+  background: var(--bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ══════════════════════════════════════
+   ONBOARDING NAV BAR (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.ob-nav-bar{
+  display:flex;
+  align-items:center;
+  padding:8px 16px 10px;
+  gap:8px;
+  flex-shrink:0;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+
+.ob-back{
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  color:var(--text-secondary);
+  font-size:14px;
+  flex-shrink:0;
+  background:var(--surface);
+}
+
+.ob-back:active{background:var(--surface2)}
+
+.ob-title-txt{
+  font-size:15px;
+  font-weight:600;
+  color:var(--text-primary);
+  flex:1;
+}
+
+.ob-step-txt{
+  font-size:12px;
+  color:var(--text-muted);
+  white-space:nowrap;
+}
+
+.ob-prog-track{
+  height:3px;
+  background:var(--surface2);
+  margin:0 16px 0;
+  flex-shrink:0;
+}
+
+.ob-prog-fill{
+  height:100%;
+  border-radius:2px;
+  background:var(--accent);
+  transition:width .4s ease;
+}
+
+/* ══════════════════════════════════════
+   SCREEN (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.ob-screen{
+  display:none;
+  flex:1;
+  flex-direction:column;
+  overflow-y:auto;
+  padding:16px 16px 24px;
+}
+
+.ob-screen.active{display:flex}
+
+.ob-section-head{margin-bottom:18px}
+
+.ob-section-head h2{
+  font-size:20px;
+  font-weight:600;
+  color:var(--text-primary);
+  margin-bottom:4px;
+  line-height:1.4;
+}
+
+.ob-section-head p{
+  font-size:13px;
+  color:var(--text-secondary);
+  line-height:1.6;
+}
+
+/* ══════════════════════════════════════
+   UPLOAD ZONE (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.upload-zone{
+  border:1.5px dashed var(--border);
+  border-radius:var(--radius);
+  padding:24px 16px;
+  text-align:center;
+  cursor:pointer;
+  transition:all .15s;
+  margin-bottom:12px;
+  background:var(--surface);
+}
+
+.upload-zone:active{
+  border-color:var(--accent);
+  background:var(--accent-dim);
+}
+
+.upload-icon-wrap{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:var(--surface2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 10px;
+}
+
+.upload-icon-wrap svg{
+  width:20px;
+  height:20px;
+  color:var(--accent);
+}
+
+.upload-zone p{
+  font-size:14px;
+  color:var(--text-secondary);
+  margin-bottom:2px;
+}
+
+.upload-zone span{
+  font-size:12px;
+  color:var(--text-muted);
+}
+
+.file-input{display:none}
+
+/* ══════════════════════════════════════
+   CARD (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.ob-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  margin-bottom:12px;
+  box-shadow:var(--shadow);
+}
+
+.card-title{
+  font-size:13px;
+  font-weight:600;
+  color:var(--text-primary);
+  margin-bottom:10px;
+}
+
+.card-list{
+  list-style:none;
+  padding:0;
+}
+
+.card-list li{
+  font-size:13px;
+  color:var(--text-secondary);
+  line-height:1.8;
+  padding-left:14px;
+  position:relative;
+}
+
+.card-list li::before{
+  content:'•';
+  color:var(--accent);
+  font-weight:700;
+  position:absolute;
+  left:0;
+}
+
+/* ══════════════════════════════════════
+   FIELD INPUT (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.field-label{
+  font-size:12px;
+  color:var(--text-secondary);
+  margin-bottom:5px;
+}
+
+.field-input{
+  width:100%;
+  font-size:14px;
+  padding:10px 12px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--text-primary);
+  outline:none;
+  font-family:var(--font);
+}
+
+.field-input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px rgba(45,91,255,.1);
+}
+
+.field-input::placeholder{
+  color:var(--text-muted);
+}
+
+/* ══════════════════════════════════════
+   INFO BOX
+══════════════════════════════════════ */
+.info-box{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:12px 14px;
+  margin-bottom:12px;
+  text-align:center;
+}
+
+.info-box-text{
+  font-size:13px;
+  color:var(--text-secondary);
+  line-height:1.5;
+}
+
+.info-box-text strong{
+  color:var(--text-primary);
+  font-weight:600;
+}
+
+/* ══════════════════════════════════════
+   BUTTONS (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.ob-btn-wrap{
+  padding:0 16px 16px;
+  flex-shrink:0;
+  margin-top:auto;
+}
+
+.ob-btn{
+  width:100%;
+  padding:14px;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  border-radius:var(--radius);
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .15s;
+  font-family:var(--font);
+}
+
+.ob-btn:active{opacity:.85}
+
+.ob-btn.success{background:var(--green)}
+
+.ob-btn:disabled{
+  background:var(--surface2);
+  color:var(--text-muted);
+  cursor:not-allowed;
+}
+
+.btn-secondary{
+  background:var(--surface2);
+  color:var(--text-primary);
+  border:1px solid var(--border);
+}
+
+.btn-secondary:active{
+  background:var(--border);
+}
+
+/* ══════════════════════════════════════
+   LOADING (기존 프로토타입 스타일)
+══════════════════════════════════════ */
+.ob-analyzing{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:460px;
+  text-align:center;
+  padding:24px;
+}
+
+.ob-spinner{
+  width:36px;
+  height:36px;
+  border:3px solid var(--surface2);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+  margin:0 auto 12px;
+}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.analyzing-text{
+  font-size:15px;
+  font-weight:500;
+  color:var(--text-secondary);
+  margin-top:8px;
+}
+
+/* ══════════════════════════════════════
+   RESULT (갤럽 강점 리스트)
+══════════════════════════════════════ */
+.strength-list{
+  list-style:none;
+  padding:0;
+}
+
+.strength-item{
+  display:flex;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+}
+
+.strength-item:last-child{
+  border-bottom:none;
+}
+
+.strength-rank{
+  font-weight:700;
+  color:var(--text-secondary);
+  margin-right:12px;
+  min-width:24px;
+  font-size:13px;
+}
+
+.strength-name{
+  font-weight:500;
+  color:var(--text-primary);
+  font-size:13px;
+  margin-right:6px;
+}
+
+.strength-en{
+  font-size:11px;
+  color:var(--text-muted);
+  flex:1;
+}
+
+.strength-cat{
+  font-size:10px;
+  font-weight:600;
+  color:var(--accent);
+  background:var(--accent-light);
+  padding:2px 6px;
+  border-radius:4px;
+}
+
+.legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid var(--border);
+}
+
+.legend-item{
+  font-size:10px;
+  color:var(--text-muted);
+}
+
+/* ══════════════════════════════════════
+   READY SCREEN
+══════════════════════════════════════ */
+.ready-wrap{
+  text-align:center;
+  padding:40px 20px;
+}
+
+.ready-icon{
+  font-size:48px;
+  margin-bottom:16px;
+}
+
+.ready-title{
+  font-size:20px;
+  font-weight:600;
+  margin-bottom:20px;
+}
+
+.ready-check-list{
+  text-align:left;
+  margin:20px auto;
+  max-width:260px;
+}
+
+.ready-check-item{
+  display:flex;
+  align-items:center;
+  margin:10px 0;
+  font-size:13px;
+  color:var(--text-primary);
+}
+
+.ready-check-item::before{
+  content:'✓';
+  color:var(--green);
+  font-weight:700;
+  margin-right:8px;
+}
+
+.ready-divider{
+  height:1px;
+  background:var(--border);
+  margin:20px 0;
+}
+
+.ready-message{
+  font-size:13px;
+  color:var(--text-secondary);
+  line-height:1.7;
+  padding:14px;
+  background:var(--surface);
+  border-radius:var(--radius-sm);
+  margin:16px 0;
+}
+
+.ready-message strong{
+  color:var(--text-primary);
+  font-weight:600;
+}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <!-- NAV BAR -->
+  <div class="ob-nav-bar">
+    <div class="ob-back" onclick="goBack()">‹</div>
+    <div class="ob-title-txt">내 정보 업로드</div>
+    <div class="ob-step-txt">2 / 4</div>
+  </div>
+  <div class="ob-prog-track">
+    <div class="ob-prog-fill" style="width:50%"></div>
+  </div>
+
+  <!-- SCREEN 1: 업로드 -->
+  <div class="ob-screen active" id="screen-upload">
+    <div class="ob-section-head">
+      <h2>내 정보를<br>업로드해주세요</h2>
+      <p>이력서, 강점·흥미·이키가이 등 진단 결과를 AI가 함께 분석합니다. 없으면 건너뛰어도 됩니다.</p>
+    </div>
+
+    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </div>
+      <p>탭해서 파일 업로드</p>
+      <span>이력서 · 진단 결과 · PDF · JPG · DOCX</span>
+    </div>
+    <input type="file" id="file-input" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.docx" onchange="handleFileUpload(event)">
+
+    <div class="ob-card">
+      <div class="card-title">업로드 가능한 자료</div>
+      <ul class="card-list">
+        <li>이력서</li>
+        <li>강점 진단 결과 (갤럽, 버크만 등)</li>
+        <li>성격·흥미 진단 (MBTI, 홀랜드 등)</li>
+        <li>이키가이, 가치관 워크시트 등</li>
+      </ul>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div class="field-label">또는 내용을 직접 입력</div>
+      <input type="text" class="field-input" id="manual-input" 
+        placeholder="예) MBTI: INTJ / 강점: 공감, 친화, 발상, ..."
+        oninput="handleManualInput()">
+    </div>
+
+    <div class="info-box">
+      <div class="info-box-text">
+        <strong>진단 결과나 이력서가 없다면?</strong><br>
+        없어도 AI 코치와 대화할 수 있어요.
+      </div>
+    </div>
+
+    <div class="ob-btn-wrap" style="margin-top:auto">
+      <button class="ob-btn btn-secondary" onclick="skipUpload()" style="margin-bottom:8px">건너뛰기</button>
+      <button class="ob-btn" id="next-btn" onclick="proceedNext()" disabled>다음</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: 파싱 중 -->
+  <div class="ob-screen" id="screen-parsing">
+    <div class="ob-analyzing">
+      <div class="ob-spinner"></div>
+      <div class="analyzing-text">파일 분석 중...</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: 결과 확인 (갤럽 강점) -->
+  <div class="ob-screen" id="screen-result">
+    <div class="ob-section-head">
+      <h2>확인 완료</h2>
+      <p>AI 코치가 대화 중 이 정보들을 자연스럽게 연결해드려요.</p>
+    </div>
+
+    <div class="ob-card">
+      <div class="card-title">추출된 정보</div>
+      <ul class="strength-list" id="strength-list">
+        <!-- JavaScript로 동적 생성 -->
+      </ul>
+      <div class="legend">
+        <div class="legend-item">T: 전략적 사고</div>
+        <div class="legend-item">E: 실행력</div>
+        <div class="legend-item">R: 관계 구축</div>
+        <div class="legend-item">I: 영향력</div>
+      </div>
+    </div>
+
+    <div class="ob-btn-wrap" style="margin-top:auto">
+      <button class="ob-btn" onclick="goToReady()">다음</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: 준비 완료 -->
+  <div class="ob-screen" id="screen-ready">
+    <div class="ready-wrap">
+      <div class="ready-icon">🎉</div>
+      <div class="ready-title">준비 완료!</div>
+
+      <div class="ready-check-list" id="ready-checklist">
+        <!-- JavaScript로 동적 생성 -->
+      </div>
+
+      <div class="ready-divider"></div>
+
+      <div class="ready-message">
+        <strong>AI 코치는 답을 주지 않습니다.</strong><br>
+        막연한 고민을 또렷한 언어로 정리하고,<br>
+        방향을 찾을 수 있도록 돕습니다.
+      </div>
+    </div>
+
+    <div class="ob-btn-wrap">
+      <button class="ob-btn success" onclick="startPhase2()">AI 코치 만나기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+let state = {
+  file: null,
+  manualInput: null,
+  parsedData: null,
+  hasData: false
+};
+
+// ══════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════
+function showScreen(screenId) {
+  document.querySelectorAll('.ob-screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+}
+
+function goBack() {
+  alert('이전 화면으로 (Phase 1)');
+}
+
+// ══════════════════════════════════════
+// UPLOAD HANDLERS
+// ══════════════════════════════════════
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // 파일 크기 체크 (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    alert('파일이 너무 큽니다 (최대 5MB)');
+    return;
+  }
+  
+  state.file = file;
+  state.hasData = true;
+  
+  // 파싱 화면으로 전환
+  showScreen('screen-parsing');
+  
+  // 파싱 시뮬레이션
+  setTimeout(() => {
+    parseFile();
+  }, 2000);
+}
+
+function handleManualInput() {
+  const input = document.getElementById('manual-input');
+  const nextBtn = document.getElementById('next-btn');
+  
+  if (input.value.trim().length > 0) {
+    nextBtn.disabled = false;
+    state.manualInput = input.value;
+    state.hasData = true;
+  } else {
+    nextBtn.disabled = !state.file;
+    state.manualInput = null;
+  }
+}
+
+function proceedNext() {
+  if (state.file) {
+    showScreen('screen-parsing');
+    setTimeout(() => parseFile(), 2000);
+  } else if (state.manualInput) {
+    // 직접 입력한 경우
+    state.parsedData = {
+      type: 'manual',
+      content: state.manualInput
+    };
+    goToReady();
+  }
+}
+
+function skipUpload() {
+  state.hasData = false;
+  goToReady();
+}
+
+// ══════════════════════════════════════
+// PARSING
+// ══════════════════════════════════════
+function parseFile() {
+  // Mock 데이터 (실제로는 Claude API 호출)
+  state.parsedData = {
+    type: 'gallup',
+    top10: [
+      { rank: 1, name_ko: '전략', name_en: 'STRATEGIC', category: 'T' },
+      { rank: 2, name_ko: '분석', name_en: 'ANALYTICAL', category: 'T' },
+      { rank: 3, name_ko: '배움', name_en: 'LEARNER', category: 'T' },
+      { rank: 4, name_ko: '성취', name_en: 'ACHIEVER', category: 'E' },
+      { rank: 5, name_ko: '책임', name_en: 'RESPONSIBILITY', category: 'E' },
+      { rank: 6, name_ko: '집중', name_en: 'FOCUS', category: 'E' },
+      { rank: 7, name_ko: '심사숙고', name_en: 'DELIBERATIVE', category: 'E' },
+      { rank: 8, name_ko: '공감', name_en: 'EMPATHY', category: 'R' },
+      { rank: 9, name_ko: '개발', name_en: 'DEVELOPER', category: 'R' },
+      { rank: 10, name_ko: '화합', name_en: 'HARMONY', category: 'R' }
+    ]
+  };
+  
+  renderResult();
+  showScreen('screen-result');
+}
+
+function renderResult() {
+  const list = document.getElementById('strength-list');
+  list.innerHTML = '';
+  
+  if (state.parsedData.type === 'gallup') {
+    state.parsedData.top10.forEach(s => {
+      const li = document.createElement('li');
+      li.className = 'strength-item';
+      li.innerHTML = `
+        <div class="strength-rank">${s.rank}.</div>
+        <div class="strength-name">${s.name_ko}</div>
+        <div class="strength-en">(${s.name_en})</div>
+        <div class="strength-cat">${s.category}</div>
+      `;
+      list.appendChild(li);
+    });
+  }
+}
+
+// ══════════════════════════════════════
+// READY SCREEN
+// ══════════════════════════════════════
+function goToReady() {
+  renderReadyScreen();
+  showScreen('screen-ready');
+}
+
+function renderReadyScreen() {
+  const checklist = document.getElementById('ready-checklist');
+  checklist.innerHTML = '';
+  
+  if (state.hasData) {
+    if (state.parsedData?.type === 'gallup') {
+      const item = document.createElement('div');
+      item.className = 'ready-check-item';
+      item.textContent = '갤럽 Top 10 강점';
+      checklist.appendChild(item);
+    } else if (state.parsedData?.type === 'manual') {
+      const item = document.createElement('div');
+      item.className = 'ready-check-item';
+      item.textContent = '직접 입력한 정보';
+      checklist.appendChild(item);
+    }
+  } else {
+    const item = document.createElement('div');
+    item.className = 'ready-check-item';
+    item.textContent = '기본 정보 준비 완료';
+    checklist.appendChild(item);
+  }
+}
+
+function startPhase2() {
+  // Phase 2로 데이터 전달
+  const s2Data = {
+    user_info: {
+      name: '사용자',
+      current_role: '직장인',
+      concern_draft: '방향을 모르겠어요'
+    },
+    data: state.parsedData,
+    meta: {
+      s2_completed_at: new Date().toISOString(),
+      has_data: state.hasData
+    }
+  };
+  
+  console.log('Phase 2 데이터 전달:', s2Data);
+  alert('Phase 2 AI 코칭 세션 시작!\n\n전달 데이터:\n' + JSON.stringify(s2Data, null, 2));
+}
+
+// Drag & Drop
+const uploadZone = document.querySelector('.upload-zone');
+if (uploadZone) {
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.style.borderColor = 'var(--accent)';
+    uploadZone.style.background = 'var(--accent-dim)';
+  });
+  
+  uploadZone.addEventListener('dragleave', () => {
+    uploadZone.style.borderColor = '';
+    uploadZone.style.background = '';
+  });
+  
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.style.borderColor = '';
+    uploadZone.style.background = '';
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      document.getElementById('file-input').files = e.dataTransfer.files;
+      handleFileUpload({ target: document.getElementById('file-input') });
+    }
+  });
+}
+</script>
+
+</body>
+</html>
