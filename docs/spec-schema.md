@@ -68,6 +68,18 @@ user_metadata jsonb       아래 필드 포함
 ```
 
 세션에서 꺼내는 법:
+
+**Next.js 환경 (권장 — 서버 검증으로 더 안전):**
+```typescript
+const { data } = await supabase.auth.getUser()
+const user = data.user
+user.id                             // uuid
+user.email                          // "hong@example.com"
+user.user_metadata.name             // "홍길동"
+user.user_metadata.consent_privacy  // true
+```
+
+**HTML 환경:**
 ```javascript
 const { data: { session } } = await sb.auth.getSession()
 const user = session.user
@@ -296,5 +308,6 @@ auth.users (Supabase Auth)
 | 날짜 | 변경 내용 | 담당 |
 |---|---|---|
 | 2026-04-26 | 최초 작성 | Mingsunny |
+| 2026-04-30 | auth.users 세션 코드 Next.js 방식 추가 (getUser 권장) | Mingsunny |
 
 > 스키마 변경 시 이 표에 추가해주세요.

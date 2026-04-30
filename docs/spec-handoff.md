@@ -9,43 +9,72 @@
 ## 전체 유저 플로우
 
 ```
-[로그인/회원가입]  →  [온보딩]  →  [진단 결과 확인]  →  [메인 앱]
-  Auth               Phase A        Phase B              Phase C
-  (Mingsunny)        (Jaeyoung)     (Inchae)             (Eunsang)
-  login.html         ↓              ↓                    ↓
-                     profiles       weekly_plans          action_items
-                     diagnoses                            retrospectives
+[로그인/회원가입]        →  [온보딩]  →  [진단 결과 확인]  →  [메인 앱]
+  Auth                     Phase A        Phase B              Phase C
+  (Mingsunny)              (Jaeyoung)     (Inchae)             (Eunsang)
+  web/src/app/login/       ↓              ↓                    ↓
+  page.tsx                 profiles       weekly_plans          action_items
+                           diagnoses                            retrospectives
 ```
+
+> 📌 Auth 파트는 Next.js (`web/` 디렉터리) 기반으로 구현 완료.
+> 다른 파트(온보딩, 진단, 메인 앱)는 별도 협의 후 연결 방식 결정 필요.
 
 ---
 
 ## 연결 지점 1: Auth → Onboarding
 
-**출발:** `login.html`
-**도착:** `career_coaching_prototype_ver2.html` (Phase A: Onboarding)
+**출발:** `web/src/app/login/page.tsx` (`/login`)
+**도착:** 온보딩 화면 (Phase A: Onboarding — 경로 미정, Jaeyoung과 협의 필요)
 
 ### 전환 조건
 ```
 로그인 완료 OR 구글 소셜 로그인 완료
 → Supabase session 생성됨
-→ career_coaching_prototype_ver2.html 로 이동
+→ router.push('/') 또는 온보딩 경로로 이동
+   (현재 임시: web/src/app/page.tsx 홈 화면 표시)
 ```
 
 ### Auth가 보장하는 것
-- `session.user.id` — 이후 모든 Supabase insert에 `user_id`로 사용
-- `session.user.email`
-- `session.user.user_metadata.name` — 온보딩 닉네임 필드 기본값으로 활용 가능
+- `user.id` — 이후 모든 Supabase insert에 `user_id`로 사용
+- `user.email`
+- `user.user_metadata.name` — 온보딩 닉네임 필드 기본값으로 활용 가능
 
 ### 세션 읽는 법 (모든 파트 공통)
+
+**Next.js (React 컴포넌트) 환경:**
+```typescript
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+
+const supabase = createClient()
+const router = useRouter()
+
+useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    if (!data.user) {
+      router.push('/login')  // 로그인 안 된 상태
+      return
+    }
+    const userId = data.user.id
+    const userName = data.user.user_metadata?.name ?? ''
+  })
+}, [])
+```
+
+> ℹ️ `getSession()` 대신 `getUser()` 사용 권장.
+> `getSession()`은 로컬 스토리지에서 읽어 위조 가능성이 있음.
+> `getUser()`는 Supabase 서버에서 직접 검증하므로 더 안전.
+
+**HTML 파일 환경 (다른 파트가 HTML 사용 시):**
 ```javascript
 const { data: { session } } = await sb.auth.getSession()
 if (!session) {
-  // 로그인 안 된 상태 → login.html로 보내기
-  window.location.href = 'login.html'
+  window.location.href = '/login'
   return
 }
 const userId = session.user.id
-const userName = session.user.user_metadata?.name ?? ''
 ```
 
 ### Auth가 보장하지 않는 것
@@ -203,13 +232,25 @@ await sb.from('retrospectives').insert({
 
 ## 로그아웃
 
-모든 파트에서 로그아웃 후 `login.html`로 이동:
+모든 파트에서 로그아웃 후 `/login`으로 이동.
+
+**Next.js 환경:**
+```typescript
+async function handleLogout() {
+  localStorage.removeItem('latest_diagnosis_id')
+  localStorage.removeItem('active_plan_id')
+  await supabase.auth.signOut()
+  router.push('/login')
+}
+```
+
+**HTML 환경 (다른 파트가 HTML 사용 시):**
 ```javascript
 async function handleLogout() {
   localStorage.removeItem('latest_diagnosis_id')
   localStorage.removeItem('active_plan_id')
   await sb.auth.signOut()
-  window.location.href = 'login.html'
+  window.location.href = '/login'
 }
 ```
 
@@ -218,9 +259,18 @@ async function handleLogout() {
 ## 자주 쓰는 코드 스니펫
 
 ### 현재 유저 ID 가져오기
+
+**Next.js 환경 (권장):**
+```typescript
+const { data } = await supabase.auth.getUser()
+if (!data.user) { router.push('/login'); return }
+const userId = data.user.id
+```
+
+**HTML 환경:**
 ```javascript
 const { data: { session } } = await sb.auth.getSession()
-if (!session) { window.location.href = 'login.html'; return }
+if (!session) { window.location.href = '/login'; return }
 const userId = session.user.id
 ```
 
@@ -259,5 +309,6 @@ const today = new Date().toISOString().split('T')[0]  // 'YYYY-MM-DD'
 | 날짜 | 변경 내용 | 담당 |
 |---|---|---|
 | 2026-04-26 | 최초 작성 | Mingsunny |
+| 2026-04-30 | Auth 파트 Next.js 전환 반영 — 파일 경로, 세션 코드, 로그아웃 코드 업데이트 | Mingsunny |
 
 > 연결 지점이 바뀌거나 데이터 전달 방식이 달라지면 이 표에 추가해주세요.
