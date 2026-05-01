@@ -1,0 +1,85 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+:root {
+  --accent: #2D5BFF;
+  --accent-light: #EEF2FF;
+  --success: #16A34A;
+  --warning: #CA8A04;
+  --error: #DC2626;
+  --surface: #FFFFFF;
+  --bg: #F7F7F5;
+  --text-primary: #1A1A18;
+  --text-secondary: #6B6B65;
+  --text-muted: #A8A8A0;
+  --border: #E5E5E0;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background-color: var(--bg);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mobile-container {
+  width: 390px;
+  min-height: 100vh;
+  margin: 0 auto;
+  background: var(--bg);
+  position: relative;
+  overflow-x: hidden;
+}
+
+@media (max-width: 390px) {
+  .mobile-container { width: 100%; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseRing {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.2); opacity: 0.08; }
+}
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes progressFill {
+  from { width: 0%; }
+  to { width: var(--target-width); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.fade-up { animation: fadeUp 0.25s ease forwards; }
+.wave-bar { animation: wave 0.8s ease-in-out infinite; }
+.pulse-ring { animation: pulseRing 2s ease-in-out infinite; }
+.slide-up { animation: slideUp 0.3s ease forwards; }
+
+input[type="text"], input[type="number"], textarea, select {
+  outline: none;
+  font-family: inherit;
+}
+
+input[type="text"]:focus, input[type="number"]:focus,
+textarea:focus, select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(45, 91, 255, 0.12);
+}
