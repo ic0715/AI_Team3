@@ -1,67 +1,59 @@
-# CareerPT — AI 커리어 코치
+# CareerPT
 
-5-10년차 직장인의 성장 갭을 찾아주는 AI 코칭 서비스.
+> 나를 잘 모르거나, 알아도 막연한 직장인이  
+> AI 코치와의 대화를 통해 자기 자신을 발견하고,  
+> 그 발견이 커리어 행동으로 이어지게 하는 서비스
 
 ---
 
-## 처음 왔다면 여기서 시작
+## 서비스 흐름
 
-| 파일 | 내용 |
+```
+회원가입 → 기본설문(3개) → 파일업로드
+    ├── 파일 있음 → 첫 코칭 세션
+    └── 파일 없음 → 보완 인터뷰(5개) → 첫 코칭 세션
+```
+
+---
+
+## 문서 읽는 순서
+
+| 문서 | 내용 |
 |---|---|
-| `docs/spec-schema.md` | **DB 테이블 정의** — 컬럼명·타입 공식 계약서 |
-| `docs/spec-handoff.md` | **파트 간 연결 지점** — 내 파트가 끝나면 뭘 저장하고 어디로 넘기는지 |
-| `docs/spec-auth.md` | 로그인/회원가입 동작 방식 |
+| `docs/04_decisions/ADR_001.md` | 왜 이런 결정을 내렸는가 (여기서 시작) |
+| `docs/01_why/MANIFESTO.md` | 왜 이 서비스인가 |
+| `docs/01_why/TARGET_USER.md` | 누구를 위한 서비스인가 |
+| `docs/02_what/SERVICE_CONCEPT.md` | 무엇을 만드는가 |
+| `docs/02_what/USER_FLOW.md` | 사용자가 어떻게 경험하는가 |
+| `docs/02_what/COACHING_DESIGN.md` | 코칭이 어떻게 동작하는가 |
+| `docs/03_how/spec-ai-coaching.md` | 기술 구현 명세 |
+| `ai/system_prompt_v2.md` | AI 코치 행동 원칙 |
+| `ai/keyword_mapping.md` | 갤럽 34 키워드 매핑 |
 
 ---
 
-## 파트별 담당
+## 팀
 
-| 파트 | 담당 | 관련 파일 |
-|---|---|---|
-| Auth (로그인/회원가입) | Mingsunny | `pages/login.html`, `pages/reset_password.html` |
-| Onboarding (기본설문·인터뷰·진단) |  | `pages/career_coaching_prototype_ver2.html` — Phase A |
-| Result Confirm (진단결과 확인·1주일 계획) |  | `pages/career_coaching_prototype_ver2.html` — Phase B |
-| Main App (홈·액션·회고) |  | `pages/career_coaching_prototype_ver2.html` — Phase C |
+- **Auth** — Mingsunny
+- **Onboarding** — Jaeyoung
+- **Result Confirm** — Inchae
+- **Main App** — Eunsang
 
----
+## 기술 스택
+
+- Next.js (App Router)
+- Supabase (Auth + DB)
+- Claude API (AI 코칭, claude-sonnet-4-20250514)
+- Pretendard 폰트
 
 ## 로컬 실행
 
-**1. config.js 설정 (최초 1회)**
-
 ```bash
-cp config.example.js config.js
+cd web
+cp .env.example .env.local
+# .env.local에 Supabase URL, anon key, Anthropic API key 입력
+npm install
+npm run dev
 ```
 
-`config.js`를 열어서 팀 채널에서 공유받은 Supabase key를 채워주세요.
-`config.js`는 `.gitignore` 처리되어 있어서 GitHub에 올라가지 않아요.
-
-**2. 서버 실행**
-
-```bash
-python3 -m http.server 3000
-```
-
-브라우저에서 `http://localhost:3000/pages/login.html` 접속.
-
-> ⚠️ HTML 파일을 더블클릭(file://)으로 열면 Supabase 인증이 작동하지 않아요. 반드시 서버로 열어주세요.
-
----
-
-## Supabase
-
-| 항목 | 값 |
-|---|---|
-| Project URL | `https://fqgpfdzjiopajpeumlac.supabase.co` |
-| 인증 방식 | 이메일+비밀번호, Google OAuth |
-| anon key | `docs/spec-auth.md` 참고 |
-
----
-
-## 스키마 변경할 때
-
-1. `docs/spec-schema.md` 먼저 수정
-2. PR 올리기
-3. 팀원 확인 후 Supabase에 반영
-
-코드보다 스펙 문서가 먼저입니다.
+브라우저에서 `http://localhost:3000` 접속
