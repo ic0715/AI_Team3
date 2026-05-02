@@ -155,17 +155,25 @@ CREATE TABLE onboarding_interviews (
 
 ```sql
 CREATE TABLE sessions (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
-  started_at  timestamptz DEFAULT now(),
-  ended_at    timestamptz,
+  -- 세션 유형
+  session_type  text NOT NULL DEFAULT 'discovery',
+  -- 'discovery' : 세션 1 — 키워드 발견 (파일 없는 유저)
+  -- 'connect'   : 세션 2 — 키워드-커리어 연결
+  -- 'action'    : 세션 3+ — 행동 점검
 
-  -- 세션 결과 (사용자가 직접 선택)
-  keywords      text[],  -- 사용자가 선택한 갤럽 키워드
-  first_action  text,    -- 사용자가 정한 첫 번째 행동
+  started_at    timestamptz DEFAULT now(),
+  ended_at      timestamptz,
 
-  created_at  timestamptz DEFAULT now()
+  -- 세션 결과 (사용자가 직접 선택/입력)
+  keywords      text[],       -- 세션 1: 사용자가 선택한 갤럽 키워드
+  first_action  text,         -- 세션 1: 첫 번째 행동
+  action_item   text,         -- 세션 2~: 이번 주 액션아이템
+  action_when   text,         -- 언제, 어떤 상황에서 할지
+
+  created_at    timestamptz DEFAULT now()
 );
 ```
 

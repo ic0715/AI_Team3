@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CareerPT — 재설계 프로토타입</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════ */
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface2: #F0F0EC;
+  --border: #E4E4DF;
+  --text-primary: #1A1A18;
+  --text-secondary: #6B6B65;
+  --text-muted: #A8A8A0;
+  --accent: #2D5BFF;
+  --accent-light: #EEF2FF;
+  --accent-dim: rgba(45,91,255,0.10);
+  --green: #16A34A;
+  --green-light: #DCFCE7;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --font: 'Pretendard', -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: var(--font);
+  background: #E8E8E4;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 16px 48px;
+}
+::-webkit-scrollbar { width: 0; }
+
+/* ══════════════════════════════════════
+   PHONE
+══════════════════════════════════════ */
+.phone {
+  width: 390px;
+  height: 820px;
+  background: var(--bg);
+  border-radius: 40px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.20), 0 0 0 1px rgba(0,0,0,0.06);
+  position: relative;
+}
+
+/* ══════════════════════════════════════
+   SCREENS
+══════════════════════════════════════ */
+.screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* ══════════════════════════════════════
+   SHARED NAV
+══════════════════════════════════════ */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px 12px;
+  gap: 10px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.nav-back {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-secondary); font-size: 16px;
+  flex-shrink: 0; transition: background .15s;
+}
+.nav-back:active { background: var(--surface2); }
+.nav-title { font-size: 15px; font-weight: 600; color: var(--text-primary); flex: 1; }
+.nav-step { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+.prog-track { height: 3px; background: var(--surface2); flex-shrink: 0; }
+.prog-fill { height: 100%; background: var(--accent); border-radius: 0 2px 2px 0; transition: width .4s ease; }
+
+.scroll-body { flex: 1; overflow-y: auto; padding: 20px 20px 32px; }
+
+/* ══════════════════════════════════════
+   SCREEN 1: 기본설문
+══════════════════════════════════════ */
+.section-head { margin-bottom: 24px; }
+.section-head h2 { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; line-height: 1.35; letter-spacing: -.5px; }
+.section-head p { font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
+
+.field-group { margin-bottom: 16px; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: .02em; }
+.field-input {
+  width: 100%; font-size: 15px; padding: 12px 14px;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text-primary);
+  outline: none; font-family: var(--font); transition: border-color .15s, box-shadow .15s;
+}
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.field-input::placeholder { color: var(--text-muted); }
+textarea.field-input { resize: none; line-height: 1.6; min-height: 80px; }
+
+.hint-box {
+  background: var(--accent-light); border-radius: var(--radius-sm);
+  padding: 12px 14px; margin-top: 8px;
+}
+.hint-box p { font-size: 12px; color: var(--accent); line-height: 1.6; }
+
+.btn-wrap { padding: 0 20px 28px; flex-shrink: 0; }
+.btn-primary {
+  width: 100%; padding: 15px; background: var(--accent); color: #fff;
+  border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700;
+  cursor: pointer; font-family: var(--font); transition: all .15s;
+  box-shadow: 0 4px 16px rgba(45,91,255,.28);
+}
+.btn-primary:active { opacity: .88; transform: scale(.99); }
+.btn-primary:disabled { background: var(--border); color: var(--text-muted); box-shadow: none; cursor: not-allowed; transform: none; }
+.btn-secondary {
+  width: 100%; padding: 13px; background: var(--surface2); color: var(--text-secondary);
+  border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: var(--font); transition: all .15s; margin-bottom: 10px;
+}
+.btn-secondary:active { background: var(--border); }
+
+/* ══════════════════════════════════════
+   SCREEN 2: 파일 업로드
+══════════════════════════════════════ */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: all .15s; background: var(--surface); margin-bottom: 14px;
+}
+.upload-zone:active, .upload-zone.drag { border-color: var(--accent); background: var(--accent-dim); }
+.upload-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent-light); display: flex; align-items: center;
+  justify-content: center; margin: 0 auto 12px;
+}
+.upload-icon svg { width: 22px; height: 22px; color: var(--accent); }
+.upload-zone h3 { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.upload-zone p { font-size: 12px; color: var(--text-muted); }
+
+.upload-types { margin-bottom: 16px; }
+.upload-type-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.upload-type-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.upload-type-item span { font-size: 13px; color: var(--text-secondary); }
+
+.divider-row {
+  display: flex; align-items: center; gap: 12px; margin: 20px 0;
+}
+.divider-line { flex: 1; height: 1px; background: var(--border); }
+.divider-text { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+.alt-btn {
+  width: 100%; padding: 15px 16px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); cursor: pointer; font-family: var(--font);
+  display: flex; align-items: center; gap: 12px; transition: all .15s;
+  text-align: left;
+}
+.alt-btn:active { background: var(--surface2); border-color: var(--accent); }
+.alt-btn-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  background: var(--surface2); display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0; font-size: 16px;
+}
+.alt-btn-text h4 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.alt-btn-text p { font-size: 12px; color: var(--text-muted); }
+.alt-btn-arrow { margin-left: auto; color: var(--text-muted); font-size: 18px; }
+
+/* ══════════════════════════════════════
+   SCREEN 3: 보완 인터뷰 (채팅)
+══════════════════════════════════════ */
+.chat-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.ai-avatar-sm {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
+}
+.ai-avatar-sm svg { width: 18px; height: 18px; }
+.chat-header-info h4 { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.chat-header-info p { font-size: 11px; color: var(--green); font-weight: 500; }
+.chat-progress-pill {
+  margin-left: auto; background: var(--surface2); border-radius: 20px;
+  padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.chat-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+.msg-row { display: flex; gap: 8px; align-items: flex-end; }
+.msg-row.user { flex-direction: row-reverse; }
+
+.msg-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--accent); display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #fff;
+}
+.msg-avatar.user-av { background: var(--surface2); color: var(--text-secondary); }
+
+.msg-bubble {
+  max-width: 78%; padding: 11px 14px; border-radius: 16px;
+  font-size: 14px; line-height: 1.6; color: var(--text-primary);
+  background: var(--surface); border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.msg-bubble.user {
+  background: var(--accent); color: #fff; border: none;
+  border-bottom-right-radius: 4px; border-bottom-left-radius: 16px;
+}
+.msg-bubble.typing {
+  display: flex; align-items: center; gap: 4px; padding: 14px;
+}
+.typing-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-muted); animation: blink 1.2s ease infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
+
+.q-number-badge {
+  align-self: center; background: var(--surface2); border-radius: 20px;
+  padding: 4px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.chat-input-area {
+  padding: 12px 16px 24px; background: var(--surface);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+.chat-input {
+  flex: 1; font-size: 14px; padding: 11px 14px;
+  border-radius: 22px; border: 1.5px solid var(--border);
+  background: var(--surface2); color: var(--text-primary);
+  outline: none; font-family: var(--font); resize: none;
+  line-height: 1.5; max-height: 100px; transition: border-color .15s;
+}
+.chat-input:focus { border-color: var(--accent); background: var(--surface); }
+.chat-input::placeholder { color: var(--text-muted); }
+.send-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .15s;
+  box-shadow: 0 2px 8px rgba(45,91,255,.3);
+}
+.send-btn:active { transform: scale(.92); }
+.send-btn svg { width: 18px; height: 18px; color: #fff; }
+.send-btn:disabled { background: var(--border); box-shadow: none; cursor: not-allowed; }
+
+.skip-link {
+  text-align: center; margin-top: 8px;
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+}
+.skip-link span { text-decoration: underline; }
+
+/* ══════════════════════════════════════
+   SCREEN 4: 코칭 세션
+══════════════════════════════════════ */
+.coaching-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--accent-light); border-radius: 20px;
+  padding: 3px 10px; font-size: 11px; font-weight: 700;
+  color: var(--accent); margin-left: auto;
+}
+.coaching-badge::before { content: '✦'; font-size: 9px; }
+
+.context-chip {
+  background: var(--surface2); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin: 12px 20px 0;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.context-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.context-chip p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.context-chip strong { color: var(--text-primary); font-weight: 600; }
+
+/* 코칭 세션은 chat UI 동일하게 사용 */
+
+/* ══════════════════════════════════════
+   SCREEN 5: 세션 마무리
+══════════════════════════════════════ */
+.summary-section { margin-bottom: 20px; }
+.summary-label {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px;
+}
+.summary-quote {
+  background: var(--surface); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 14px 16px; font-size: 14px; color: var(--text-primary);
+  line-height: 1.65; font-style: italic;
+}
+
+.keyword-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.keyword-chip {
+  padding: 8px 14px; border-radius: 20px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; transition: all .15s; user-select: none;
+}
+.keyword-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.keyword-chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.keyword-chip.domain-E { --dk: #7C3AED; --dkl: #EDE9FE; }
+.keyword-chip.domain-I { --dk: #EA580C; --dkl: #FFF0E6; }
+.keyword-chip.domain-R { --dk: #2563EB; --dkl: #EFF6FF; }
+.keyword-chip.domain-T { --dk: #16A34A; --dkl: #DCFCE7; }
+.keyword-chip.selected.domain-E { background: var(--dk, var(--accent)); border-color: var(--dk, var(--accent)); }
+.keyword-chip.selected.domain-I { background: var(--dk, var(--accent)); border-color: var(--dk, var(--accent)); }
+.keyword-chip.selected.domain-R { background: var(--dk, var(--accent)); border-color: var(--dk, var(--accent)); }
+.keyword-chip.selected.domain-T { background: var(--dk, var(--accent)); border-color: var(--dk, var(--accent)); }
+
+.keyword-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+
+.action-input-wrap {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 4px;
+}
+.action-input-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.action-input {
+  width: 100%; font-size: 14px; border: none; outline: none;
+  font-family: var(--font); color: var(--text-primary); background: transparent;
+  line-height: 1.6;
+}
+.action-input::placeholder { color: var(--text-muted); }
+
+.action-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.suggestion-chip {
+  padding: 6px 12px; border-radius: 20px;
+  background: var(--surface2); border: 1px solid var(--border);
+  font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  transition: all .15s;
+}
+.suggestion-chip:active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+
+.btn-success {
+  width: 100%; padding: 15px; background: var(--green); color: #fff;
+  border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700;
+  cursor: pointer; font-family: var(--font); transition: all .15s;
+  box-shadow: 0 4px 16px rgba(22,163,74,.28);
+}
+.btn-success:active { opacity: .88; }
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp .25s ease forwards; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+<!-- ════════════════════════════════
+     SCREEN 1: 기본설문
+════════════════════════════════ -->
+<div class="screen active" id="s1">
+  <div class="nav-bar">
+    <div class="nav-title">CareerPT</div>
+    <div class="nav-step">1 / 4</div>
+  </div>
+  <div class="prog-track"><div class="prog-fill" style="width:25%"></div></div>
+  <div class="scroll-body">
+    <div class="section-head">
+      <h2>시작하기 전에<br>간단히 알려주세요</h2>
+      <p>딱 세 가지만요. 나머지는 대화하면서 자연스럽게 알게 될 거예요.</p>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">어떻게 불러드릴까요?</div>
+      <input class="field-input" id="s1-name" type="text" placeholder="이름 또는 닉네임" oninput="checkS1()">
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">지금 어떤 일을 하고 계세요?</div>
+      <input class="field-input" id="s1-role" type="text" placeholder="예) PM, 마케터, 개발자, 디자이너..." oninput="checkS1()">
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">요즘 일이나 커리어에서 가장 마음에 걸리는 게 뭔가요?</div>
+      <textarea class="field-input" id="s1-concern" placeholder="편하게 적어주세요. 짧아도 괜찮아요." oninput="checkS1()"></textarea>
+      <div class="hint-box">
+        <p>💡 이 답변이 AI 코치와의 첫 대화 시작점이 돼요.</p>
+      </div>
+    </div>
+  </div>
+  <div class="btn-wrap">
+    <button class="btn-primary" id="s1-next" onclick="goTo('s2')" disabled>다음</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 2: 파일 업로드
+════════════════════════════════ -->
+<div class="screen" id="s2">
+  <div class="nav-bar">
+    <div class="nav-back" onclick="goTo('s1')">‹</div>
+    <div class="nav-title">강점 자료</div>
+    <div class="nav-step">2 / 4</div>
+  </div>
+  <div class="prog-track"><div class="prog-fill" style="width:50%"></div></div>
+  <div class="scroll-body">
+    <div class="section-head">
+      <h2>강점 관련 자료가<br>있으신가요?</h2>
+      <p>있으면 코칭이 더 깊어져요. 없어도 괜찮아요.</p>
+    </div>
+
+    <div class="upload-zone" id="upload-zone" onclick="simulateUpload()">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <h3>탭해서 파일 업로드</h3>
+      <p>PDF · JPG · DOCX · 최대 5MB</p>
+    </div>
+
+    <div class="upload-types">
+      <div class="upload-type-item"><div class="upload-type-dot"></div><span>갤럽 CliftonStrengths 결과지</span></div>
+      <div class="upload-type-item"><div class="upload-type-dot"></div><span>이력서</span></div>
+      <div class="upload-type-item"><div class="upload-type-dot"></div><span>MBTI, 버크만 등 기타 진단 결과</span></div>
+    </div>
+
+    <div class="divider-row">
+      <div class="divider-line"></div>
+      <div class="divider-text">파일이 없다면</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="alt-btn" onclick="goTo('s3')">
+      <div class="alt-btn-icon">💬</div>
+      <div class="alt-btn-text">
+        <h4>간단한 인터뷰로 대체할게요</h4>
+        <p>5개 질문으로 강점을 파악해요</p>
+      </div>
+      <div class="alt-btn-arrow">›</div>
+    </div>
+  </div>
+  <div class="btn-wrap">
+    <button class="btn-primary" id="s2-next" onclick="goTo('s4-coaching')" disabled>업로드하고 코칭 시작</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 3: 보완 인터뷰
+════════════════════════════════ -->
+<div class="screen" id="s3">
+  <div class="chat-header">
+    <div class="ai-avatar-sm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+    </div>
+    <div class="chat-header-info">
+      <h4>AI 코치</h4>
+      <p>● 강점 파악 인터뷰</p>
+    </div>
+    <div class="chat-progress-pill" id="interview-progress">1 / 5</div>
+  </div>
+
+  <div class="chat-body" id="interview-chat">
+    <div class="q-number-badge">질문 1 / 5</div>
+    <div class="msg-row fade-up">
+      <div class="msg-avatar">AI</div>
+      <div class="msg-bubble">일하면서 시간 가는 줄 모르고 몰입했던 순간이 있었나요? 어떤 상황이었는지 떠오르는 대로 말씀해주세요. 😊</div>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="interview-input" placeholder="편하게 적어주세요..." rows="1" oninput="autoResize(this)" onkeydown="handleInterviewKey(event)"></textarea>
+      <button class="send-btn" id="interview-send" onclick="sendInterviewMsg()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <div class="skip-link" onclick="goTo('s4-coaching')"><span>건너뛰고 코칭 시작하기</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 4: 코칭 세션
+════════════════════════════════ -->
+<div class="screen" id="s4-coaching">
+  <div class="chat-header">
+    <div class="ai-avatar-sm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+    </div>
+    <div class="chat-header-info">
+      <h4>AI 코치</h4>
+      <p>● 코칭 세션</p>
+    </div>
+    <div class="coaching-badge">MCC 기준</div>
+  </div>
+
+  <div class="context-chip">
+    <div class="context-chip-dot"></div>
+    <p id="coaching-context"><strong>안녕하세요</strong> — 오늘 코칭을 시작할게요.</p>
+  </div>
+
+  <div class="chat-body" id="coaching-chat">
+    <div class="msg-row fade-up">
+      <div class="msg-avatar">AI</div>
+      <div class="msg-bubble" id="coaching-opening">말씀해주신 고민에 대해 좀 더 이야기해주실 수 있어요? 그 상황이 지금 어떻게 느껴지세요?</div>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="coaching-input" placeholder="편하게 이야기해주세요..." rows="1" oninput="autoResize(this)" onkeydown="handleCoachingKey(event)"></textarea>
+      <button class="send-btn" onclick="sendCoachingMsg()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <div class="skip-link" onclick="goTo('s5')"><span>오늘 세션 마무리하기</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 5: 세션 마무리
+════════════════════════════════ -->
+<div class="screen" id="s5">
+  <div class="nav-bar">
+    <div class="nav-back" onclick="goTo('s4-coaching')">‹</div>
+    <div class="nav-title">오늘의 발견</div>
+    <div class="nav-step">4 / 4</div>
+  </div>
+  <div class="prog-track"><div class="prog-fill" style="width:100%"></div></div>
+  <div class="scroll-body">
+    <div class="section-head">
+      <h2>오늘 대화에서<br>무엇을 발견하셨나요?</h2>
+      <p>AI 코치가 느낀 것을 공유해드릴게요. 맞지 않으면 수정해주세요.</p>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-label">AI 코치가 느낀 패턴</div>
+      <div class="summary-quote" id="ai-reflection">
+        말씀을 들으면서, 새로운 걸 연결하고 가능성을 먼저 보는 경향이 느껴졌어요. 아직 아무도 안 한 걸 먼저 해보고 싶은 마음도요.
+      </div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-label">나를 설명하는 키워드 <span style="color:var(--text-muted);font-weight:400">(1~3개 선택)</span></div>
+      <div class="keyword-grid">
+        <div class="keyword-chip domain-T" onclick="toggleKeyword(this)">발상</div>
+        <div class="keyword-chip domain-T" onclick="toggleKeyword(this)">미래지향</div>
+        <div class="keyword-chip domain-T" onclick="toggleKeyword(this)">배움</div>
+        <div class="keyword-chip domain-T" onclick="toggleKeyword(this)">전략</div>
+        <div class="keyword-chip domain-E" onclick="toggleKeyword(this)">성취</div>
+        <div class="keyword-chip domain-R" onclick="toggleKeyword(this)">공감</div>
+        <div class="keyword-chip domain-I" onclick="toggleKeyword(this)">존재감</div>
+        <div class="keyword-chip domain-I" onclick="toggleKeyword(this)">최상화</div>
+      </div>
+      <div class="keyword-hint">갤럽 CliftonStrengths 기반 키워드예요</div>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-label">오늘 커리어에서 해볼 첫 번째 행동</div>
+      <div class="action-input-wrap">
+        <div class="action-input-label">작아도 괜찮아요. 오늘 당장 할 수 있는 것 하나만요.</div>
+        <input class="action-input" id="action-input" type="text" placeholder="예) 팀 회의에서 아이디어 하나 꺼내보기">
+      </div>
+      <div class="action-suggestions">
+        <div class="suggestion-chip" onclick="setAction(this)">아이디어 메모 3개 쓰기</div>
+        <div class="suggestion-chip" onclick="setAction(this)">커리어 고민 5분 글쓰기</div>
+        <div class="suggestion-chip" onclick="setAction(this)">동료에게 피드백 요청</div>
+      </div>
+    </div>
+  </div>
+  <div class="btn-wrap">
+    <button class="btn-success" onclick="finish()">저장하고 시작하기 →</button>
+  </div>
+</div>
+
+</div><!-- /phone -->
+
+<script>
+/* ════════════════════
+   STATE
+════════════════════ */
+const state = {
+  name: '',
+  role: '',
+  concern: '',
+  hasFile: false,
+  interviewStep: 0,
+  coachingTurn: 0,
+  selectedKeywords: []
+}
+
+const INTERVIEW_QS = [
+  '일하면서 시간 가는 줄 모르고 몰입했던 순간이 있었나요? 어떤 상황이었는지 떠오르는 대로 말씀해주세요. 😊',
+  '주변 사람들이 나에게 자주 부탁하거나 "이건 네가 잘하잖아"라고 말하는 게 있나요?',
+  '일할 때 절대 타협하기 싫은 것, 혹은 이것만큼은 지키고 싶다는 게 있나요?',
+  '팀이나 사람들 사이에서 내가 자연스럽게 맡게 되는 역할이 있나요?\n예를 들어, 분위기를 만드는 사람, 정리해주는 사람, 앞장서는 사람, 깊이 들어주는 사람 같은 것이요.',
+  '마지막 질문이에요 🙂 지금까지 커리어에서 가장 뿌듯했던 순간을 하나 꼽는다면요? 어떤 상황이었고, 왜 그게 기억에 남으세요?'
+]
+
+const COACHING_RESPONSES = [
+  (msg) => `"${msg.slice(0,20)}..."${msg.length>20?'에 대해':''} 조금 더 이야기해주실 수 있어요? 그 상황에서 어떤 감정이 들었나요?`,
+  '그 순간에 가장 중요하게 느껴진 게 뭔가요?',
+  '지금 말씀하신 것들을 들으면서... 어떤 공통점이 느껴지시나요?',
+  '만약 그게 해결된다면, 커리어에서 무엇이 달라질 것 같으세요?',
+  '오늘 이야기하면서 새롭게 발견한 게 있다면 뭔가요?'
+]
+
+/* ════════════════════
+   NAVIGATION
+════════════════════ */
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById(screenId).classList.add('active')
+
+  if (screenId === 's4-coaching') {
+    setupCoaching()
+  }
+}
+
+/* ════════════════════
+   SCREEN 1 — 기본설문
+════════════════════ */
+function checkS1() {
+  const name = document.getElementById('s1-name').value.trim()
+  const role = document.getElementById('s1-role').value.trim()
+  const concern = document.getElementById('s1-concern').value.trim()
+  const btn = document.getElementById('s1-next')
+  btn.disabled = !(name && role && concern)
+  state.name = name
+  state.role = role
+  state.concern = concern
+}
+
+/* ════════════════════
+   SCREEN 2 — 파일 업로드
+════════════════════ */
+function simulateUpload() {
+  const zone = document.getElementById('upload-zone')
+  zone.innerHTML = `
+    <div class="upload-icon" style="background:var(--green-light)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" width="22" height="22">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h3 style="color:var(--green)">업로드 완료</h3>
+    <p>갤럽_결과지.pdf</p>
+  `
+  state.hasFile = true
+  document.getElementById('s2-next').disabled = false
+}
+
+/* ════════════════════
+   SCREEN 3 — 보완 인터뷰
+════════════════════ */
+function handleInterviewKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendInterviewMsg(); }
+}
+
+function sendInterviewMsg() {
+  const input = document.getElementById('interview-input')
+  const text = input.value.trim()
+  if (!text) return
+
+  const chat = document.getElementById('interview-chat')
+
+  // 사용자 메시지
+  addMsg(chat, text, 'user')
+  input.value = ''
+  input.style.height = ''
+
+  state.interviewStep++
+  const progress = document.getElementById('interview-progress')
+
+  if (state.interviewStep >= INTERVIEW_QS.length) {
+    // 인터뷰 완료
+    setTimeout(() => {
+      addTyping(chat, () => {
+        addMsg(chat, '감사해요 😊 이제 코칭을 시작해볼게요. 잠깐만요!', 'ai')
+        setTimeout(() => goTo('s4-coaching'), 1400)
+      })
+    }, 600)
+    return
+  }
+
+  progress.textContent = `${state.interviewStep + 1} / 5`
+
+  // 다음 질문
+  setTimeout(() => {
+    addTyping(chat, () => {
+      const badge = document.createElement('div')
+      badge.className = 'q-number-badge fade-up'
+      badge.textContent = `질문 ${state.interviewStep + 1} / 5`
+      chat.appendChild(badge)
+      addMsg(chat, INTERVIEW_QS[state.interviewStep], 'ai')
+      chat.scrollTop = chat.scrollHeight
+    })
+  }, 700)
+}
+
+/* ════════════════════
+   SCREEN 4 — 코칭 세션
+════════════════════ */
+function setupCoaching() {
+  const name = state.name || '사용자'
+  const concern = state.concern || '커리어 고민'
+  document.getElementById('coaching-context').innerHTML =
+    `<strong>${name}님</strong> — "${concern.slice(0,22)}${concern.length>22?'...':''}"에 대해 이야기해봐요.`
+
+  // 오프닝 — 기본설문 Q3 이어받기 (반복 아님)
+  if (state.concern) {
+    const short = state.concern.slice(0, 30) + (state.concern.length > 30 ? '...' : '')
+    document.getElementById('coaching-opening').textContent =
+      `"${short}"라고 하셨는데, 그 상황이 지금 어떻게 느껴지세요?`
+  }
+}
+
+function handleCoachingKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCoachingMsg(); }
+}
+
+function sendCoachingMsg() {
+  const input = document.getElementById('coaching-input')
+  const text = input.value.trim()
+  if (!text) return
+
+  const chat = document.getElementById('coaching-chat')
+  addMsg(chat, text, 'user')
+  input.value = ''
+  input.style.height = ''
+
+  const turn = state.coachingTurn
+  state.coachingTurn++
+
+  setTimeout(() => {
+    addTyping(chat, () => {
+      let response
+      if (turn < COACHING_RESPONSES.length) {
+        const r = COACHING_RESPONSES[turn]
+        response = typeof r === 'function' ? r(text) : r
+      } else {
+        response = '오늘 이야기 나눠주셔서 감사해요. 마무리해볼까요?'
+        setTimeout(() => {
+          // AI 반영 업데이트
+          document.getElementById('ai-reflection').textContent =
+            `말씀을 들으면서, "${text.slice(0,20)}..."에서 느껴지는 에너지가 인상적이었어요. 그 안에 중요한 무언가가 있는 것 같아요.`
+        }, 500)
+        setTimeout(() => goTo('s5'), 2000)
+      }
+      addMsg(chat, response, 'ai')
+    })
+  }, 800)
+}
+
+/* ════════════════════
+   SCREEN 5 — 세션 마무리
+════════════════════ */
+function toggleKeyword(el) {
+  const selected = document.querySelectorAll('.keyword-chip.selected')
+  if (!el.classList.contains('selected') && selected.length >= 3) {
+    el.style.animation = 'none'
+    el.style.transform = 'scale(0.95)'
+    setTimeout(() => { el.style.transform = ''; el.style.animation = ''; }, 200)
+    return
+  }
+  el.classList.toggle('selected')
+  state.selectedKeywords = [...document.querySelectorAll('.keyword-chip.selected')].map(c => c.textContent)
+  document.getElementById('s5-btn') && updateFinishBtn()
+}
+
+function setAction(el) {
+  document.getElementById('action-input').value = el.textContent
+}
+
+function finish() {
+  alert(`저장 완료! 🎉\n\n선택한 키워드: ${state.selectedKeywords.join(', ') || '(없음)'}\n첫 번째 행동: ${document.getElementById('action-input').value || '(없음)'}`)
+}
+
+/* ════════════════════
+   CHAT HELPERS
+════════════════════ */
+function addMsg(container, text, role) {
+  const row = document.createElement('div')
+  row.className = `msg-row fade-up${role === 'user' ? ' user' : ''}`
+
+  const avatar = document.createElement('div')
+  avatar.className = role === 'user' ? 'msg-avatar user-av' : 'msg-avatar'
+  avatar.textContent = role === 'user' ? (state.name?state.name[0]:'나') : 'AI'
+
+  const bubble = document.createElement('div')
+  bubble.className = role === 'user' ? 'msg-bubble user' : 'msg-bubble'
+  bubble.textContent = text
+
+  row.appendChild(avatar)
+  row.appendChild(bubble)
+  container.appendChild(row)
+  container.scrollTop = container.scrollHeight
+}
+
+function addTyping(container, callback) {
+  const row = document.createElement('div')
+  row.className = 'msg-row fade-up'
+  row.innerHTML = `<div class="msg-avatar">AI</div><div class="msg-bubble typing"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`
+  container.appendChild(row)
+  container.scrollTop = container.scrollHeight
+
+  setTimeout(() => {
+    container.removeChild(row)
+    callback()
+    container.scrollTop = container.scrollHeight
+  }, 1200)
+}
+
+function autoResize(el) {
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px'
+}
+</script>
+</body>
+</html>
