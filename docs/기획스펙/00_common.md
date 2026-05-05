@@ -1,22 +1,4 @@
-# CareerPT 기획 스펙 (Product Spec v1.2 — SLC 전체 범위)
-
-**전략 목표** SLC (Simple·Lovable·Complete) — MVP가 아닌 완결된 경험 제공
-
-**화면 범위** 01 Landing ~ 15 Profile + NEW01~NEW06 (운영·예외 화면 포함, 총 21개 화면)
-
-**문서 목적** 팀 내부 기획·개발·디자인 정렬용 기준 문서
-
-**타겟 유저** 커리어 전환을 고민하는 직장인
-
-**AI 엔진** Claude API (MCC 코칭 + 갤럽 강점 기반 시스템 프롬프트)
-
-**데이터** Supabase (Auth + PostgreSQL)
-
-**작성 기준** 프로토타입 01~15 화면 + 운영 화면(NEW01~NEW06)
-
-**버전** v1.2 (00_FLOW.md 정렬판) — v1.1에서 신규 운영·예외 화면 6종 추가, AI 엔진 Claude로 확정
-
----
+# CareerPT 기획 스펙
 
 ## 목차
 
