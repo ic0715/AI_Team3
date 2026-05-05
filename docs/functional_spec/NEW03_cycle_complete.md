@@ -14,8 +14,7 @@
 
 ## 2. 진입 조건
 
-- users.coaching_start_at으로부터 84일(12주) 경과
-- 12주차 일요일 자정 자동 변경
+- `goals.status = 'completed'` (`current_week >= total_weeks` 달성 시 자동 전환)
 - 완료 후 첫 로그인 시 1회 자동 노출
 - 이후에도 15 프로필에서 재진입 가능
 
@@ -36,7 +35,7 @@
 
 ### 3.2 회고 카드
 
-- "12주 동안 발견한 핵심 패턴 3가지" (insight_history 기반 AI 요약)
+- "12주 동안 발견한 핵심 패턴 3가지" (`coaching_insights` 기반 AI 요약)
 
 ### 3.3 CTA
 
@@ -47,15 +46,14 @@
 ## 4. 기능
 
 - 1회 자동 노출 후 15 프로필에서 재진입 가능
-- 사이클 종료 판정은 별도 status 필드 없이 coaching_start_at 시점 기반으로 자동 계산
-- NEW03 진입 시 기존 career_focus.status를 active → completed로 변경
+- 사이클 종료 판정: `goals.status = 'completed'` (11 홈에서 12주 완주 시 자동 UPDATE + `ended_at`, `final_completion_rate` 기록)
 - 완주 보상(있을 경우): 배지 알림 처리
 
 ## 5. 데이터
 
-- 참조: 해당 사이클의 모든 데이터 집계 (weekly_actions, weekday_memos, insight_history, career_focus)
-- 쓰기: career_focus.status = completed (현재 사이클 종료 처리)
-- 다음 사이클 진입 시 새 career_focus 생성 (quarter+1, status=active, start_week=13...)
+- 참조: 해당 사이클의 모든 데이터 집계 (`action_completions`, `daily_memos`, `coaching_insights`, `goals`)
+- `goals.status = 'completed'`, `goals.ended_at`, `goals.final_completion_rate` 기록 (11 홈에서 이미 처리)
+- 다음 사이클 진입 시 새 `goals` INSERT (새 goal_title, status='active', started_at=today)
 
 ## 6. 예외 처리
 
@@ -69,6 +67,15 @@
 
 | 이벤트 | 속성 |
 | --- | --- |
-| cycle_complete_view | coaching_start_at, total_done_days, total_memos |
+| cycle_complete_view | goals.started_at, total_done_days, total_memos |
 | cycle_complete_cta_clicked | cta_kind=new_cycle/redo_strength/history |
 | next_cycle_started | continue_strength=true/false |
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: 진입 조건 `coaching_start_at + 84일` → `goals.status='completed'`, `career_focus`·`weekly_actions`·`weekday_memos`·`insight_history` → `goals`·`action_completions`·`daily_memos`·`coaching_insights`, `career_focus.status=completed` → `goals.status` 이미 처리, 다음 사이클 시 새 `goals` INSERT |
+| v1.0 | 2026-05-04 | 최초 작성 |
