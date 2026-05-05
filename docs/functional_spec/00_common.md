@@ -173,12 +173,12 @@ CareerPT는 MVP(Minimum Viable Product) 대신 **SLC(Simple·Lovable·Complete)*
 | --- | --- | --- |
 | 비로그인 | 세션 없음 | 01 랜딩 |
 | 이메일 미인증 | `email_confirmed_at IS NULL` | NEW01 이메일 인증 |
-| 기본 정보 미완 | `users.basic_info_completed_at IS NULL` | 03 기본 정보 |
-| 강점 미분석 | `strength_results 없음` | 04 강점 진단 방식 |
-| 커리어 미분석 | `career_results.selected_direction 없음` | 07 커리어 인터뷰 인트로 |
-| 액션 미선택 | `action_items 없음` | 10 액션 아이템 |
-| 코칭 진행 중 | `users.coaching_start_at` 있고 12주 미경과 | 11 홈 |
-| 12주 완주 | `coaching_start_at`으로부터 84일 경과 | NEW03 |
+| 기본 정보 미완 | `profiles.profile_completed = false` | 03 기본 정보 |
+| 강점 미분석 | `strength_analyses` (is_latest=true) 없음 | 04 강점 진단 방식 |
+| 커리어 미분석 | `goals` 없음 (career_interview_results는 있으나 goals 미생성) | 07 커리어 인터뷰 인트로 |
+| 액션 미선택 | `action_items` (week_number=1) 없음 | 10 액션 아이템 |
+| 코칭 진행 중 | `goals.status = 'active'` 또는 `'paused'` | 11 홈 |
+| 12주 완주 | `goals.status = 'completed'` | NEW03 |
 
 ### 5.5 에러 화면 진입 (전역)
 
@@ -230,7 +230,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | AI 코칭 개인화를 위해 이름·나이대·직군·현재 고민을 수집한다. |
 | 주요 UI | 이름 텍스트 입력, 나이대 선택, 직군 선택(드롭다운), 현재 고민 자유 텍스트, "다음으로" CTA |
 | 핵심 동작 | 필수 필드 미입력 시 CTA 비활성화 → 모두 입력 시 활성화 → Supabase 저장 → 04 이동 |
-| 기술 키워드 | Supabase users 테이블 upsert, basic_info_completed_at 기록, 입력값 → AI 시스템 프롬프트 컨텍스트 주입 |
+| 기술 키워드 | Supabase `profiles` 테이블 upsert, `profiles.profile_completed = true` 기록, 입력값 → AI 시스템 프롬프트 컨텍스트 주입 |
 
 ### ── DISCOVER (04 ~ 06) ──
 
@@ -250,7 +250,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | AI 코치와 멀티턴 대화를 통해 유저의 핵심 강점 테마를 탐색·언어화한다. |
 | 주요 UI | 채팅 인터페이스, 주관식 텍스트 입력창 + 전송 버튼, 인터뷰 완료 CTA |
 | 핵심 동작 | 유저 메시지 → AI 코칭 질문 반환 → 대화 반복 → 완료 시 AI가 강점 JSON 반환 → 06 이동 |
-| 기술 키워드 | Claude API, 시스템 프롬프트: MCC 코칭+갤럽 강점, 대화 히스토리 누적, 강점 Top 5 JSON 파싱 → strength_results 저장 |
+| 기술 키워드 | Claude API, 시스템 프롬프트: MCC 코칭+갤럽 강점, 대화 히스토리 누적, 강점 Top 5 JSON 파싱 → `strength_analyses` INSERT |
 
 #### 06. 강점 결과 [DISCOVER]
 
@@ -259,7 +259,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 인터뷰 또는 업로드 분석 결과를 바탕으로 유저의 갤럽 34개 테마 중 상위 강점 Top 5를 카드 형태로 제시하고 유저가 결과를 확인·납득하도록 한다. |
 | 주요 UI | 강점 카드 5개 (순위·테마명·도메인·설명), "커리어 방향 찾기" CTA, "강점 분석 다시하기" 버튼 |
 | 핵심 동작 | 결과 확인 → 07 커리어 인트로 이동 / 재분석 → 04 이동 (이전 결과 비활성화) |
-| 기술 키워드 | AI 응답 파싱 후 강점 Top 5 구조화, Supabase strength_results 테이블 저장 (themes JSONB 5개) |
+| 기술 키워드 | AI 응답 파싱 후 강점 Top 5 구조화, Supabase `strength_analyses` 테이블 INSERT (`strengths JSONB` 5개, `method='ai_interview'`), `is_latest` 트리거 자동 관리 |
 
 ### ── DIRECTION (07 ~ 09) ──
 
@@ -270,7 +270,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 강점 결과를 확인한 유저가 커리어 방향 탐색으로 자연스럽게 전환하도록 동기를 부여한다. |
 | 주요 UI | 안내 문구, 강점 요약 배지(Top 5 chip), "인터뷰 시작하기" CTA |
 | 핵심 동작 | 버튼 클릭 → 08 커리어 인터뷰 이동 |
-| 기술 키워드 | strength_results에서 강점 테마 읽기, Static 전환 화면 |
+| 기술 키워드 | `strength_analyses` (is_latest=true) 에서 강점 테마 읽기, Static 전환 화면 |
 
 #### 08. 커리어 인터뷰 (AI 채팅) [DIRECTION]
 
@@ -279,7 +279,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 강점 결과를 컨텍스트로 받은 AI 코치와 대화하며 커리어 고민과 방향을 탐색한다. |
 | 주요 UI | 채팅 인터페이스, 주관식 입력창, "진단 완료하기" CTA, "인터뷰 더하기" 버튼 |
 | 핵심 동작 | 강점 요약을 시스템 프롬프트에 포함하여 AI 호출 → AI 커리어 코칭 대화 → 완료 시 방향 5개 JSON 반환 → 09 이동 |
-| 기술 키워드 | Claude API, 시스템 프롬프트에 기본정보+강점 컨텍스트 주입, 커리어 방향 5개 JSON 파싱 → career_results 저장 |
+| 기술 키워드 | Claude API, 시스템 프롬프트에 기본정보+강점 컨텍스트 주입, 완료 시 `career_interview_results` INSERT (`key_insights`, `ai_summary` 저장) — 대화 원문 미저장 |
 
 #### 09. 커리어 방향 결과 [DIRECTION]
 
@@ -288,7 +288,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | AI가 도출한 커리어 방향(역량목표) 후보 5가지를 제시하고, 유저가 원하는 방향을 선택하게 한다. |
 | 주요 UI | 커리어 방향 카드 5개 (제목 + 설명 + 강점 연관 이유), 선택 체크, "액션 아이템 받기" CTA, "인터뷰 다시하기" 링크 |
 | 핵심 동작 | 방향 선택 → CTA 활성화 → 선택값 저장 → 10 이동 / "인터뷰 다시하기" → 08 재진입 |
-| 기술 키워드 | career_results.directions(JSONB), selected_direction에 유저 선택값 저장, 선택값 → 10 액션 아이템 생성에 전달 |
+| 기술 키워드 | "목표 추천받기" 버튼 → AI가 `career_interview_results.recommended_goal_categories` UPDATE → `goal_title` 후보 3~5개 제시 → 유저 선택 시 `goals` INSERT (`goal_category`, `goal_title`, `status='active'`, `started_at=today`) |
 
 ### ── DO (10 + NEW02 + NEW04) ──
 
@@ -299,7 +299,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 선택한 커리어 방향에 맞는 실행 과제(액션 아이템)를 추천·선택하고 12주 코칭을 시작한다. 첫 액션은 즉시 적용되어 W1이 시작된다. |
 | 주요 UI | 추천 액션 카드 리스트, 직접 입력 추가 UI, 선택 체크(다중 선택), "홈으로 시작하기 🚀" CTA |
 | 핵심 동작 | AI 추천 또는 사전 정의 목록 제공 → 유저 선택 → action_items 저장 + users.coaching_start_at 기록 + W1 weekly_actions 생성 → NEW02 이동 |
-| 기술 키워드 | action_items 테이블 저장, weekly_actions(week_num=1) 자동 생성, 12주 코칭 시작 타임스탬프 기록, 트랜잭션 처리 |
+| 기술 키워드 | AI가 `action_items` INSERT (week_number=1, is_custom=false) 자동 생성, `goals.started_at` 기록, 트랜잭션 처리 |
 
 #### NEW02. 12주 여정 시작 안내 [DO] 🆕
 
@@ -308,7 +308,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 10 액션 선택 완료 직후 1회 노출. 사용자가 선택한 강점·커리어 방향·액션을 종합 요약하고 본격 12주 시작을 알린다. |
 | 주요 UI | 메인 타이틀, 요약 카드(강점 Top 5 + 방향 + 첫 액션), 일정 표시(시작일/종료일), "홈으로 가기 →" CTA |
 | 핵심 동작 | CTA 클릭 → NEW04 푸시 권한 또는 11 홈으로 이동 / 재방문 시 노출되지 않음 |
-| 기술 키워드 | users.coaching_start_at 직후 1회 노출, 1회 노출 플래그 관리 |
+| 기술 키워드 | `goals.started_at` 직후 1회 노출, 1회 노출 플래그 관리 |
 
 #### NEW04. 푸시 알림 권한 요청 [DO] 🆕
 
@@ -328,7 +328,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 유저가 매일 방문하여 12주 코칭 진행 현황·오늘의 액션·주간 타임라인을 확인하고 동기를 유지한다. |
 | 주요 UI | 인사말(이름+요일+현재 주차), 12주 테마 카드(테마명+12주 도트), 오늘의 액션 체크 카드(액션 텍스트 + 토글 + 7일 그리드), 알림 카드(평일=메모 / 주말=회고 유도), 12주 타임라인(W1~W12 흐름) |
 | 핵심 동작 | 오늘의 액션 토글 → weekly_actions.daily_done 업데이트 / 7일 그리드 클릭 → 해당 요일 체크 / 타임라인 "회고하기" → 12 회고 이동 / 12주 완주 시 자동 NEW03로 라우팅 |
-| 기술 키워드 | users + action_items + weekly_actions 조회, 주차 계산(coaching_start_at 기준), 미래 주차 액션은 노출 안 함, 탭바 네비게이션 |
+| 기술 키워드 | `profiles` + `goals` + `action_items` + `action_completions` 조회, 주차 계산(`goals.started_at` 기준), 체크 토글 → `action_completions` INSERT/DELETE, 탭바 네비게이션 |
 
 #### 12. 회고 [MAINTAIN]
 
@@ -337,7 +337,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 평일에는 짧은 일일 메모를 작성하고, 주말에는 한 주 메모를 기반으로 주간 회고를 완성한다. |
 | 주요 UI | **[평일 모드 (월~금)]** 오늘의 메모 textarea + "메모 저장" 버튼, 이번 주 메모 리스트, "회고 코칭 미리하기" 카드<br>**[주말 모드 (토·일)]** 이번 주 액션 요약 카드, 평일 메모 컨텍스트 카드, 한 줄 회고 textarea, "코치와 이야기 나누기 →" CTA |
 | 핵심 동작 | 평일 메모 저장 → weekday_memos 누적 / 주말 "코치와 이야기 나누기" → 13 회고 코칭 / 평일 "회고 코칭 미리 하기" → 13 (다음 주 적용 모드) |
-| 기술 키워드 | weekday_memos(평일 메모) + weekly_actions.reflection(주간 회고) 저장, 요일 기반 자동 분기, 평일 메모는 회고 코칭 컨텍스트로 자동 주입 |
+| 기술 키워드 | `daily_memos` INSERT (평일 메모, `memo_date` + `week_number`), `weekly_retros` INSERT (주간 회고, `completion_count`/`target_count` 프론트 집계), 요일 기반 자동 분기, 평일 메모는 회고 코칭 컨텍스트로 자동 주입 |
 
 #### 13. 회고 코칭 (AI 채팅) [MAINTAIN]
 
@@ -346,7 +346,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 주간 회고 내용을 컨텍스트로 받은 AI 코치와 대화하며 패턴·인사이트를 도출하고 다음 주 방향을 정한다. (※ 새 주제 발굴 X) |
 | 주요 UI | 자체 헤더(공통 탭바 숨김 풀스크린), 진행 바(질문 N/6 + %), AI 코치 메시지(회색 라운드), 사용자 메시지(블루 라운드), 주관식 텍스트 입력창, 단일 진행 버튼 "다음 주 변경 사항 정리하기", 정리 화면("맞아요" / "다시 다듬기") |
 | 핵심 동작 | 주간 회고 + 강점 컨텍스트 → AI 코칭 대화(회고 전용 6개 질문 순차) → "다음 주 변경 사항 정리" → 정리 카드 → "맞아요" 클릭 시 다음 주 월요일부터 새 액션 적용(이번 주 데이터는 보존) → 11 이동 / "다시 다듬기" → 코칭 화면 복귀 |
-| 기술 키워드 | Claude API, 시스템 프롬프트에 주간 메모+강점+커리어방향 주입, coaching_sessions(원문) + insight_history(요약본) 저장, RETRO 모드 |
+| 기술 키워드 | Claude API, 시스템 프롬프트에 `daily_memos`+`weekly_retros`+`coaching_insights`(최근 3주) 주입, 대화 원문 미저장(sessionStorage), 확정 시 `coaching_insights` INSERT + `action_items` INSERT (week+1), RETRO 모드 |
 
 #### 14. 히스토리 [MAINTAIN]
 
@@ -355,7 +355,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 과거 강점·커리어 방향·액션·패턴·인사이트를 아카이브 형태로 한 곳에 모아 조회하며 성장을 확인한다. |
 | 주요 UI | Archive 헤더, 아카이브 카드 리스트(주차+날짜·패턴·액션·강점 연결·인사이트), 사이클/강점 필터, 무한 스크롤 |
 | 핵심 동작 | 카드 탭 → 상세 내용 펼침 / 강점 연관 태그 클릭 → 해당 강점 상세로 이동(추후) |
-| 기술 키워드 | insight_history 조회(회고 코칭 완료 시 자동 저장), 날짜 역순 정렬, 패턴·액션·강점 필드 렌더링 |
+| 기술 키워드 | `coaching_insights` 조회(회고 코칭 확정 시 자동 저장), `goals` (status=completed/abandoned) 이력 조회, `week_number` 역순 정렬, 패턴·액션·강점 필드 렌더링 |
 
 #### 15. 프로필 [MAINTAIN]
 
@@ -364,7 +364,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 유저의 강점 요약·커리어 방향·기본정보를 확인하고, 알림 설정·재인터뷰·로그아웃·회원 탈퇴를 제공한다. |
 | 주요 UI | 내 강점 Top 5 섹션, 커리어 방향 섹션(재인터뷰 링크), 기본정보 섹션(정보 수정), 설정 섹션(알림 시간 / 비밀번호 변경 / 데이터 다운로드 / 약관), Danger Zone(로그아웃 / 회원 탈퇴) |
 | 핵심 동작 | 강점 재분석 → 04 이동 / 커리어 재인터뷰 → 07 이동 / 알림 설정 저장 / 로그아웃 → 02 이동 / 탈퇴 → 데이터 삭제 확인 모달(2단계) → 01 이동 |
-| 기술 키워드 | strength_results·career_results·users 조회, Supabase signOut, 회원 탈퇴: users 데이터 삭제 + Supabase Auth deleteUser, 알림: Web Push 또는 서버 스케줄러 |
+| 기술 키워드 | `strength_analyses`(is_latest=true)·`career_interview_results`·`profiles` 조회, Supabase signOut, 회원 탈퇴: `profiles` 데이터 삭제 + Supabase Auth deleteUser, 알림: Web Push 또는 서버 스케줄러 |
 
 ### ── CYCLE END (NEW03) ──
 
@@ -375,7 +375,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | 12주차를 완주한 사용자에게 노출되는 성취 페이지. 다음 사이클로의 자연스러운 전환을 유도한다. |
 | 주요 UI | 축하 애니메이션, 성취 요약(총 액션 일수 X/84, 메모 개수, 회고 횟수, 자주 활용한 강점 Top 5), 핵심 패턴 3가지 회고 카드, "새로운 12주 시작하기" / "강점부터 다시 분석하기" / "히스토리로 돌아보기" CTA |
 | 핵심 동작 | 12주 완주 후 첫 로그인 시 1회 자동 노출 / 이후 15에서 재진입 가능 / 새 12주 시작 → 07 / 강점부터 → 04 / 히스토리 → 14 |
-| 기술 키워드 | coaching_start_at + 84일 경과 판정, 사이클 데이터 집계(weekly_actions, weekday_memos, insight_history), cycle_summaries 저장(선택) |
+| 기술 키워드 | `goals.status='completed'` 판정, 사이클 데이터 집계(`action_completions`, `daily_memos`, `coaching_insights`), cycle_summaries 저장(선택) |
 
 ### ── ERROR (NEW05, NEW06) ──
 
@@ -459,9 +459,9 @@ AI 코칭은 두 가지 모드로 분리되어 동작하며, UI도 다른 화면
 
 | 화면 | INPUT | OUTPUT | 저장 위치 |
 | --- | --- | --- | --- |
-| 05 강점 인터뷰 | 기본정보 + 대화 히스토리 | 코칭 질문 + 종료 시 강점 테마 Top 5 JSON | strength_results |
-| 08 커리어 인터뷰 | 기본정보 + 강점 요약 + 대화 히스토리 | 코칭 질문 + 종료 시 커리어 방향 5개 JSON | career_results |
-| 13 회고 코칭 | 주간 메모 + 강점 + 커리어방향 | 코칭 대화 + 인사이트 요약 | coaching_sessions(원문) + insight_history(요약) |
+| 05 강점 인터뷰 | 기본정보 + 대화 히스토리(sessionStorage) | 코칭 질문 + 종료 시 강점 테마 Top 5 JSON | `strength_analyses` INSERT (`strengths JSONB`, `method='ai_interview'`, `is_latest` 트리거) |
+| 08 커리어 인터뷰 | 기본정보 + 강점 요약 + 대화 히스토리(sessionStorage) | 코칭 질문 + 종료 시 `key_insights` + `ai_summary` | `career_interview_results` INSERT — 대화 원문 미저장 |
+| 13 회고 코칭 | `daily_memos` + `action_completions` + `weekly_retros` + `coaching_insights`(최근 3주) | 코칭 대화 + 인사이트 요약 | `coaching_insights` INSERT + `action_items` INSERT (week+1) — 대화 원문 미저장 |
 
 ### 7.6 안전장치
 
@@ -480,134 +480,150 @@ Supabase (PostgreSQL 기반) — 인증(Auth)과 데이터베이스 모두 Supab
 ### 8.2 테이블 관계 개요
 
 ```
-users ─┬─ strength_results    ── (강점 인터뷰 결과)
-       ├─ career_results      ── (커리어 방향 결과)
-       ├─ action_items        ── (선택 액션 아이템)
-       ├─ career_focus        ── (12주 테마 / 분기 목표)
-       ├─ weekly_actions      ── (주차별 액션 + 데일리 체크)
-       ├─ weekday_memos       ── (평일 메모)
-       ├─ coaching_sessions   ── (AI 코칭 대화 원문)
-       ├─ insight_history     ── (회고/코칭 정리본, 요약만)
-       └─ push_subscriptions  ── (푸시 토큰, NEW04 연동) 🆕
+profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_latest 트리거)
+          ├─ career_interview_results  ── (커리어 인터뷰 결과, recommended_goal_categories)
+          ├─ goals                     ── (12주 목표 + 사이클 상태 관리)
+          │    └─ action_items         ── (주차별 액션 아이템, week_number)
+          │         └─ action_completions ── (일일 액션 완료 기록)
+          ├─ daily_memos               ── (평일 메모, goal_id NOT NULL)
+          ├─ weekly_retros             ── (주간 회고)
+          ├─ coaching_insights         ── (AI 코칭 정리본, 대화 원문 미저장)
+          └─ push_subscriptions        ── (푸시 토큰, NEW04 연동) 🆕
 ```
+
+> ⚠️ **삭제된 테이블 (v0.2 정책 변경)**:
+> - `coaching_sessions` — 대화 원문 미저장 정책으로 삭제
+> - `career_focus`, `weekly_actions`, `weekday_memos`, `insight_history` — 테이블 통폐합
+> - `users` → `profiles` (테이블명 변경)
 
 ### 8.3 주요 테이블 명세
 
-#### ① users
+> ⚠️ **v1.2 → v1.3 schema 전면 검증 완료** (2026-05-05): 실제 Supabase 스키마(`spec-schema.md` v0.6)와 불일치하는 테이블/컬럼명 전체 수정. 상세 내용은 각 화면 정의서 변경 이력 참조.
+
+#### ① profiles (구 users)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | Supabase Auth UID (PK) |
-| name | TEXT | 유저 이름 |
+| nickname | TEXT | 유저 이름 (03에서 입력) |
 | age_range | TEXT | 나이대 |
-| job_title | TEXT | 직군/직책 |
-| concern | TEXT | 현재 커리어 고민 |
-| basic_info_completed_at | TIMESTAMP | 03 기본 정보 입력 완료 시각 🆕 |
-| coaching_start_at | TIMESTAMP | 12주 코칭 시작 시각 (10 완료 시점) |
+| job_field | TEXT | 직군 |
+| career_level | TEXT | 경력 수준 |
+| main_concern | TEXT | 현재 커리어 고민 |
+| profile_completed | BOOLEAN | 03 기본 정보 입력 완료 여부 |
 | created_at | TIMESTAMP | 계정 생성 시각 |
 
-#### ② strength_results
+#### ② strength_analyses (구 strength_results)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| themes | JSONB | 강점 테마 배열 [{rank, name, description, domain}] (Top 5) |
-| raw_interview | TEXT | AI 대화 원문 (또는 업로드 결과지 추출 텍스트) |
-| source | TEXT | 'interview' 또는 'upload' |
-| is_active | BOOLEAN | 가장 최근 결과만 true (재분석 시 이전 row는 false) 🆕 |
+| user_id | UUID | FK → profiles.id |
+| strengths | JSONB | 강점 테마 배열 [{rank, name, description}] (Top 5) |
+| method | TEXT | `'ai_interview'` 또는 `'gallup_upload'` |
+| file_url | TEXT | 갤럽 결과지 업로드 URL (method='gallup_upload' 시) |
+| is_latest | BOOLEAN | 최신 결과만 true (새 INSERT 시 트리거가 기존 row 자동 false) |
 | created_at | TIMESTAMP | 저장 시각 |
 
-#### ③ career_results
+#### ③ career_interview_results (구 career_results)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| directions | JSONB | 방향 후보 5개 [{title, description, fit_reason, related_strengths}] |
-| selected_direction | TEXT | 유저가 선택한 방향 제목 |
-| raw_interview | TEXT | 커리어 인터뷰 대화 원문 |
+| user_id | UUID | FK → profiles.id |
+| key_insights | TEXT | AI가 추출한 핵심 인사이트 요약 |
+| ai_summary | TEXT | 커리어 인터뷰 전체 요약 |
+| recommended_goal_categories | JSONB | 09 화면에서 AI가 생성한 목표 카테고리 후보 |
 | created_at | TIMESTAMP | 저장 시각 |
 
-#### ④ action_items
+> 대화 원문 미저장 (v0.2 정책). 브라우저 sessionStorage에서만 관리.
+
+#### ④ goals (구 career_focus)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| career_result_id | UUID | FK → career_results.id |
-| items | JSONB | 선택 아이템 [{title, detail, is_custom}] |
-| created_at | TIMESTAMP | 저장 시각 |
-
-#### ⑤ career_focus (12주 테마 / 분기 목표)
-
-| 필드명 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| quarter | INT | 분기 번호 (1~4) |
-| theme_title | TEXT | 테마명 (예: '비판적 사고 기르기') |
-| status | TEXT | active / completed / planned |
-| start_week | INT | 시작 주차 |
-| end_week | INT | 종료 주차 |
+| user_id | UUID | FK → profiles.id |
+| career_interview_id | UUID | FK → career_interview_results.id |
+| goal_title | TEXT | 유저가 선택한 목표명 |
+| goal_category | TEXT | 목표 카테고리 |
+| status | TEXT | `active` / `paused` / `completed` / `abandoned` |
+| current_week | INT | 현재 진행 주차 (1~12, 매주 월요일 자동 증가) |
+| total_weeks | INT | 전체 주차 (기본 12) |
+| started_at | DATE | 12주 코칭 시작일 |
+| ended_at | DATE | 종료일 (completed/abandoned 시) |
+| final_completion_rate | NUMERIC | 최종 완수율 (completed/abandoned 시 기록) |
 | created_at | TIMESTAMP | 생성 시각 |
 
-#### ⑥ weekly_actions (주차별 액션 + 데일리 체크)
+#### ⑤ action_items (주차별 액션 아이템)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| week_num | INT | 주차 (1~12) |
-| quarter | INT | 분기 (1~4) |
-| action | TEXT | 이번 주 액션 텍스트 |
-| strength_link | TEXT | 연결된 갤럽 강점명 (예: 「체계」 + 「학습」) |
-| target_count | INT | 주간 목표 횟수 |
-| daily_done | JSONB | 요일별 완료 [bool x 7] (월~일) |
-| reflection | TEXT | 주말 회고 텍스트 🆕 |
-| status | TEXT | future / current / done |
+| goal_id | UUID | FK → goals.id |
+| week_number | INT | 해당 주차 (1~12) |
+| title | TEXT | 액션 제목 |
+| description | TEXT | 액션 설명 |
+| is_custom | BOOLEAN | 유저 직접 입력 여부 |
 | created_at | TIMESTAMP | 생성 시각 |
 
-#### ⑦ weekday_memos (평일 메모)
+> 각 액션 아이템이 별도 row로 저장됨 (JSONB 배열 방식 아님).
+
+#### ⑥ action_completions (일일 액션 완료 기록)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| week_num | INT | 해당 주차 |
-| day_of_week | INT | 0~4 (월~금) |
-| text | TEXT | 메모 본문 |
+| action_item_id | UUID | FK → action_items.id |
+| user_id | UUID | FK → profiles.id |
+| completed_at | DATE | 완료일 |
+| created_at | TIMESTAMP | 기록 시각 |
+
+> 체크 시 INSERT, 체크 해제 시 DELETE. 7일 이내만 수정 가능.
+
+#### ⑦ daily_memos (구 weekday_memos)
+
+| 필드명 | 타입 | 설명 |
+| --- | --- | --- |
+| id | UUID | PK |
+| user_id | UUID | FK → profiles.id |
+| goal_id | UUID | FK → goals.id (NOT NULL) |
+| memo_date | DATE | 메모 작성 날짜 |
+| week_number | INT | 해당 주차 |
+| content | TEXT | 메모 본문 (최대 500자) |
 | created_at | TIMESTAMP | 작성 시각 |
 
-#### ⑧ coaching_sessions (AI 코칭 대화 원문)
+> `goal_id NOT NULL` — active 목표 없으면 메모 작성 불가.
+
+#### ⑧ weekly_retros (구 weekly_actions.reflection)
 
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| type | TEXT | strength / career / retro |
-| status | TEXT | in_progress / completed / abandoned |
-| messages | JSONB | 대화 메시지 배열 [{role, content, created_at}] |
-| context_data | JSONB | 분석에 활용한 입력 메타데이터 |
-| started_at | TIMESTAMP | 시작 시각 |
-| completed_at | TIMESTAMP | 완료 시각 (nullable) |
-
-#### ⑨ insight_history (회고/코칭 정리본)
-
-| 필드명 | 타입 | 설명 |
-| --- | --- | --- |
-| id | UUID | PK |
-| user_id | UUID | FK → users.id |
-| week_num | INT | 해당 주차 |
-| date_label | TEXT | 날짜 라벨 (예: 4/23 화) |
-| topic | TEXT | 다룬 주제 (한 줄) |
-| pattern | TEXT | 발견한 패턴 (1~2문장) |
-| action | TEXT | 다음 주 액션 |
-| strength_link | TEXT | 강점 연결 (예: 「체계」 + 「학습」) |
-| mode | TEXT | general / retro |
+| user_id | UUID | FK → profiles.id |
+| goal_id | UUID | FK → goals.id |
+| week_number | INT | 해당 주차 |
+| retro_date | DATE | 회고 작성 날짜 |
+| summary_one_line | TEXT | 한 줄 회고 (최대 1000자) |
+| completion_count | INT | 해당 주 액션 완료 횟수 (프론트 집계) |
+| target_count | INT | 해당 주 액션 목표 횟수 (프론트 집계) |
 | created_at | TIMESTAMP | 저장 시각 |
 
-> insight_history는 원문 대화(raw_interview)를 저장하지 않습니다. DB 부하를 줄이고 사용자 프라이버시를 보호하기 위함입니다. 원문은 coaching_sessions에 보관됩니다.
+#### ⑨ coaching_insights (구 insight_history)
+
+| 필드명 | 타입 | 설명 |
+| --- | --- | --- |
+| id | UUID | PK |
+| user_id | UUID | FK → profiles.id |
+| week_number | INT | 해당 주차 |
+| topic | TEXT | 다룬 주제 (한 줄) |
+| pattern_insight | TEXT | 발견한 패턴 (1~2문장) |
+| next_action_title | TEXT | 다음 주 액션 제목 |
+| next_action_reason | TEXT | 액션 선택 이유 |
+| strength_link | TEXT | 강점 연결 (예: 「체계」 + 「학습」) |
+| created_at | TIMESTAMP | 저장 시각 |
+
+> 대화 원문 미저장. `coaching_sessions` 테이블 삭제됨 (v0.2).
 
 #### ⑩ push_subscriptions 🆕
 
@@ -690,10 +706,26 @@ users ─┬─ strength_results    ── (강점 인터뷰 결과)
 | 11 홈 알림: 브라우저 Push Notification vs 서버 이메일 발송 | Web Push로 잠정 결정 (NEW04에 반영) |
 | 12 회고 메모 최소 글자 수 또는 분량 기준 존재 여부 | 미결 |
 | 14 히스토리 카드 상세 펼침 UX: 인라인 펼침 vs 별도 상세 화면 | 미결 |
-| 15 재인터뷰 시 기존 강점 결과 덮어쓰기 vs 히스토리 보존 방식 | strength_results.is_active 플래그로 이력 보존 (v1.2) |
+| 15 재인터뷰 시 기존 강점 결과 덮어쓰기 vs 히스토리 보존 방식 | `strength_analyses.is_latest` 트리거로 이력 보존 (v1.3) |
 | **NEW02 푸시 권한 노출 시점**: NEW02 직후 강제 vs 11 첫 진입 | 🆕 미결 |
 | **NEW03 → 새 12주 진입 시 03 기본정보 재진입 옵션 제공 여부** | 🆕 미결 |
 | **15 커리어 재인터뷰**: 기존 액션(10) 유지 vs 새로 선택 | 🆕 미결 |
+
+---
+
+## 부록. v1.2 → v1.3 변경 이력
+
+### v1.3 (2026-05-05) — schema 전면 검증
+
+실제 Supabase 스키마(`spec-schema.md` v0.6) 대조 후 전체 불일치 수정.
+
+- **테이블명 변경**: `users`→`profiles`, `strength_results`→`strength_analyses`, `career_results`→`career_interview_results`, `weekday_memos`→`daily_memos`, `insight_history`→`coaching_insights`
+- **삭제된 테이블**: `coaching_sessions`(대화 원문 미저장), `career_focus`(→`goals`로 통합), `weekly_actions`(→`action_items`+`action_completions`로 분리)
+- **컬럼명 수정**: `is_active`→`is_latest`(트리거 자동), `themes`→`strengths`, `source`→`method`, `week_num`→`week_number`
+- **신규 테이블 추가**: `goals`, `action_completions`, `weekly_retros`
+- **사용자 상태 라우팅**: `users.basic_info_completed_at` → `profiles.profile_completed`, `coaching_start_at + 84일` → `goals.status='completed'`
+- **AI 저장 정책**: 모든 인터뷰 대화 원문 미저장(sessionStorage 전용) 반영
+- **09 화면 2단계 플로우**: `career_results.selected_direction` → "목표 추천받기" 버튼 → `goals` INSERT 흐름 명시
 
 ---
 

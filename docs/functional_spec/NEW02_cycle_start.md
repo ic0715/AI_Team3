@@ -15,7 +15,7 @@
 ## 2. 진입 조건
 
 - 10 완료 직후 1회 노출
-- users.coaching_start_at이 막 기록된 시점
+- `goals.started_at`이 막 기록된 시점
 - 재방문 시 노출되지 않음
 
 ## 3. UI 구성
@@ -25,7 +25,7 @@
 ### 3.1 요약 카드
 
 - 강점: Top 5 (Chip, 갤럽 34 테마)
-- 커리어 방향: selected_direction
+- 커리어 방향: `goals.goal_title`
 - 첫 주 액션: 선택한 action_items 리스트
 
 ### 3.2 일정 표시
@@ -39,19 +39,28 @@
 ## 4. 기능
 
 - CTA 클릭 시 11 홈 이동 (또는 NEW04 푸시 권한 요청 화면 경유)
-- 첫 주 weekly_actions는 10 완료 시 이미 생성되어 있음
-- coaching_start_at 표시
+- 첫 주 `action_items`(week_number=1)는 10 완료 시 이미 생성되어 있음
+- `goals.started_at` 기준 종료일 표시 (started_at + 84일)
 
 ## 5. 예외 처리
 
 | 상황 | 처리 |
 | --- | --- |
-| weekly_actions 생성 실패 (10에서 누락) | 재시도 + 실패 시 고객센터 안내 |
+| `action_items`(week_number=1) 생성 실패 (10에서 누락) | 재시도 + 실패 시 고객센터 안내 |
 | 요약 데이터 누락 | 가능한 데이터만 표시 + 안내 |
 
 ## 6. 분석 이벤트
 
 | 이벤트 | 속성 |
 | --- | --- |
-| cycle_start_view | coaching_start_at |
+| cycle_start_view | goals.started_at |
 | cycle_start_cta_clicked | time_spent |
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `users.coaching_start_at`→`goals.started_at`, `selected_direction`→`goals.goal_title`, `weekly_actions`→`action_items`(week_number=1) |
+| v1.0 | 2026-05-04 | 최초 작성 |

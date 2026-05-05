@@ -162,12 +162,12 @@ flowchart TD
 |---|---|---|
 | 비로그인 | 세션 없음 | 01 랜딩 |
 | 이메일 미인증 | `email_confirmed_at IS NULL` | NEW01 이메일 인증 |
-| 기본 정보 미완 | `basic_info_completed_at IS NULL` | 03 기본 정보 |
-| 강점 미분석 | `strength_results 없음` | 04 강점 진단 방식 선택 |
-| 커리어 미분석 | `career_results.selected_direction 없음` | 07 커리어 인터뷰 안내 |
-| 액션 미선택 | `action_items 없음` | 10 액션 아이템 선택 |
-| 코칭 진행 중 | `coaching_start_at IS NOT NULL` 그리고 12주 미경과 | 11 홈 |
-| 12주 완주 | `coaching_start_at`으로부터 84일 경과 | NEW03 12주 완료 |
+| 기본 정보 미완 | `profiles.profile_completed = false` | 03 기본 정보 |
+| 강점 미분석 | `strength_analyses` (is_latest=true) 없음 | 04 강점 진단 방식 선택 |
+| 커리어 미분석 | `goals` 없음 | 07 커리어 인터뷰 안내 |
+| 액션 미선택 | `action_items` (week_number=1) 없음 | 10 액션 아이템 선택 |
+| 코칭 진행 중 | `goals.status = 'active'` 또는 `'paused'` | 11 홈 |
+| 12주 완주 | `goals.status = 'completed'` | NEW03 12주 완료 |
 
 ## 4. 페이즈별 그룹
 
@@ -225,3 +225,12 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 - **재방문 시 NEW02 노출 여부**: 사용자가 로그아웃 후 재로그인할 때 NEW02를 다시 보여줄지
 - **15 프로필의 "커리어 재인터뷰"**: 기존 액션(10)을 유지할지, 새로 선택하게 할지
 - **NEW03 → 새 12주 진입 시 03 기본 정보**: 직군이 바뀌었을 수도 있는데 03 재진입 옵션 제공할지
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: 사용자 상태별 라우팅 조건 수정 (`basic_info_completed_at`→`profiles.profile_completed`, `strength_results`→`strength_analyses is_latest`, `career_results.selected_direction`→`goals`, `coaching_start_at + 84일`→`goals.status='completed'`) |
+| v1.0 | 2026-05-04 | 최초 작성 |
