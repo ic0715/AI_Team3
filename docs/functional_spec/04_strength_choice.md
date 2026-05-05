@@ -15,9 +15,11 @@
 ## 2. 진입 조건
 
 - 사용자 상태 = ONBOARDING
-- 03 기본 정보 입력 완료 후
-- strength_results.is_active = true 인 결과가 없는 경우
+- 03 기본 정보 입력 완료 후 (`profiles.profile_completed = true`)
+- `strength_analyses` 테이블에 `is_latest = true` 인 결과가 없는 경우
 - 또는 15에서 강점 재분석 요청 시
+
+> ⚠️ **schema 불일치 수정**: `strength_results.is_active` → `strength_analyses.is_latest`로 변경 (테이블명 및 컬럼명 모두 수정)
 
 ## 3. UI 구성
 
@@ -65,10 +67,10 @@
 
 | 기능 | 동작 |
 | --- | --- |
-| 카드 A 선택 | 강조 → 다음 클릭 시 신규 interview_session(type=strength) 생성 → 05 진입 |
+| 카드 A 선택 | 강조 → 다음 클릭 시 05 강점 인터뷰 진입 (별도 세션 생성 없음 — 대화는 브라우저 메모리에서만 진행) |
 | 카드 B 선택 | 강조 + 파일 업로드 영역 노출 |
 | 파일 업로드 | Supabase Storage 업로드 + 서버사이드 파싱 (PDF/이미지) |
-| 파싱 성공 | 강점 Top 5 데이터 추출 → strength_results에 source=upload로 저장 → 다음 클릭 시 06 직행 |
+| 파싱 성공 | 강점 Top 5 데이터 추출 → `strength_analyses`에 `method='gallup_upload'`로 저장 → 다음 클릭 시 06 직행 |
 | 파싱 실패 | 에러 안내 + 재업로드 또는 AI 인터뷰로 변경 권장 |
 | 카드 전환 | 카드 B → A로 변경 시 업로드 데이터 초기화(확인 다이얼로그) |
 
@@ -95,10 +97,17 @@
 
 ## 7. 데이터 정책
 
-- 카드 A 경로: coaching_sessions 신규 생성 (type=strength, status=in_progress)
-- 카드 B 경로: strength_results 직접 생성 (source=upload, raw_file_url 보관)
+- 카드 A 경로: DB 저장 없음. 대화는 브라우저 메모리에서만 진행, 인터뷰 완료 후 `strength_analyses` INSERT
+- 카드 B 경로: `strength_analyses` 신규 INSERT (`method='gallup_upload'`, `file_url` 보관)
 - 업로드 파일: Supabase Storage의 private 버킷, 사용자별 접근 권한
-- 파싱 결과: themes JSONB로 저장 [{rank, name, description}]
+- 파싱 결과: `strengths` JSONB로 저장 `[{rank, name_ko, name_en, description}]`
+
+> ⚠️ **schema 불일치 수정**:
+> - `coaching_sessions` 테이블은 v0.2에서 삭제됨 (대화 원문 미저장 정책)
+> - `strength_results` → `strength_analyses` (테이블명)
+> - `source` → `method` (컬럼명), 허용값: `ai_interview` / `gallup_upload`
+> - `raw_file_url` → `file_url` (컬럼명)
+> - `themes` → `strengths` (컬럼명)
 
 ## 8. 분석 이벤트
 
@@ -116,3 +125,12 @@
 - 파일 업로드 영역은 키보드로도 트리거 가능
 - 드래그앤드롭 외에 버튼 클릭 대안 제공
 - 업로드 진행률은 aria-live로 알림
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `strength_results.is_active` → `strength_analyses.is_latest` 수정, 카드A 인터뷰 세션 생성 제거(브라우저 메모리 방식 명시), `coaching_sessions` 테이블 삭제됨 명시, 테이블·컬럼명 전반 수정(`strength_results`→`strength_analyses`, `source`→`method`, `raw_file_url`→`file_url`, `themes`→`strengths`) |
+| v1.0 | 2026-05-04 | 최초 작성 |

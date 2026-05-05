@@ -15,7 +15,9 @@
 ## 2. 진입 조건
 
 - 04에서 "AI 인터뷰" 선택 후 "다음" 클릭
-- 또는 진행 중인 strength interview 세션이 있고 사용자가 "이어하기" 선택
+- 또는 sessionStorage에 진행 중인 대화가 남아 있고 사용자가 "이어하기" 선택 (브라우저 내에서만 복원 가능)
+
+> ⚠️ **schema 정책 확인**: 대화 원문은 DB에 저장하지 않음. 브라우저를 닫으면 이어하기 불가.
 
 ## 3. UI 구성
 
@@ -99,25 +101,29 @@ AI가 답변을 평가하여 다음 조건 중 하나에 해당하면 follow-up 
 | 그만하기 | "지금까지 답변은 저장돼요" 안내 후 15 또는 직전 화면 |
 | 5분 무응답 | "잠시 자리 비우셨나요?" 다이얼로그 |
 | 30분 무응답 | 자동 저장 후 세션 paused |
-| 인터뷰 완료 | AI가 강점 JSON 반환 → strength_results 저장 → 06으로 자동 이동 |
+| 인터뷰 완료 | AI가 강점 JSON 반환 → `strength_analyses` INSERT → 06으로 자동 이동 |
 
 ## 7. 자동 저장 정책
 
-- **매 메시지마다** coaching_sessions.messages JSONB 배열에 append하여 즉시 UPDATE
-- **사용자 입력 중** sessionStorage.draft_message_{session_id}에 백업
+> ⚠️ **schema 정책**: 대화 원문은 DB에 저장하지 않음 (v0.2 결정). 아래 정책은 브라우저 메모리 기반.
+
+- **사용자 입력 중** `sessionStorage.draft_strength_interview`에 대화 전체 백업
 - **전송 실패 시** 재시도 큐(최대 3회, 지수 백오프 1s/3s/9s)
 - **3회 실패 시** 사용자에게 안내 + 재시도 버튼
-- **다른 디바이스 진입 시** 마지막 메시지 시점 기준 자동 동기화
+- **다른 디바이스 진입 시** 복원 불가 (DB에 저장되지 않으므로). 처음부터 재진행 안내.
 
 ## 8. 인터뷰 재개 (Resume)
 
-사용자가 인터뷰 도중 이탈 후 다시 진입한 경우:
+사용자가 인터뷰 도중 이탈 후 같은 브라우저에서 다시 진입한 경우:
 
-- **1단계**: coaching_sessions WHERE user_id=? AND type=strength AND status=in_progress 검색
-- **2단계**: 세션 존재 시 다이얼로그 표시
-  -    · "이어서 하기" → 기존 세션 메시지 복원, 마지막 AI 질문 표시
-  -    · "처음부터" → 기존 세션 status=abandoned 처리, 새 세션 시작
-- **3단계**: 세션 부재 시 새 세션 생성
+- **1단계**: `sessionStorage.draft_strength_interview` 존재 여부 확인
+- **2단계**: 데이터 존재 시 다이얼로그 표시
+  - · "이어서 하기" → sessionStorage에서 대화 복원, 마지막 AI 질문 표시
+  - · "처음부터" → sessionStorage 초기화, 새 인터뷰 시작
+- **3단계**: 데이터 없음 (브라우저 닫힌 후 재진입) → 처음부터 시작
+
+> ⚠️ **schema 불일치 수정**: `coaching_sessions` 테이블은 v0.2에서 삭제됨.  
+> 기존 `coaching_sessions.status=in_progress` 조회 로직 제거. sessionStorage 기반으로 대체.
 
 ## 9. 예외 처리
 
@@ -160,3 +166,12 @@ AI가 답변을 평가하여 다음 조건 중 하나에 해당하면 follow-up 
 - AI 응답 첫 토큰 도달: p95 3초 이하
 - 스트리밍 응답으로 체감 지연 최소화
 - AI 분석 (인터뷰 종료 시): p95 12초 이하, 로딩 메시지 노출
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `coaching_sessions` 테이블 삭제됨 명시, 자동 저장 정책 DB저장→sessionStorage 기반으로 수정, 인터뷰 재개 로직 sessionStorage 기반으로 수정, 다른 디바이스 동기화 불가 명시, `strength_results` → `strength_analyses` 테이블명 수정 |
+| v1.0 | 2026-05-04 | 최초 작성 |
