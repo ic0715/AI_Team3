@@ -56,15 +56,18 @@
 
 ## 4. 기능
 
-- 시작 클릭 → 신규 career interview 세션 생성 → 08 진입
-- 진행 중인 세션이 있으면 이어하기 다이얼로그
-- 강점 결과(strength_results)를 컨텍스트로 인터뷰 prompt에 자동 포함
+- 시작 클릭 → 08 진입 (별도 세션 생성 없음 — 대화는 브라우저 메모리에서만 진행)
+- sessionStorage에 진행 중인 대화가 있으면 이어하기 다이얼로그 (브라우저 내에서만 가능)
+- `strength_analyses` (is_latest=true) 읽어서 인터뷰 prompt에 자동 포함
 
 ## 5. 데이터
 
-- 읽기: strength_results (Top 5 표시용)
-- 쓰기: coaching_sessions 신규 생성 (type=career, status=in_progress)
-- Static 전환 화면 - 페이지 전환 애니메이션
+- 읽기: `strength_analyses` (is_latest=true, Top 5 표시 + AI 프롬프트 컨텍스트용)
+- 쓰기: 없음 (Static 전환 화면)
+
+> ⚠️ **schema 불일치 수정**:
+> - `strength_results` → `strength_analyses` (테이블명)
+> - `coaching_sessions` 신규 생성 로직 제거 (v0.2에서 삭제된 테이블, 대화 원문 미저장 정책)
 
 ## 6. 예외 처리
 
@@ -80,3 +83,12 @@
 | --- | --- |
 | interview_intro_view | type=career |
 | interview_started | type=career, has_strength_context |
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `coaching_sessions` 신규 생성 제거(브라우저 메모리 방식), `strength_results`→`strength_analyses` 수정, 이어하기 sessionStorage 기반 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |
