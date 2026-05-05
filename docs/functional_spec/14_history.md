@@ -59,8 +59,9 @@
 
 | 기능 | 동작 |
 | --- | --- |
-| 인사이트 로드 | insight_history 테이블에서 user_id 기준 조회 |
-| 정렬 | week_num 내림차순 |
+| 인사이트 로드 | `coaching_insights` 조회 (RLS로 본인 것만 자동 필터) |
+| 목표 이력 로드 | `goals` WHERE `status IN ('completed', 'abandoned')` 조회 |
+| 정렬 | `week_number` 내림차순 |
 | 필터 | 사이클/강점 |
 | 카드 탭 | 상세 모달 (해당 주차의 액션, 메모 개수, 회고 일자 등) |
 | 강점 태그 클릭 | 해당 강점 상세로 이동 (추후) |
@@ -68,10 +69,17 @@
 
 ## 5. 데이터
 
-- 출처: insight_history (회고 코칭 완료 시 자동 저장)
-- 필드: user_id, week_num, pattern, action, strength_ref, insight
-- 사이클별 그룹핑 가능
-- 개인정보 최소화: 본문 텍스트는 저장하지 않고 요약 필드만
+- 코칭 인사이트: `coaching_insights` (13 회고 코칭 완료 시 자동 저장)
+  - 컬럼: `week_number`, `topic`, `pattern_insight`, `next_action_title`, `next_action_reason`, `strength_link`
+- 목표 이력: `goals` (status='completed' 또는 'abandoned')
+  - 컬럼: `goal_title`, `goal_category`, `status`, `started_at`, `ended_at`, `final_completion_rate`
+  - `final_completion_rate`가 종료 시 이미 저장되어 있어 JOIN 없이 조회 가능
+- 사이클별 그룹핑 가능 (`goals.id` 기준)
+- 개인정보 최소화: 대화 원문은 저장 안 함, 요약 컬럼만 표시
+
+> ⚠️ **schema 불일치 수정**:
+> - `insight_history` → `coaching_insights` (테이블명)
+> - 필드명: `week_num`→`week_number`, `pattern`→`pattern_insight`, `action`→`next_action_title`, `strength_ref`→`strength_link`, `insight`→`topic`
 
 ## 6. 예외 처리
 
@@ -94,3 +102,12 @@
 
 - 카드 리스트는 <ul>/<li> 또는 role="list"
 - 각 카드 키보드 접근 가능
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `insight_history`→`coaching_insights`(테이블명), 필드명 수정(`week_num`→`week_number`, `pattern`→`pattern_insight`, `action`→`next_action_title`, `strength_ref`→`strength_link`, `insight`→`topic`), 목표 이력(`goals` WHERE status IN ('completed','abandoned')) 및 `final_completion_rate` 조회 추가, RLS 자동 필터 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |

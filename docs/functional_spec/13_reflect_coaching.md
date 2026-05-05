@@ -74,11 +74,11 @@
 
 | 기능 | 동작 |
 | --- | --- |
-| 인터뷰 진행 | 05와 동일한 자동 저장/재개 정책 |
-| 컨텍스트 자동 주입 | 이번 주 weekday_memos + weekly_actions.reflection + 강점(strength_results) + 커리어방향(career_results) + 지난주 insight_history |
+| 인터뷰 진행 | 대화 원문은 DB 저장 없음, sessionStorage에서만 관리 (05 동일 정책) |
+| 컨텍스트 자동 주입 | `daily_memos` (이번 주) + `action_completions` (이번 주) + `weekly_retros` (이번 주) + `coaching_insights` (최근 3주) |
 | 정리 화면 전환 | 인터뷰 완료 후 자동 |
 | 다시 다듬기 | 인터뷰 모드로 복귀, 추가 답변 가능 |
-| 확정 | insight_history 저장 (week_num, pattern, action, strength_link, mode=retro) + 다음 주 weekly_actions 생성 → 11 이동 |
+| 확정 | `coaching_insights` INSERT + `action_items` INSERT (다음 주, week_number+1) → 11 이동 |
 
 ## 5. AI 시스템 프롬프트
 
@@ -87,8 +87,15 @@
 - **컨텍스트**: 주간 메모+강점+커리어 방향을 받아 패턴·인사이트 도출 및 다음 주 방향 제안
 - **MCC 코칭 원칙** + **갤럽 강점 프레임** 유지
 - **시간 정책**: 다음 주 월요일부터 적용 — 이번 주 데이터는 그대로 보존되어 12주 여정의 한 페이지로 남음
-- **저장**: coaching_sessions에 messages JSONB로 대화 원문 저장
-- 인사이트는 insight_history에 저장 (본문은 저장하지 않고 요약 키워드만, 원문은 coaching_sessions에 보관)
+- **저장**: 대화 원문 미저장 (v0.2 결정). 브라우저 메모리에서만 진행
+- 인사이트는 `coaching_insights`에 저장: `topic`, `pattern_insight`, `next_action_title`, `next_action_reason`, `strength_link`, `week_number`
+
+> ⚠️ **schema 불일치 수정**:
+> - `coaching_sessions` 삭제됨 (대화 원문 미저장 정책)
+> - `insight_history` → `coaching_insights` (테이블명)
+> - `weekly_actions.reflection` / `weekday_memos` → `weekly_retros.summary_one_line` / `daily_memos`
+> - `strength_results` → `strength_analyses`, `career_results` → `career_interview_results`
+> - 다음 주 `weekly_actions` 생성 → `action_items` INSERT (week_number = current_week + 1)
 - 위기 신호 / PII 처리는 05와 동일 정책 적용
 
 ## 6. 예외 처리
@@ -117,3 +124,12 @@
 
 - 05와 동일 (채팅 패턴)
 - AI 응답은 스트리밍
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `coaching_sessions` 삭제됨(대화 원문 미저장), 컨텍스트 주입 테이블명 수정(`weekday_memos`→`daily_memos`, `strength_results`→`strength_analyses`, `career_results`→`career_interview_results`, `insight_history`→`coaching_insights`), 확정 시 `coaching_insights` INSERT + `action_items` INSERT 명시, `coaching_insights` 저장 컬럼 목록 추가 |
+| v1.0 | 2026-05-04 | 최초 작성 |

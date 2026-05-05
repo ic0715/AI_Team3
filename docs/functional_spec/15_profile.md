@@ -32,13 +32,13 @@
 
 ### 3.3 내 강점 Top 5 섹션
 
-- 갤럽 34 테마 기반 Top 5 강점 chips
+- 갤럽 34 테마 기반 Top 5 강점 chips (`strength_analyses` WHERE `is_latest=true`의 `strengths JSONB` 기반)
 - "강점 상세 보기" → 06 (읽기 전용)
 - "강점 다시 분석하기" → 확인 다이얼로그 → 04
 
 ### 3.4 커리어 방향 섹션
 
-- 현재 시즌: selected_direction + 진행 주차
+- 현재 시즌: `goals.goal_title` (active 목표) + 진행 주차 (`goals.current_week / goals.total_weeks`)
 - "커리어 방향 재설정" → 확인 다이얼로그 → 07
 - 재인터뷰 링크 포함
 
@@ -66,14 +66,14 @@
 
 | 기능 | 동작 |
 | --- | --- |
-| 강점 다시 분석 | 확인: "현재 12주 사이클은 영향 없어요" → 04로 이동, 04 진입 시 기존 strength_results.is_active를 false로 변경 |
-| 커리어 재설정 | 확인: "현재 사이클이 중단되고 새 사이클이 시작돼요" → 07 |
+| 강점 다시 분석 | 확인: "현재 12주 사이클은 영향 없어요" → 04로 이동, 새 `strength_analyses` INSERT 시 트리거가 기존 행의 `is_latest`를 자동으로 false로 변경 |
+| 커리어 재설정 | 확인: "현재 사이클이 중단되고 새 사이클이 시작돼요" → 현재 `goals.status='abandoned'` UPDATE 후 07로 이동 |
 | 정보 수정 | 별도 수정 화면 (03 재활용 가능) |
 | 알림 설정 | 토글 즉시 반영, 시간 저장 |
 | 비밀번호 변경 | 현재 비밀번호 확인 + 새 비밀번호 |
 | 데이터 다운로드 | JSON/CSV export, 이메일 발송 |
 | 로그아웃 | 확인 다이얼로그 → Supabase signOut → 02 이동 |
-| 회원 탈퇴 | 확인 모달 2단계 → users 데이터 삭제 후 Supabase Auth deleteUser → 01 랜딩으로 이동 |
+| 회원 탈퇴 | 확인 모달 2단계 → `profiles` 및 관련 데이터 삭제 후 Supabase Auth deleteUser → 01 랜딩으로 이동 |
 
 ## 5. 회원 탈퇴 절차
 
@@ -81,7 +81,7 @@
 - 2단계: 사유 수집 (선택)
 - 3단계: 데이터 삭제 안내 ("삭제되는 데이터 / 보관되는 데이터")
 - 4단계: 최종 확인 (오탈퇴 방지 위해 2단계 모달)
-- 5단계: users 데이터 삭제 → Supabase Auth deleteUser → 01 랜딩으로 이동
+- 5단계: `profiles` 및 관련 테이블 데이터 삭제 → Supabase Auth deleteUser → 01 랜딩으로 이동
 
 ## 6. 예외 처리
 
@@ -113,3 +113,18 @@
 - 설정 토글 ARIA 패턴
 - Danger Zone은 시각/스크린 리더 모두 명확
 - 비밀번호 변경은 input type=password 적절히 사용
+
+> ⚠️ **schema 불일치 수정**:
+> - `selected_direction` 컬럼 없음 → `goals.goal_title` (active 목표) 사용
+> - `strength_results.is_active` → `strength_analyses.is_latest` (트리거 자동 관리)
+> - `users 데이터 삭제` → `profiles 데이터 삭제` (테이블명 통일)
+> - 커리어 재설정 시 현재 `goals.status='abandoned'` UPDATE 명시
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `selected_direction`→`goals.goal_title`, `strength_results.is_active`→`strength_analyses.is_latest`(트리거 자동 관리), `users 데이터`→`profiles 데이터`, 커리어 재설정 시 `goals.status='abandoned'` UPDATE 명시, 강점 Top 5 데이터 소스(`strength_analyses is_latest=true`) 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |

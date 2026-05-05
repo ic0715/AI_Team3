@@ -14,9 +14,12 @@
 
 ## 2. 진입 조건
 
-- 사용자 상태 = ACTIVE
+- `goals` 테이블에 `status='active'`인 목표가 있는 경우
 - 탭바 "회고" 선택
 - 자동 분기: 토/일 = 주말 모드, 그 외 = 평일 모드 (수동 토글 가능)
+
+> ⚠️ **schema 정책**: `daily_memos.goal_id` NOT NULL이므로 active 목표가 없으면 메모/회고 화면 접근 불가.  
+> PAUSED 상태(active 없음)에서는 "목표를 먼저 설정해주세요" 안내 표시.
 
 ## 3. UI 구성
 
@@ -81,11 +84,18 @@
 | 기능 | 동작 |
 | --- | --- |
 | 모드 자동 분기 | 토/일 = 주말, 그 외 = 평일 (사용자 토글로 변경 가능) |
-| 메모 저장 | weekday_memos 즉시 저장 (user_id, week_num, day_of_week, text) |
+| 메모 저장 | `daily_memos` INSERT (`goal_id`, `memo_date`, `content`, `week_number`) |
 | 메모 수정 | 3일 이내만, 그 외 읽기 전용 |
 | 메모 삭제 | 확인 다이얼로그 |
-| 주간 회고 저장 | weekly_actions.reflection 컬럼에 저장 (해당 주차) |
+| 주간 회고 저장 | `weekly_retros` INSERT (`goal_id`, `week_number`, `retro_date`, `summary_one_line`, `completion_count`, `target_count`) |
+| 완료 횟수 자동 집계 | `action_completions` + `action_items` 조회 후 `completion_count` / `target_count` 계산해서 함께 저장 |
 | 코치와 이야기 나누기 | 13 진입 |
+
+> ⚠️ **schema 불일치 수정**:
+> - `weekday_memos` → `daily_memos` (테이블명)
+> - 저장 컬럼: `week_num`/`day_of_week` 없음 → `memo_date(date)` + `week_number(int)`
+> - `weekly_actions.reflection` 없음 → `weekly_retros` 별도 row INSERT
+> - `weekly_retros.completion_count` / `target_count`는 프론트에서 집계해서 함께 저장 (자동 계산)
 
 ## 5. 예외 처리
 
@@ -115,3 +125,12 @@
 - textarea는 적절한 레이블링
 - 저장 성공/실패는 aria-live로 알림
 - 모드 토글은 토글 버튼 ARIA 패턴
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: 진입 조건 PAUSED/active 없음 시 접근 불가 명시, `weekday_memos`→`daily_memos`, 저장 컬럼 수정(memo_date+week_number), `weekly_actions.reflection`→`weekly_retros` INSERT, completion_count/target_count 프론트 집계 방식 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |

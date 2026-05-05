@@ -14,9 +14,11 @@
 
 ## 2. 진입 조건
 
-- 05 인터뷰 완료 + 분석 완료 (strength_results 생성됨)
-- 또는 04 파일 업로드 + 파싱 완료 (strength_results 생성됨)
+- 05 인터뷰 완료 + 분석 완료 (`strength_analyses` INSERT 완료)
+- 또는 04 파일 업로드 + 파싱 완료 (`strength_analyses` INSERT 완료)
 - 또는 15에서 "이전 결과 보기" 진입 시 (읽기 전용 모드)
+
+> ⚠️ **schema 불일치 수정**: `strength_results` → `strength_analyses` (테이블명)
 
 ## 3. UI 구성
 
@@ -67,16 +69,24 @@
 | 카드 순차 등장 | fade-up 애니메이션, stagger delay (reduce-motion 대응) |
 | 카드 탭 | 상세 모달 (갤럽 정의, 활용 팁, 다른 강점과의 시너지) |
 | 다음 클릭 | 07로 이동 |
-| 재분석 클릭 | 확인 다이얼로그 → 기존 결과 is_active=false → 04 |
+| 재분석 클릭 | 확인 다이얼로그 → 04로 이동 (새 결과 INSERT 시 트리거가 자동으로 기존 `is_latest` → false 처리) |
 | 공유 (선택) | 결과 카드 이미지 공유 (개인정보 노출 주의) |
 
 ## 5. 데이터
 
-- 표시 데이터: strength_results (가장 최근 is_active=true row)
-- themes JSONB 구조: [{rank, name_ko, name_en, domain, description}]
-- source 컬럼: "interview" (05 경로) 또는 "upload" (04 파일 업로드 경로)
-- 갤럽 34 테마 마스터 데이터: strength_master 테이블
+- 표시 데이터: `strength_analyses` (`is_latest = true` row 1개)
+- `strengths` JSONB 구조: `[{rank, name_ko, name_en, description}]`
+- `method` 컬럼: `"ai_interview"` (05 경로) 또는 `"gallup_upload"` (04 업로드 경로)
+- 갤럽 34 테마 도메인(4대 도메인) 데이터: 클라이언트 상수로 관리 (테마명 기반 매핑)
 - 결과 저장: 분석 완료 시 자동 저장된 상태로 진입
+
+> ⚠️ **schema 불일치 수정**:
+> - `strength_results` → `strength_analyses` (테이블명)
+> - `is_active` → `is_latest` (컬럼명)
+> - `themes` → `strengths` (컬럼명)
+> - `source` → `method` (컬럼명), 허용값 `"interview"`/`"upload"` → `"ai_interview"`/`"gallup_upload"`
+> - `strength_master` 테이블 미존재 → 클라이언트 상수로 대체
+> - `domain` 필드는 schema의 `strengths` JSONB에 없음 → 클라이언트에서 테마명 기반으로 도메인 매핑 처리
 
 ## 6. 갤럽 라이선스 관련 주의
 
@@ -113,3 +123,12 @@
 - 카드는 <article> 또는 role="article"
 - 순위는 텍스트로도 명시 (스크린 리더 "1위", "2위" 읽기)
 - reduce-motion 대응
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: `strength_results`→`strength_analyses`, `is_active`→`is_latest`, `themes`→`strengths`, `source`→`method`, 허용값 수정, `strength_master` 테이블 미존재(클라이언트 상수 대체) 명시, `domain` 필드 클라이언트 매핑 처리 명시, 재분석 시 트리거 자동 처리 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |

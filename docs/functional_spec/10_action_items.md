@@ -14,9 +14,12 @@
 
 ## 2. 진입 조건
 
-- 09에서 방향 선택 후 진입
-- career_results.selected_direction이 있는 상태
-- users.coaching_start_at이 NULL (아직 12주 코칭 미시작)
+- 09에서 목표 선택 후 `goals` INSERT 완료된 상태
+- `goals` 테이블에 `status='active'`인 목표가 있는 상태
+- 해당 목표의 현재 주차(`current_week`)에 `action_items`가 아직 없는 경우 (AI 생성 전)
+
+> ⚠️ **schema 불일치 수정**: `career_results.selected_direction` 컬럼 없음. `goals.goal_title` 사용.  
+> `users.coaching_start_at` 없음. `goals.started_at`으로 대체.
 
 ## 3. UI 구성
 
@@ -27,8 +30,8 @@
 
 ### 3.2 방향 배너
 
-- selected_direction 표시 (pill 형태)
-- 부가: "12주 동안 키울 방향"
+- `goals.goal_title` 표시 (pill 형태)
+- 부가: "12주 동안 키울 목표"
 
 ### 3.3 안내 패널
 
@@ -64,21 +67,28 @@
 
 ## 4. 기능
 
+> ⚠️ **schema 구조 수정**: 이 화면은 "액션 선택" 화면이 아니라 **AI가 자동으로 액션 아이템을 생성하는 로딩 화면**에 가까움.  
+> 유저가 직접 액션을 고르는 게 아니라 AI가 `goals` + `profiles` 기반으로 1주차 액션 3~5개를 생성 → `action_items` INSERT.
+
 | 기능 | 동작 |
 | --- | --- |
-| 액션 다중 선택 | 체크박스 토글 |
-| 커스텀 입력 | 5자 미만 시 추가 버튼 disabled, 공백 제출 차단 |
-| 커스텀 추가 | 리스트에 추가, 다중 선택 가능 |
-| 시작 클릭 | action_items 저장 + users.coaching_start_at = now() 기록 + career_focus 생성(theme_title=selected_direction, quarter=1, status=active) + 첫 주 weekly_actions(week_num=1) 자동 생성 → NEW02 |
+| 화면 진입 시 | AI 액션아이템 생성 API 호출 (로딩 표시) |
+| 액션 생성 완료 | `action_items` INSERT (week_number=1, is_custom=false) → 11 홈으로 이동 |
+| 커스텀 추가 (선택) | `action_items` INSERT (`is_custom=true`) |
+| 시작 클릭 | 11 홈으로 이동 (action_items는 이미 저장된 상태) |
 
 ## 5. 데이터
 
-- 액션 옵션 생성: selected_direction + 강점 + 인터뷰 답변 → AI 추천 또는 사전 정의 목록
-- 저장 위치: action_items 테이블 (items JSONB: [{title, detail, is_custom}])
-- career_focus 신규 row: theme_title=selected_direction, quarter=1, status=active, start_week=1, end_week=12
-- 첫 주 weekly_actions 자동 생성: week_num=1, quarter=1, action_items 매핑, daily_done=[false×7], status=current
-- users.coaching_start_at에 timestamptz 기록 (12주 카운트의 기준 시각)
+- 읽기: `goals` (active, goal_title, goal_category, current_week), `profiles` (job_field, career_level)
+- 쓰기: `action_items` INSERT (3~5건, week_number=1, is_custom=false)
+- 커스텀 추가 시: `action_items` INSERT (is_custom=true)
 - 전체 작업은 트랜잭션으로 처리 (실패 시 롤백)
+
+> ⚠️ **schema 불일치 수정**:
+> - `career_focus` 테이블 없음 → `goals` 테이블로 대체
+> - `weekly_actions` 테이블 없음 → `action_items` 테이블로 대체 (week_number 컬럼으로 주차 구분)
+> - `action_items.items JSONB` 구조 없음 → 각 액션아이템이 별도 row (title, description, tags, is_custom 컬럼)
+> - `users.coaching_start_at` 없음 → `goals.started_at`으로 대체
 
 ## 6. 예외 처리
 
@@ -106,3 +116,12 @@
 - 체크박스는 native + 충분한 hit area
 - 커스텀 입력 라벨 명확
 - 선택 결과 요약은 aria-live로 즉시 알림
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: 화면 역할 재정의(유저 선택→AI 자동 생성 로딩 화면), `career_results.selected_direction`→`goals.goal_title`, `career_focus`·`weekly_actions` 테이블 없음(→`goals`·`action_items`), `action_items.items JSONB`→별도 row 구조, `users.coaching_start_at`→`goals.started_at` 수정 |
+| v1.0 | 2026-05-04 | 최초 작성 |
