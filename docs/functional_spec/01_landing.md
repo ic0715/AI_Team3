@@ -20,9 +20,36 @@
 | --- | --- |
 | GUEST (비로그인) | 본 화면 정상 노출 |
 | UNVERIFIED (이메일 미인증) | NEW01 이메일 인증으로 자동 리다이렉트 |
-| ONBOARDING (온보딩 진행 중) | 마지막 진행 단계 화면으로 자동 리다이렉트 |
+| ONBOARDING (온보딩 진행 중) | 마지막 진행 단계 화면으로 자동 리다이렉트 (아래 2.1 참조) |
+| PAUSED (목표 일시중단 중) | 11 홈으로 자동 리다이렉트 (중단됨 배지 표시) |
 | ACTIVE (12주 진행 중) | 11 홈으로 자동 리다이렉트 |
 | COMPLETED (12주 완료) | NEW03 12주 완료 화면으로 자동 리다이렉트 |
+
+> **상태 판별 우선순위:** ACTIVE → PAUSED → COMPLETED → ONBOARDING → UNVERIFIED 순으로 체크.  
+> active 목표가 있으면 ACTIVE로 처리하여 11 홈으로 이동.
+
+### 2.1 ONBOARDING 리다이렉트 세부 로직
+
+ONBOARDING 상태인 경우, 아래 순서로 DB를 체크해 마지막으로 완료된 단계 다음 화면으로 이동.
+
+```
+1. profiles.profile_completed = false  →  03 기본 정보 입력
+2. strength_analyses (is_latest=true) 없음  →  04 강점 진단 선택
+3. career_interview_results 없음  →  07 커리어 인터뷰 안내
+4. career_interview_results.recommended_goal_categories is null  →  09 커리어 인터뷰 결과
+5. goals (active) 없음  →  10 목표 선택 (액션아이템 화면)
+```
+
+> `profiles.profile_completed` 컬럼: `profiles` 테이블에 `boolean DEFAULT false` 로 추가 필요.  
+> 03 기본 정보 입력 완료 시 `true`로 UPDATE.  
+> → **schema 반영 필요 항목** (spec-schema.md에 미기재)
+
+### 2.2 COMPLETED 판별 기준
+
+`goals.status = 'completed'` AND `goals.current_week >= goals.total_weeks`(기본값 12) 인 목표가 있고,  
+현재 `active` 목표가 없는 경우 COMPLETED로 판별.
+
+> active 목표가 새로 생성되면 ACTIVE 우선으로 처리됨.
 
 ## 3. UI 구성
 
@@ -108,3 +135,12 @@
 - 초기 JS 번들 50KB(gzip) 이하
 - 이미지: WebP/AVIF 포맷 + lazy load
 - CLS 0.1 이하
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: PAUSED 상태 리다이렉트 추가, ONBOARDING 세부 로직(2.1) 신규, COMPLETED 판별 기준(2.2) 명시, 상태 판별 우선순위 추가, profiles.profile_completed 컬럼 schema 반영 필요 항목 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |

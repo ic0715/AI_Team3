@@ -16,7 +16,11 @@
 
 - 사용자 상태 = ONBOARDING
 - NEW01 이메일 인증 완료 후 진입
-- users.basic_info_completed_at IS NULL
+- `profiles.profile_completed = false` (또는 NULL)
+
+> ⚠️ **schema 불일치 수정**: 기존 `users.basic_info_completed_at` 컬럼은 schema에 존재하지 않음.  
+> 완료 여부는 `profiles.profile_completed (boolean)` 컬럼으로 대체.  
+> → **schema 반영 필요 항목**: `profiles` 테이블에 `profile_completed boolean DEFAULT false` 컬럼 추가
 
 ## 3. UI 구성
 
@@ -43,7 +47,10 @@
 
 ### 3.4 직업/분야 카테고리
 
-카테고리 마스터(job_categories 테이블)로 운영 중 추가/수정 가능. 초기 목록:
+카테고리 목록은 클라이언트 상수로 관리. 초기 목록:
+
+> ⚠️ **schema 불일치 수정**: `job_categories` 테이블은 schema에 존재하지 않음.  
+> `profiles.job_field (text)`에 선택한 카테고리 텍스트를 저장하는 방식으로 운영.
 
 - IT/개발, 디자인, 기획/PM, 마케팅/영업, HR/인사
 - 재무/회계, 교육, 의료/보건, 제조/생산
@@ -67,11 +74,15 @@
 
 ## 5. 저장 정책
 
-- **저장 위치**: Supabase users 테이블
+- **저장 위치**: `profiles` 테이블
 - **저장 시점**: "다음" 버튼 클릭 시 일괄 저장
-- **완료 기록**: 저장 후 basic_info_completed_at에 timestamptz 기록
+- **저장 컬럼**: `nickname`, `birthdate`, `gender`, `job_field`, `career_level`, `main_concern`
+- **완료 기록**: 저장 후 `profiles.profile_completed = true`로 UPDATE
 - **임시 저장(이탈 대비)**: sessionStorage.draft_basic_info에 1분마다 백업, 다음 단계 진입 시 삭제
 - **입력값 → AI 시스템 프롬프트 컨텍스트로 주입**: 강점 인터뷰(05), 커리어 인터뷰(08) 시 활용
+
+> ⚠️ **schema 검토 필요**: `profiles.birthdate`는 nullable로 설정되어 있으나, 본 화면에서는 필수 입력.  
+> 닉네임 중복 검사 기능 제공 시 `profiles.nickname`에 UNIQUE 제약 추가 또는 서버 측 중복 체크 로직 필요 (현재 schema에 UNIQUE 제약 없음).
 
 ## 6. 예외 처리
 
@@ -107,3 +118,12 @@
 - 에러 메시지 aria-describedby로 input과 연결
 - date picker 키보드 입력 가능
 - dropdown은 native <select> 또는 ARIA combobox 패턴
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-05 | schema 검증 반영: 진입 조건 `users.basic_info_completed_at` → `profiles.profile_completed`로 수정, 저장 테이블명 `users` → `profiles` 정정, 저장 컬럼 명시, `job_categories` 테이블 미존재 명시(클라이언트 상수 관리), birthdate nullable 불일치 및 nickname UNIQUE 제약 검토 필요 항목 명시 |
+| v1.0 | 2026-05-04 | 최초 작성 |
