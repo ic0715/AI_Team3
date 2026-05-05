@@ -74,7 +74,7 @@
 
 - 액션 옵션 생성: selected_direction + 강점 + 인터뷰 답변 → AI 추천 또는 사전 정의 목록
 - 저장 위치: action_items 테이블 (items JSONB: [{title, detail, is_custom}])
-- 첫 주 weekly_plans 자동 생성: week_index=1, action_items 매핑
+- 첫 주 weekly_actions 자동 생성: week_index=1, action_items 매핑
 - users.coaching_start_at에 timestamptz 기록
 - 전체 작업은 트랜잭션으로 처리 (실패 시 롤백)
 
@@ -85,7 +85,7 @@
 | 미선택 상태 시작 클릭 | CTA disabled |
 | 커스텀 욕설/짧음/공백 | 인라인 에러, 저장 불가 |
 | 선택값 저장 실패 | 토스트 + 재시도 |
-| weekly_plan 생성 실패 | 트랜잭션 롤백, 재시도 |
+| weekly_actions 생성 실패 | 트랜잭션 롤백, 재시도 |
 | 새로고침 | DB 복원 |
 | 중복 클릭 | 첫 클릭 시 disabled |
 | 액션 데이터 없음 | fallback 추천 액션 5개 표시 + 안내 |
