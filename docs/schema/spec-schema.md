@@ -1,9 +1,26 @@
-# CareerPT — DB 스키마 설계 (Draft v0.6)
+# CareerPT — DB 스키마 설계 (Draft v0.7)
 
-> 기준 프로토타입: `CareerPT_prototype_0504.html`  
-> 작성일: 2026-05-04  
-> 상태: 기획 요건 확정 → Supabase 테이블 생성 준비  
+> 기준 프로토타입: `CareerPT_prototype_v6_0505.html`  
+> 작성일: 2026-05-04 / 최종 수정: 2026-05-07  
+> 상태: 기획 요건 확정 → Supabase 테이블 생성 완료  
 > DB: Supabase (PostgreSQL)
+
+### v0.6 → v0.7 변경 사항
+
+| # | 변경 내용 |
+|---|---|
+| 1 | `goals.goal_category` (7개 대분류) 제거 → `goals.competency_code` (12개 역량 코드) + `goals.domain` (4개 도메인) 추가 |
+| 2 | `goals.goal_title` LLM 자유 생성 → competency_code 매핑 한글명 (앱 상수) |
+| 3 | `career_interview_results.recommended_goal_categories` (text[]) → `recommended_competencies` (JSONB, code+match_score+badge 구조) |
+| 4 | 옵션 개수 정책: 3~5개 동적 → **5개 고정** |
+| 5 | 옵션 매칭 로직: AI 추천 → **결정적 매칭(코드)** + 카드 문구만 AI 개인화 |
+| 6 | 액션 생성 정책: AI 자유 생성 → competency_action_map.md 시드 6개 + AI 재해석 |
+| 7 | `action_items.source_seed_id` 컬럼 신규 추가 (nullable, 디버깅용) |
+| 8 | `profiles.career_level` 표준 enum화 (junior_new/junior/senior_mid/senior) + NOT NULL |
+| 9 | `profiles.profile_completed` 컬럼 신규 추가 (boolean, 온보딩 완료 판단) |
+| 10 | 정적 레퍼런스 데이터 섹션 신규 추가 (DB 외부 데이터 경계 명시) |
+| 11 | AI 연동 #2: 강점 페어 컨텍스트 활용 명시 (P08 커리어 인터뷰부터) |
+| 12 | 마이그레이션 SQL 섹션 신규 추가 |
 
 ### v0.5 → v0.6 변경 사항
 | # | 변경 내용 |
@@ -50,12 +67,13 @@
 
 ## 목차
 
+0. [정적 레퍼런스 데이터 (DB 외부)](#정적-레퍼런스-데이터-db-외부) ← v0.7 신규
 1. [전체 테이블 목록](#전체-테이블-목록)
 2. [ERD 관계 요약](#erd-관계-요약)
 3. [테이블 상세 정의](#테이블-상세-정의)
    - [profiles](#1-profiles)
    - [strength_analyses](#2-strength_analyses)
-   - [career_interview_results](#3-career_interview_results) ← v0.3 신규
+   - [career_interview_results](#3-career_interview_results)
    - [goals](#4-goals)
    - [action_items](#5-action_items)
    - [action_completions](#6-action_completions)
@@ -66,6 +84,24 @@
 5. [주차 자동 전환 정책](#주차-자동-전환-정책)
 6. [보안 정책 (RLS)](#보안-정책-rls)
 7. [DB 생성 시 필수 설정](#db-생성-시-필수-설정)
+8. [마이그레이션 SQL (v0.6 → v0.7)](#마이그레이션-sql-v06--v07) ← v0.7 신규
+
+---
+
+## 정적 레퍼런스 데이터 (DB 외부)
+
+> 아래 데이터는 Supabase DB가 아닌 **앱 코드/JSON 파일**로 관리됩니다.  
+> 빌드 시 번들에 포함되며, AI 호출 시점에 클라이언트가 슬라이싱하여 프롬프트에 주입.
+
+| 데이터 | 위치 | 용도 |
+|---|---|---|
+| 12개 역량 정의 + 연계 강점 매핑 + 액션 시드 | `competency_action_map.md` → 앱 JSON 변환 | #3 옵션 매칭, #4 액션 시드 |
+| 강점 페어 설명문 (1,089개) | 비공개 (`.gitignore`) | #2 커리어 인터뷰 질문 개인화 |
+| 강점별 실행항목 가이드 (34개) | 비공개 (`.gitignore`) | #4 액션 톤 참고 |
+
+> ⚠️ **갤럽 원본 데이터는 `.gitignore`로 공개 저장소에서 제외.**  
+> Top 5 강점만 AI에게 전달하고, AI의 자체 지식으로 페어 통찰 생성.  
+> DB에는 강점 `name_en` 코드만 저장하며, 설명문은 저장하지 않음.
 
 ---
 
@@ -133,12 +169,26 @@ auth.users (Supabase 관리)
 | `birthdate` | `date` | nullable | 생년월일 | `1997-03-15` |
 | `gender` | `text` | nullable | 성별 (`남성` / `여성` / `기타`) | `여성` |
 | `job_field` | `text` | nullable | 직업/분야 | `IT/개발` |
-| `career_level` | `text` | nullable | 경력 단계 | `주니어 (1~3년)` |
+| `career_level` | `text` | NOT NULL, CHECK | 경력 단계 (허용값 아래 참고) | `junior` |
 | `main_concern` | `text` | nullable | 가장 큰 커리어 고민 (자유 입력) | `이직을 해야 하는지 모르겠어요` |
+| `profile_completed` | `boolean` | default false | 기본 정보 입력 완료 여부 (03 화면 저장 시 true) | `true` |
 | `avatar_url` | `text` | nullable | 프로필 이미지 URL | `https://...` |
 | `streak_days` | `int` | default 0 | 연속 접속일 | `7` |
 | `created_at` | `timestamptz` | default now() | 가입 일시 | `2026-04-16 09:00:00+09` |
 | `updated_at` | `timestamptz` | default now() | 마지막 수정 일시 | `2026-04-23 18:30:00+09` |
+
+**`career_level` 허용값 및 시드 매핑:**
+
+| 저장값 | 앱 표시 라벨 | 액션 시드 매핑 |
+|---|---|---|
+| `junior_new` | 신입 (1년 미만) | seed_level = `junior` |
+| `junior` | 주니어 (1~3년) | seed_level = `junior` |
+| `senior_mid` | 미드레벨 (4~7년) | seed_level = `senior` |
+| `senior` | 시니어 (8년+) | seed_level = `senior` |
+
+> ⚡ v0.7 변경: 한글 표시값 직접 저장 → 표준 enum 코드로 변경. 앱 표시 라벨은 상수 파일에서 변환.  
+> "취업 준비 중" 선택지 제거 (서비스 대상 범위 외).  
+> `profile_completed`는 온보딩 라우팅 판단에 사용 (01 랜딩 → 03 기본 정보 완료 체크).
 
 ---
 
@@ -189,7 +239,7 @@ auth.users (Supabase 관리)
 | `interviewed_at` | `timestamptz` | NOT NULL, default now() | 인터뷰 완료 일시 | `2026-04-16 10:30:00+09` |
 | `key_insights` | `jsonb` | NOT NULL | AI가 대화에서 추출한 핵심 인사이트 (아래 참고) | 아래 참고 |
 | `ai_summary` | `text` | NOT NULL | AI가 생성한 인터뷰 종합 한 줄 요약 | `성취 지향적이며 방향성보다 성장 환경을 중시함` |
-| `recommended_goal_categories` | `text[]` | nullable | AI가 추천한 목표 대분류 코드 배열 (최대 3개) | `["thinking", "technical"]` |
+| `recommended_competencies` | `jsonb` | nullable | 결정적 매칭으로 산출된 역량 옵션 5개 (아래 참고) | 아래 참고 |
 
 **`key_insights` JSONB 구조:**
 
@@ -226,6 +276,27 @@ auth.users (Supabase 관리)
 > AI 요약: 성취 지향적이며 방향성보다 성장 환경을 중시함
 > ```
 
+**`recommended_competencies` JSONB 구조 (항상 5개 고정):**
+
+```json
+[
+  { "code": "T-1", "match_score": 4, "badge": "strength_match" },
+  { "code": "I-1", "match_score": 3, "badge": "strength_match" },
+  { "code": "R-2", "match_score": 1, "badge": "growth_potential" },
+  { "code": "E-1", "match_score": 2, "badge": "strength_match" },
+  { "code": "T-3", "match_score": 2, "badge": "strength_match" }
+]
+```
+
+| 필드 | 설명 |
+|---|---|
+| `code` | 12개 역량 코드 중 하나 (`T-1` ~ `E-3`) |
+| `match_score` | 사용자 Top 5 강점 ↔ 해당 역량 연계 강점 교집합 카운트 (결정적 계산) |
+| `badge` | `strength_match` (교집합 2개 이상) / `growth_potential` (교집합 1개 이하) |
+
+> ⚡ v0.7 변경: `recommended_goal_categories TEXT[]` → `recommended_competencies JSONB`.  
+> 매칭 점수·뱃지를 함께 저장해야 해서 JSONB로 전환. 옵션 5개 고정.
+
 > **재인터뷰 시:** 새 row 추가 → 이력이 쌓임. 가장 최근 것은 `interviewed_at DESC`로 조회.
 
 ---
@@ -245,8 +316,9 @@ auth.users (Supabase 관리)
 | `id` | `uuid` | PK, default gen_random_uuid() | 목표 고유 ID | `c3d4e5f6-...` |
 | `user_id` | `uuid` | NOT NULL, FK → `profiles.id` | 유저 ID | `a1b2c3d4-...` |
 | `career_interview_id` | `uuid` | nullable, FK → `career_interview_results.id` | 이 목표를 만들게 된 커리어 인터뷰 | `z1y2x3w4-...` |
-| `goal_category` | `text` | NOT NULL | UI·통계·필터용 대분류 코드 (고정 7개, 아래 참고) | `thinking` |
-| `goal_title` | `text` | NOT NULL | LLM이 생성한 유저에게 보이는 목표 제목 | `비판적 사고 기르기` |
+| `competency_code` | `text` | NOT NULL, CHECK | 12개 표준 역량 코드 (아래 참고) | `T-1` |
+| `domain` | `text` | NOT NULL, CHECK | 역량 도메인 (4개: T/I/R/E) | `T` |
+| `goal_title` | `text` | NOT NULL | competency_code에 매핑된 한글 목표명 (앱 상수) | `비판적 사고 기르기` |
 | `status` | `text` | NOT NULL, default `'active'` | 진행 상태 (`active` / `paused` / `completed` / `abandoned`) | `active` |
 | `pause_reason` | `text` | nullable | 목표 일시중단 사유 (선택 입력) | `바빠서 잠깐 쉬고 싶어요` |
 | `current_week` | `int` | default 1 | 현재 진행 주차 (1~12) | `3` |
@@ -256,21 +328,26 @@ auth.users (Supabase 관리)
 | `final_completion_rate` | `int` | nullable | 목표 종료 시 최종 달성률 (%) | `78` |
 | `created_at` | `timestamptz` | default now() | 생성 일시 | `2026-04-16 09:30:00+09` |
 
-**`goal_category` 허용값 (7개 고정 대분류):**
+**`competency_code` + `domain` 허용값 (12개 역량, `competency_action_map.md` 기준):**
 
-| 코드 | 한글 대분류 | LLM이 생성할 수 있는 `goal_title` 예시 |
-|------|------------|---------------------------------------|
-| `thinking` | 사고력 | 비판적 사고 기르기, 논리적 사고력 향상, 창의적 문제해결 능력 키우기 |
-| `technical` | 기술·전문성 | 데이터 분석 능력 기르기, SQL 익히기, 파이썬으로 업무 자동화하기 |
-| `communication` | 소통·표현 | 커뮤니케이션 능력 기르기, 발표력 향상, 설득력 있는 글쓰기 |
-| `leadership` | 리더십·관리 | 리더십 역량 기르기, 팀 코칭 역량 키우기, 의사결정력 높이기 |
-| `execution` | 실행·습관 | 실행력·추진력 기르기, 꾸준한 실행 습관 만들기, 마감 관리 능력 키우기 |
-| `career` | 커리어 탐색 | 이직 준비하기, 포트폴리오 만들기, 업계 네트워크 넓히기 |
-| `wellness` | 멘탈·에너지 | 번아웃 없이 일하는 방법 찾기, 스트레스 관리 능력 기르기, 자기인식 높이기 |
+| code | domain | goal_title (앱 상수) |
+|---|---|---|
+| `T-1` | `T` | 비판적 사고 기르기 |
+| `T-2` | `T` | 데이터 분석 능력 기르기 |
+| `T-3` | `T` | 기획력 기르기 |
+| `I-1` | `I` | 커뮤니케이션 능력 기르기 |
+| `I-2` | `I` | 리더십 역량 기르기 |
+| `I-3` | `I` | 설득·협상력 기르기 |
+| `R-1` | `R` | 협업 능력 기르기 |
+| `R-2` | `R` | 코칭·멘토링 역량 기르기 |
+| `R-3` | `R` | 공감 소통 기르기 |
+| `E-1` | `E` | 실행력·추진력 기르기 |
+| `E-2` | `E` | 문제해결력 기르기 |
+| `E-3` | `E` | 자기관리 역량 기르기 |
 
-> **LLM 프롬프트 지침:** AI는 `goal_title`을 자유롭게 생성하되,  
-> 반드시 위 7개 `goal_category` 중 하나로 분류해서 함께 반환해야 합니다.  
-> 애매한 경우는 가장 가까운 카테고리로 매핑하고, 어느 쪽에도 맞지 않으면 `wellness` 사용.
+> ⚡ v0.7 변경: `goal_category` (7개 자유 생성) → `competency_code` (12개 결정적 코드).  
+> `goal_title`은 더 이상 LLM이 자유 생성하지 않고 **앱 상수 파일에서 code 기반으로 조회**함.  
+> `domain`은 `competency_code`의 prefix와 항상 일치해야 함 (앱에서 INSERT 시 검증).
 
 **`status` 허용값:**
 
@@ -313,12 +390,16 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 | `description` | `text` | nullable | 상세 설명 | `강연을 보고 주장과 근거를 써보는 연습이에요.` |
 | `tags` | `text[]` | nullable | 분류 태그 배열 | `["📹 영상 분석", "⏱ 1~2시간"]` |
 | `is_custom` | `boolean` | default false | 유저 직접 추가 여부 (`true`면 AI 추천 아님, `false`면 AI 추천) | `false` |
+| `source_seed_id` | `text` | nullable | 파생된 시드 액션 식별자 (예: `T-1-junior-2`) | `T-1-junior-2` |
 | `created_at` | `timestamptz` | default now() | 생성 일시 | `2026-04-16 09:35:00+09` |
 
-> ⚡ v0.6 변경: `ai_recommended` 컬럼 제거 → `is_custom`의 반대값으로 판단 가능 (`is_custom=false` = AI 추천)
+> ⚡ v0.6 변경: `ai_recommended` 컬럼 제거 → `is_custom`의 반대값으로 판단 가능 (`is_custom=false` = AI 추천)  
+> ⚡ v0.7 변경: `source_seed_id` 신규 추가. `competency_action_map.md`의 어느 시드에서 파생됐는지 기록 (디버깅·품질 분석용, 필수 아님).
 
-> **매주 추천 흐름:** 코칭 인사이트 저장 시 다음 주 액션 아이템을 AI가 생성 → `action_items`에 INSERT  
-> 유저가 직접 추가하면 `is_custom=true`로 INSERT
+> **v0.7 액션 생성 흐름:**  
+> `competency_action_map.md`에서 해당 `competency_code × career_level` 시드 6개를 가져와 AI에 전달  
+> → AI가 사용자 강점 결에 맞춰 3~5개로 재해석 → `action_items` INSERT  
+> 유저가 직접 추가하면 `is_custom=true`, `source_seed_id=null`
 
 ---
 
@@ -447,55 +528,75 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 #### #2 커리어 인터뷰 (대화형)
 
 ```
-입력: strength_analyses.strengths (강점 결과를 초기 컨텍스트로 제공)
+입력 (DB):
+  - strength_analyses.strengths (Top 5 강점)
+입력 (정적 레퍼런스, 클라이언트가 주입):
+  - Top 5 기반 페어 슬라이싱: C(5,2) = 10개 페어 통찰
+    (페어 원본 데이터는 비공개. AI의 자체 지식으로 페어 시너지 추론)
   ↓
 [대화 진행 — 브라우저 메모리]
   ↓
 출력: career_interview_results INSERT
   - key_insights = AI가 대화에서 추출한 인사이트 (JSONB)
   - ai_summary   = 종합 한 줄 요약
-  ※ 이 단계에서는 recommended_goal_categories 아직 미입력
+  ※ 이 단계에서는 recommended_competencies 아직 미입력
 ```
 
-#### #3 역량 방향 도출 (분석·생성형)
+> 페어 컨텍스트는 P08 커리어 인터뷰부터 활용. P05 강점 인터뷰에는 사용하지 않음.
 
-> **기획 결정 (v0.6):** 인터뷰 완료 후 유저가 별도 버튼("목표 추천받기")을 눌러야 이 단계가 실행됨.  
-> 따라서 `career_interview_results` 에 대한 UPDATE가 발생하며, RLS도 UPDATE를 허용함.
+#### #3 역량 방향 도출 (결정적 매칭 + AI 개인화)
+
+> **기획 결정 (v0.6 유지):** 인터뷰 완료 후 유저가 별도 버튼("목표 추천받기")을 눌러야 이 단계가 실행됨.  
+> ⚡ **v0.7 변경:** AI 자유 추천 → 결정적 매칭(코드) + AI는 카드 문구 개인화만 담당.
 
 ```
 트리거: 유저가 커리어 인터뷰 완료 후 "목표 추천받기" 버튼 클릭
   ↓
-입력: strength_analyses.strengths
-    + career_interview_results.key_insights + ai_summary
+Step 1 (결정적, 코드):
+  입력: strength_analyses.strengths (Top 5 강점)
+       정적 레퍼런스: 12개 역량 × 연계 강점 매핑 표
+  처리: 각 역량의 match_score 산출 → 상위 5개 선택 → badge 부여
   ↓
-[AI가 강점 × 커리어 인사이트를 종합 분석]
+Step 2 (생성형, AI — DB 미저장):
+  입력: 5개 역량 후보 + career_interview_results.key_insights + ai_summary
+  처리: 각 옵션의 카드 설명 문구를 사용자 컨텍스트에 맞춰 개인화
   ↓
 출력: career_interview_results UPDATE
-  - recommended_goal_categories = ["thinking", "technical", ...]
-  (각 카테고리에 대해 goal_title도 함께 생성해서 유저에게 선택지로 제시)
-  (유저에게 goal_title 선택지 3~5개 제시 → 유저가 1개 선택 → goals INSERT)
-     goals.goal_category = 분류된 카테고리 코드
-     goals.goal_title    = LLM이 생성한 목표 제목
+  - recommended_competencies = [{code, match_score, badge}, ...] (5개 고정)
+  (카드 문구는 화면 표시용, DB 미저장)
+
+유저에게 5개 옵션 카드 제시 → 1개 선택 → goals INSERT
+  goals.competency_code = 선택한 code
+  goals.domain          = code의 prefix (T/I/R/E)
+  goals.goal_title      = 앱 상수에서 code로 조회한 한글명
 ```
 
-#### #4 액션아이템 개인화 생성 (생성형)
+#### #4 액션아이템 개인화 생성 (시드 + AI 재해석)
 
-> **기획 결정 (v0.6):** 회고 작성 여부와 무관하게 다음 액션아이템을 추천해야 함.  
-> 회고가 없으면 `coaching_insights`가 비어있을 수 있으므로, 없을 경우 `goals + profiles`만으로 생성.
+> **기획 결정 (v0.6 유지):** 회고 작성 여부와 무관하게 다음 액션아이템을 추천해야 함.  
+> ⚡ **v0.7 변경:** AI 자유 생성 → `competency_action_map.md` 시드 6개 기반 AI 재해석.
 
 ```
 트리거: 매주 월요일 자정 주차 자동 전환 후 OR 유저가 앱 재접속 시 (해당 주차 action_items 없으면)
   ↓
-입력 (필수): goals.goal_category + goals.goal_title + goals.current_week
-           + profiles (직군, 경력)
-입력 (선택): coaching_insights (최근 1~3개 — 존재하면 이전 주 패턴 참고)
+입력 (필수):
+  - goals.competency_code + goals.current_week
+  - profiles.career_level (junior_new/junior → seed_level='junior', senior_mid/senior → 'senior')
+  - 정적 레퍼런스: competency_action_map.md의 시드 6개
+                  (해당 competency_code × seed_level)
+입력 (선택):
+  - strength_analyses.strengths (Top 5 강점 — 강점 결을 살린 재해석에 활용)
+  - coaching_insights (최근 1~3개 — 이전 주 패턴 참고)
   ↓
-[AI가 이번 주에 맞는 액션 아이템 3~5개 생성]
+[AI가 시드 6개를 강점 결에 맞춰 재해석하여 3~5개 액션 출력]
+  예) 화합 강점 사용자가 T-1 선택 시:
+      시드 "팀 결정에 반론 3가지 써보기" → AI 재해석 "다양한 관점 끌어내는 질문 연습"
   ↓
-출력: action_items INSERT (여러 건)
-  - week_number = current_week
-  - is_custom   = false  (AI 추천)
+출력: action_items INSERT (3~5건)
+  - week_number    = current_week
+  - is_custom      = false  (AI 추천)
   - title, description, tags
+  - source_seed_id = 파생된 시드 식별자 (예: T-1-junior-2)
 ```
 
 #### #5 회고 메모 → 코칭 컨텍스트 주입 (분석형)
@@ -551,9 +652,9 @@ profiles ← 기본 정보 입력
 strength_analyses ← #1 강점 인터뷰 결과
     ↓
 career_interview_results ← #2 커리어 인터뷰 결과
-career_interview_results ← #3 역량 방향 도출 (recommended_goal_categories + goal_title 후보 생성)
+career_interview_results ← #3 역량 방향 도출 (recommended_competencies 5개 고정, 결정적 매칭)
     ↓
-goals ← 유저가 목표 선택 (goals.career_interview_id 연결)
+goals ← 유저가 옵션 1개 선택 (competency_code + domain + goal_title 앱 상수)
 action_items ← #4 1주차 액션 아이템 생성
 
 [매주 반복]
@@ -633,7 +734,7 @@ CREATE POLICY "본인 목표만 수정"
 | `weekly_retros` | 본인만 | 본인만 | 본인만 | ❌ 불가 |
 | `coaching_insights` | 본인만 | 본인만 | ❌ 불가 | ❌ 불가 |
 
-> ¹ `career_interview_results` UPDATE: `recommended_goal_categories` 컬럼만 UPDATE 허용 (AI 터치포인트 #3에서 유저가 "목표 추천받기" 버튼을 눌렀을 때 한 번 기록). 앱에서 해당 컬럼만 PATCH하도록 제한.  
+> ¹ `career_interview_results` UPDATE: `recommended_competencies` 컬럼만 UPDATE 허용 (AI 터치포인트 #3에서 유저가 "목표 추천받기" 버튼을 눌렀을 때 한 번 기록). 앱에서 해당 컬럼만 PATCH하도록 제한.  
 > 🔐 `coaching_insights`는 당시 기록 보존이 중요하므로 생성 후 수정·삭제 불가로 설정합니다.  
 > 재인터뷰가 필요하면 새 row를 INSERT하는 방식으로 이력을 쌓습니다.
 
@@ -701,9 +802,20 @@ CREATE TRIGGER trg_strength_analyses_is_latest
 ### 4. CHECK 제약 (테이블 생성 시 컬럼에 포함)
 
 ```sql
+-- profiles 테이블
+career_level TEXT NOT NULL
+  CHECK (career_level IN ('junior_new','junior','senior_mid','senior')),
+
 -- goals 테이블
-goal_category TEXT NOT NULL
-  CHECK (goal_category IN ('thinking','technical','communication','leadership','execution','career','wellness')),
+competency_code TEXT NOT NULL
+  CHECK (competency_code IN (
+    'T-1','T-2','T-3',
+    'I-1','I-2','I-3',
+    'R-1','R-2','R-3',
+    'E-1','E-2','E-3'
+  )),
+domain TEXT NOT NULL
+  CHECK (domain IN ('T','I','R','E')),
 status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active','paused','completed','abandoned')),
 final_completion_rate INT
@@ -729,3 +841,43 @@ CREATE INDEX idx_strength_latest ON strength_analyses (user_id, is_latest);
 -- 코칭 인사이트 컨텍스트 재구성용
 CREATE INDEX idx_coaching_goal_week ON coaching_insights (goal_id, week_number DESC);
 ```
+
+---
+
+## 마이그레이션 SQL (v0.6 → v0.7)
+
+> ⚠️ 이미 Supabase에 v0.6으로 테이블이 생성되어 있다면 아래 SQL을 순서대로 실행하세요.  
+> Supabase Dashboard → SQL Editor에서 실행.
+
+```sql
+-- ① goals: goal_category → competency_code + domain 추가
+ALTER TABLE goals DROP CONSTRAINT IF EXISTS goals_goal_category_check;
+ALTER TABLE goals RENAME COLUMN goal_category TO competency_code;
+ALTER TABLE goals ADD CONSTRAINT goals_competency_code_check
+  CHECK (competency_code IN (
+    'T-1','T-2','T-3',
+    'I-1','I-2','I-3',
+    'R-1','R-2','R-3',
+    'E-1','E-2','E-3'
+  ));
+ALTER TABLE goals ADD COLUMN domain TEXT NOT NULL DEFAULT 'T'
+  CHECK (domain IN ('T','I','R','E'));
+-- ⚠️ domain DEFAULT 임시 설정. 기존 rows에 실제 값 채운 후 DEFAULT 제거 필요.
+
+-- ② career_interview_results: recommended_goal_categories → recommended_competencies
+ALTER TABLE career_interview_results DROP COLUMN recommended_goal_categories;
+ALTER TABLE career_interview_results ADD COLUMN recommended_competencies JSONB;
+
+-- ③ action_items: source_seed_id 추가
+ALTER TABLE action_items ADD COLUMN source_seed_id TEXT;
+
+-- ④ profiles: career_level enum 제약 추가 + profile_completed 추가
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_career_level_check;
+ALTER TABLE profiles ADD CONSTRAINT profiles_career_level_check
+  CHECK (career_level IN ('junior_new','junior','senior_mid','senior'));
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT false;
+-- ⚠️ 기존 career_level 값(한글)이 있으면 enum 제약 적용 전 값 변환 필요.
+```
+
+> ⚠️ `goals.goal_title` 컬럼은 유지하되, INSERT 시점에 더 이상 LLM 자유 생성 텍스트가 아닌  
+> **competency_code에 매핑된 앱 상수 한글명**이 들어갑니다. 앱 코드의 INSERT 로직 변경 필요.
