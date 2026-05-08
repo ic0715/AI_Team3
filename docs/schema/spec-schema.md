@@ -1,12 +1,19 @@
-# CareerPT — DB 스키마 설계 (Draft v0.7.1)
+# CareerPT — DB 스키마 설계 (Draft v0.7.2)
 
 > 기준 프로토타입: `CareerPT_prototype_v3_0505.html`
 > 작성일: 2026-05-04
-> 최종 수정: 2026-05-07
+> 최종 수정: 2026-05-08
 > 상태: 기획 요건 확정 → Supabase 테이블 생성 준비
 > DB: Supabase (PostgreSQL)
 
 ---
+
+### v0.7.1 → v0.7.2 변경 사항 (2026-05-08)
+
+| # | 변경 내용 |
+| --- | --- |
+| 1 | `profiles.profile_completed` 컬럼 추가 — 온보딩 완료 여부, 앱 라우팅 로직의 핵심 조건 |
+| 2 | `push_subscriptions` 테이블 신규 추가 — 푸시 알림 구독 정보 저장 (NEW04) |
 
 ### v0.7 → v0.7.1 변경 사항 (2026-05-07)
 
@@ -96,6 +103,7 @@
    - [daily_memos](#7-daily_memos)
    - [weekly_retros](#8-weekly_retros)
    - [coaching_insights](#9-coaching_insights)
+   - [push_subscriptions](#10-push_subscriptions)
 5. [AI 연동 설계](#ai-연동-설계)
 6. [주차 자동 전환 정책](#주차-자동-전환-정책)
 7. [보안 정책 (RLS)](#보안-정책-rls)
@@ -133,6 +141,7 @@
 | 7 | `daily_memos` | 일일 메모 | 평일 짧은 메모 |
 | 8 | `weekly_retros` | 주차 회고 | 주말 회고 한 줄 요약 |
 | 9 | `coaching_insights` | 코칭 인사이트 | 코칭 세션 종료 후 AI가 생성한 결과 요약 (히스토리) |
+| 10 | `push_subscriptions` | 푸시 구독 정보 | 유저별 웹 푸시 구독 토큰 및 알림 설정 |
 
 > ⚠️ `coaching_sessions` 테이블은 **삭제**했어요.
 > 대화 원문은 저장하지 않고, 브라우저 메모리에서만 진행 후 결과 요약만 `coaching_insights`에 저장합니다.
@@ -160,7 +169,9 @@ auth.users (Supabase 관리)
             │               │
             │               └── coaching_insights (1:N) ← 코칭 결과 요약
             │
-            └── daily_memos (1:N)               ← 날짜별 평일 메모
+            ├── daily_memos (1:N)               ← 날짜별 평일 메모
+            │
+            └── push_subscriptions (1:1)        ← 푸시 알림 구독 정보
 ```
 
 > `career_interview_results` → `goals` 의 관계:
@@ -178,6 +189,7 @@ auth.users (Supabase 관리)
 > 회원가입 후 기본 정보 입력 화면에서 저장됨.
 >
 > ⚡ v0.7 변경: `career_level` 표준 enum화
+> ⚡ v0.7.2 변경: `profile_completed` 컬럼 추가
 
 | 컬럼명 | 타입 | 제약 | 설명 | 예시 |
 | --- | --- | --- | --- | --- |
@@ -187,11 +199,17 @@ auth.users (Supabase 관리)
 | `gender` | `text` | nullable | 성별 (`남성` / `여성` / `기타`) | `여성` |
 | `job_field` | `text` | nullable | 직업/분야 | `IT/개발` |
 | `career_level` | `text` | NOT NULL, CHECK | 경력 단계 표준 enum | `junior` |
+| `profile_completed` | `boolean` | NOT NULL, default false | 03 기본 정보 입력 완료 여부. 앱 라우팅의 핵심 조건 | `false` |
 | `main_concern` | `text` | nullable | 가장 큰 커리어 고민 (자유 입력) | `이직을 해야 하는지 모르겠어요` |
 | `avatar_url` | `text` | nullable | 프로필 이미지 URL | `https://...` |
 | `streak_days` | `int` | default 0 | 연속 접속일 | `7` |
 | `created_at` | `timestamptz` | default now() | 가입 일시 | `2026-04-16 09:00:00+09` |
 | `updated_at` | `timestamptz` | default now() | 마지막 수정 일시 | `2026-04-23 18:30:00+09` |
+
+> **`profile_completed` 사용 규칙:**
+> - 회원가입 직후: `false` (트리거 자동 설정)
+> - 03 기본 정보 입력 완료 시: `true`로 UPDATE
+> - 앱 라우팅에서 `false`이면 → 03 기본 정보 입력 화면으로 리다이렉트
 
 **`career_level` 표준값:**
 
@@ -506,6 +524,36 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 
 ---
 
+### 10. `push_subscriptions`
+
+> 역할: 유저별 웹 푸시 알림 구독 정보 저장.
+> NEW04 알림 권한 허용 시 생성, 알림 설정 화면에서 종류별 on/off 변경 가능.
+>
+> ⚡ v0.7.2 신규 추가
+
+| 컬럼명 | 타입 | 제약 | 설명 | 예시 |
+| --- | --- | --- | --- | --- |
+| `id` | `uuid` | PK, default gen_random_uuid() | 구독 고유 ID | `i9j0k1l2-...` |
+| `user_id` | `uuid` | NOT NULL, FK → `profiles.id`, UNIQUE | 유저 ID (유저당 1개) | `a1b2c3d4-...` |
+| `endpoint` | `text` | NOT NULL | 웹 푸시 엔드포인트 URL | `https://fcm.googleapis.com/...` |
+| `keys` | `jsonb` | NOT NULL | 암호화 키 (`p256dh`, `auth`) | `{"p256dh": "...", "auth": "..."}` |
+| `daily_action` | `boolean` | NOT NULL, default true | 일일 액션 알림 수신 여부 | `true` |
+| `weekly_review` | `boolean` | NOT NULL, default true | 주간 회고 알림 수신 여부 | `true` |
+| `coaching_reminder` | `boolean` | NOT NULL, default true | 코칭 일정 알림 수신 여부 | `true` |
+| `marketing` | `boolean` | NOT NULL, default false | 마케팅 알림 수신 여부 | `false` |
+| `created_at` | `timestamptz` | default now() | 최초 구독 일시 | `2026-04-16 09:00:00+09` |
+| `updated_at` | `timestamptz` | default now() | 설정 변경 일시 | `2026-04-23 18:30:00+09` |
+
+> **알림 종류별 정책:**
+> - `daily_action`: 매일 오전 9시, 오늘의 액션 아이템 리마인드
+> - `weekly_review`: 매주 토요일 오후 7시, 주간 회고 작성 안내
+> - `coaching_reminder`: 코칭 세션 당일 오전 알림
+> - `marketing`: 기본값 false (명시적 동의 후에만 true)
+
+> **구독 갱신:** 엔드포인트가 만료되면 새 구독 정보로 UPDATE (INSERT가 아닌 UPSERT 처리).
+
+---
+
 ## AI 연동 설계
 
 > 대화 원문은 저장하지 않고, 각 AI 기능의 **결과값만** DB에 저장하는 원칙을 따릅니다.
@@ -787,6 +835,7 @@ CREATE POLICY "본인 목표만 수정"
 | `daily_memos` | 본인만 | 본인만 | 본인만 | 본인만 |
 | `weekly_retros` | 본인만 | 본인만 | 본인만 | ❌ 불가 |
 | `coaching_insights` | 본인만 | 본인만 | ❌ 불가 | ❌ 불가 |
+| `push_subscriptions` | 본인만 | 본인만 | 본인만 | 본인만 |
 
 > ¹ `career_interview_results` UPDATE: `recommended_competencies` 컬럼만 UPDATE 허용 (AI 터치포인트 #3에서 유저가 "역량 방향 받기" 버튼을 눌렀을 때 한 번 기록). 앱에서 해당 컬럼만 PATCH하도록 제한.
 
@@ -906,13 +955,13 @@ CREATE INDEX idx_coaching_goal_week ON coaching_insights (goal_id, week_number D
 
 ---
 
-## v0.6 → v0.7.1 마이그레이션 SQL
+## v0.6 → v0.7.2 마이그레이션 SQL
 
 이미 Supabase에 v0.6으로 테이블이 생성되어 있다면 다음 SQL을 적용하세요.
 
 ```sql
 -- ============================================================
--- v0.6 → v0.7.1 마이그레이션
+-- v0.6 → v0.7.2 마이그레이션
 -- ============================================================
 
 -- 1. goals 테이블 — competency_code + domain 도입
@@ -959,6 +1008,35 @@ ALTER TABLE profiles ADD CONSTRAINT profiles_career_level_check
 
 -- 5. 새 인덱스
 CREATE INDEX IF NOT EXISTS idx_goals_domain ON goals (domain);
+
+-- 6. profiles — profile_completed 컬럼 추가 (v0.7.2)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT false;
+
+-- 7. push_subscriptions 테이블 신규 생성 (v0.7.2)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
+  endpoint        TEXT NOT NULL,
+  keys            JSONB NOT NULL,
+  daily_action    BOOLEAN NOT NULL DEFAULT true,
+  weekly_review   BOOLEAN NOT NULL DEFAULT true,
+  coaching_reminder BOOLEAN NOT NULL DEFAULT true,
+  marketing       BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- push_subscriptions RLS
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "본인 푸시 구독만 조회"
+  ON push_subscriptions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "본인 푸시 구독만 생성"
+  ON push_subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "본인 푸시 구독만 수정"
+  ON push_subscriptions FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "본인 푸시 구독만 삭제"
+  ON push_subscriptions FOR DELETE USING (auth.uid() = user_id);
 ```
 
 > ⚠️ `goals.goal_title` 컬럼은 그대로 유지하지만, INSERT 시점에 더 이상 LLM이 생성한 자유 텍스트가 아닌 **competency_code에 매핑된 앱 상수의 한글명**이 들어갑니다. 앱 코드에서 INSERT 로직 변경 필요.
@@ -977,4 +1055,4 @@ CREATE INDEX IF NOT EXISTS idx_goals_domain ON goals (domain);
 
 ---
 
-*CareerPT DB 스키마 v0.7.1 · 2026-05-07*
+*CareerPT DB 스키마 v0.7.2 · 2026-05-08*
