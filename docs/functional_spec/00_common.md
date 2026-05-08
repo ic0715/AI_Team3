@@ -584,7 +584,7 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | id | UUID | PK |
 | action_item_id | UUID | FK → action_items.id |
 | user_id | UUID | FK → profiles.id |
-| completed_at | DATE | 완료일 |
+| completed_date | DATE | 완료일 |
 | created_at | TIMESTAMP | 기록 시각 |
 
 > 체크 시 INSERT, 체크 해제 시 DELETE. 7일 이내만 수정 가능.
@@ -623,6 +623,8 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | --- | --- | --- |
 | id | UUID | PK |
 | user_id | UUID | FK → profiles.id |
+| goal_id | UUID | FK → goals.id |
+| weekly_retro_id | UUID | FK → weekly_retros.id |
 | week_number | INT | 해당 주차 |
 | topic | TEXT | 다룬 주제 (한 줄) |
 | pattern_insight | TEXT | 발견한 패턴 (1~2문장) |
@@ -638,7 +640,7 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
+| user_id | UUID | FK → profiles.id |
 | endpoint | TEXT | 푸시 엔드포인트 URL |
 | keys | JSONB | p256dh, auth 등 푸시 키 |
 | daily_action | BOOLEAN | 일일 액션 알림 수신 여부 |
@@ -721,6 +723,18 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 
 ---
 
+## 부록. v1.4 → v1.5 변경 이력
+
+### v1.5 (2026-05-07) — schema v0.7.1/v0.7.2 반영
+
+`spec-schema.md` v0.7.1/v0.7.2 업데이트 내용을 공통 스펙에 동기화.
+
+- **`action_completions.completed_at`** → **`completed_date`** (컬럼명 수정)
+- **`coaching_insights`**: `goal_id`(FK → goals.id), `weekly_retro_id`(FK → weekly_retros.id) 컬럼 추가
+- **`push_subscriptions.user_id`**: `FK → users.id` → **`FK → profiles.id`** (오타 수정)
+
+---
+
 ## 부록. v1.3 → v1.4 변경 이력
 
 ### v1.4 (2026-05-07) — schema v0.7 반영
@@ -789,4 +803,4 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 
 ---
 
-— 문서 끝 | CareerPT Product Spec v1.4 (schema v0.7 반영)
+— 문서 끝 | CareerPT Product Spec v1.5 (schema v0.7.1/v0.7.2 반영)

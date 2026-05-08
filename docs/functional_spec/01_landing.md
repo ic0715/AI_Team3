@@ -36,13 +36,13 @@ ONBOARDING 상태인 경우, 아래 순서로 DB를 체크해 마지막으로 �
 1. profiles.profile_completed = false  →  03 기본 정보 입력
 2. strength_analyses (is_latest=true) 없음  →  04 강점 진단 선택
 3. career_interview_results 없음  →  07 커리어 인터뷰 안내
-4. career_interview_results.recommended_goal_categories is null  →  09 커리어 인터뷰 결과
+4. career_interview_results.recommended_competencies is null  →  09 커리어 인터뷰 결과
 5. goals (active) 없음  →  10 목표 선택 (액션아이템 화면)
 ```
 
-> `profiles.profile_completed` 컬럼: `profiles` 테이블에 `boolean DEFAULT false` 로 추가 필요.  
+> `profiles.profile_completed` 컬럼: `profiles` 테이블에 `boolean DEFAULT false` 로 추가.  
 > 03 기본 정보 입력 완료 시 `true`로 UPDATE.  
-> → **schema 반영 필요 항목** (spec-schema.md에 미기재)
+> → **schema v0.7.2에 반영 완료** (spec-schema.md 업데이트됨)
 
 ### 2.2 COMPLETED 판별 기준
 
@@ -151,6 +151,7 @@ ONBOARDING 상태인 경우, 아래 순서로 DB를 체크해 마지막으로 �
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-07 | schema v0.7.1/v0.7.2 반영: **2.1 ONBOARDING 리다이렉트** — `recommended_goal_categories` → `recommended_competencies` / `profiles.profile_completed` schema 반영 완료 주석 업데이트 |
 | v1.2 | 2026-05-05 | 프로토타입(v6) 기반 UI 상세 추가: 헤더 브랜드 서브타이틀 추가 / 헤더 로그인 링크 제거(Footer 통합) / Hero 카피 및 Eyebrow 태그 프로토타입 기준으로 업데이트 / 코칭 원칙 카드 아이콘·본문 실제 문구 반영 / 타임라인 각 단계 부제목 추가 / Footer CTA 스타일 명세 / 기능·분석 이벤트 헤더 로그인→Secondary CTA 기준으로 수정 |
 | v1.1 | 2026-05-05 | schema 검증 반영: PAUSED 상태 리다이렉트 추가, ONBOARDING 세부 로직(2.1) 신규, COMPLETED 판별 기준(2.2) 명시, 상태 판별 우선순위 추가, profiles.profile_completed 컬럼 schema 반영 필요 항목 명시 |
 | v1.0 | 2026-05-04 | 최초 작성 |

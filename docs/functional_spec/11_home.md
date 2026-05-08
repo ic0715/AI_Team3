@@ -129,7 +129,7 @@ v2 구현 내용:
 ## 5. 데이터
 
 - `profiles` (nickname)
-- `goals` (goal_title, goal_category, status, current_week, total_weeks, started_at)
+- `goals` (goal_title, competency_code, domain, status, current_week, total_weeks, started_at)
 - `goals` 전체 row (Q{n} 순번 계산용, user_id 기준)
 - `action_items` (week_number = current_week, 단일 항목)
 - `action_completions` (이번 주 완료 기록 — 진행률·체크 인디케이터 기준)
@@ -196,6 +196,7 @@ v2 구현 내용:
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-07 | schema v0.7.1 반영: **5번 데이터** — `goals.goal_category` → `goals.competency_code, domain` |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: **① 테마 카드 레이블 "Q{n} · 12주 테마" 확정** — DB 컬럼 추가 없이 프론트에서 goals row 순번 계산 / **② 상단 바 프로토타입 수정 권고 주석 추가** (알림·프로필 아이콘 미구현) / **③ PAUSED UI v2 구현 대상으로 명시** (3.7항 신설) / **④ 오늘의 액션 카드 진행률 분모 7일 고정으로 확정** — "N/7 완료" 형태, action_completions 날짜 기준 / **⑤ 액션 표시 방식 "목록"→"단일 항목 1개"로 수정** (10에서 1개 선택 구조 반영) / **⑥ 타임라인 완료율 데이터 소스 수정** — weekly_actions.daily_done → action_completions 기반 / **⑦ 알림 카드 조건부 노출 규칙 표로 명세** |
 | v1.1 | 2026-05-05 | schema 검증 반영: 진입 조건 PAUSED 상태 추가, `career_focus`/`weekly_actions`→`goals`/`action_items` 수정, 오늘 체크 토글 `action_completions` INSERT/DELETE 방식 명시, 주차 자동 전환 로직 명시, 12주 완료 시 `ended_at`+`final_completion_rate` 기록 명시, 테이블명 전반 수정 |
 | v1.0 | 2026-05-04 | 최초 작성 |

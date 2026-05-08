@@ -100,7 +100,7 @@
 
 ## 5. 데이터
 
-- 읽기: `goals` (active, goal_title, goal_category, current_week), `profiles` (job_field, career_level)
+- 읽기: `goals` (active, goal_title, competency_code, domain, current_week), `profiles` (job_field, career_level)
 - 쓰기: 선택된 `action_items` INSERT (week_number=1, is_custom=false)
 - 커스텀 추가 시: `action_items` INSERT (is_custom=true)
 - 전체 작업은 트랜잭션으로 처리 (실패 시 롤백)
@@ -136,7 +136,7 @@
 | `action_selection_view` | — |
 | `action_option_selected` | `action_id`, `kind=recommended/custom` |
 | `custom_action_added` | — |
-| `cycle_started` | `direction_title`, `goal_category`, `time_from_signup` |
+| `cycle_started` | `direction_title`, `competency_code`, `time_from_signup` |
 
 ---
 
@@ -153,6 +153,7 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-07 | schema v0.7.1 반영: **5번 데이터** — `goal_category` → `competency_code, domain` / **7번 분석 이벤트** `cycle_started` 속성 `goal_category` → `competency_code` |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: **① 화면 성격 확정** — "AI 자동 생성 로딩 화면" 정의 삭제, 유저가 직접 1개 선택하는 UX로 확정 / **② 선택 개수 1개로 확정** (프로토타입 기준) — 3.3 안내 패널·3.4 카드·3.7 CTA 전반 수정 / **③ 커스텀 maxlength 5~50자로 확정** (기존 5~80자에서 수정) / **④ 하단 summary 영역 프로토타입 기준으로 변경** — "12주 시작 준비 완료!" 문구 삭제, 목표명 pill + 선택 수 badge 구성으로 변경 / **⑤ 상단 goal pill 선택 수 badge 명세 추가** (3.2항 신규) |
 | v1.1 | 2026-05-05 | schema 검증 반영: 화면 역할 재정의(유저 선택→AI 자동 생성 로딩 화면), `career_results.selected_direction`→`goals.goal_title`, `career_focus`·`weekly_actions` 테이블 없음(→`goals`·`action_items`), `action_items.items JSONB`→별도 row 구조, `users.coaching_start_at`→`goals.started_at` 수정 |
 | v1.0 | 2026-05-04 | 최초 작성 |
