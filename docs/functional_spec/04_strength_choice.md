@@ -2,6 +2,8 @@
 
 > AI 인터뷰와 갤럽 결과지 파일 업로드 두 가지 강점 발견 경로 중 하나를 유저가 선택하게 하는 분기 화면.
 
+---
+
 ## 1. 화면 개요
 
 | 항목 | 내용 |
@@ -12,6 +14,8 @@
 | 이전 화면 | 03 기본 정보 |
 | 다음 화면 | 경로 A: 05 강점 인터뷰 / 경로 B: 06 강점 결과 (파싱 후 직행) |
 
+---
+
 ## 2. 진입 조건
 
 - 사용자 상태 = ONBOARDING
@@ -19,7 +23,9 @@
 - `strength_analyses` 테이블에 `is_latest = true` 인 결과가 없는 경우
 - 또는 15에서 강점 재분석 요청 시
 
-> ⚠️ **schema 불일치 수정**: `strength_results.is_active` → `strength_analyses.is_latest`로 변경 (테이블명 및 컬럼명 모두 수정)
+> ⚠️ **schema 불일치 수정 완료**: `strength_results.is_active` → `strength_analyses.is_latest` (테이블명 및 컬럼명 모두 수정)
+
+---
 
 ## 3. UI 구성
 
@@ -27,59 +33,79 @@
 
 - 뒤로가기 → 03 또는 15
 - 페이지 타이틀: "강점 진단"
+- 프로그레스: 2 / 5 단계 (40%)
 
 ### 3.2 인트로
 
-- 타이틀: "당신의 강점을 어떻게 발견할까요?"
-- 서브: "두 가지 방법 중 편한 쪽을 선택해주세요"
+- 타이틀: "나의 강점을 발견해볼게요 💡"
+- 서브: "강점을 파악하는 방법을 선택해주세요."
 
 ### 3.3 카드형 선택지 2개
 
 #### 카드 A. AI 인터뷰
 
-- 아이콘: 💬 또는 채팅 일러스트
+- 아이콘: 💬
 - 제목: "AI 코치와 대화하기"
-- 설명: "5~8분간의 대화로 당신의 강점 5가지를 발견해요"
-- 소요 시간 배지: "약 5~8분"
-- 추천 배지: "처음 진단하는 분께 추천"
+- 설명: "AI가 질문을 드리면 자유롭게 답변해주세요. 경험 속에서 강점을 자동으로 분석해드려요."
+- 소요 시간 배지: "⏱ 약 5~10분"
+- 추천 배지: "추천" (badge-blue 스타일)
+- 부가 태그: "🎙 대화형", "✨ 가장 정확해요"
 
 #### 카드 B. 갤럽 결과지 업로드
 
-- 아이콘: 📄 또는 파일 일러스트
+- 아이콘: 📄
 - 제목: "갤럽 결과지 업로드"
-- 설명: "이미 갤럽 CliftonStrengths 진단을 받으셨다면 결과지를 업로드해주세요"
-- 소요 시간 배지: "약 1분"
-- 지원 형식: "PDF 또는 이미지"
+- 설명: "이미 갤럽 StrengthsFinder 검사를 받으셨나요? 결과 파일을 업로드하면 바로 시작할 수 있어요."
+- 소요 시간 배지: "⚡ 빠른 시작"
+- 부가 태그: "📎 PDF/이미지"
 
-### 3.4 파일 업로드 영역 (카드 B 선택 시 노출)
+### 3.4 파일 업로드 영역 (카드 B 선택 시 노출) `v1.2 수정`
 
-- 드래그앤드롭 또는 파일 선택 버튼
-- 지원 형식: PDF, JPG, PNG (최대 10MB)
-- 업로드 진행률 표시
-- 업로드 완료 후 미리보기 + 파싱 결과 미리 안내
+> 허용 파일 포맷 및 업로드 진행 상태 UI가 프로토타입 v6 기준으로 확정되었습니다.
 
-### 3.5 Bottom CTA
+- 드래그앤드롭 영역 또는 "클릭하여 파일 선택" 버튼
+- **허용 파일 포맷 (확정)**: PDF, JPG, PNG
+- **최대 파일 크기 (확정)**: 10MB
+- input `accept` 속성값: `.pdf,.jpg,.jpeg,.png`
 
-- "다음으로 →" - 카드 선택 시 활성화
-- 카드 B 선택 시: 파일 업로드 + 파싱 완료 시에만 활성화
+**업로드 진행 상태 UI — 3단계 (확정)** `v1.2 신규`
+
+| 단계 | 상태 | UI 표시 |
+| --- | --- | --- |
+| 1단계 | 업로드 중 | 파일명 + 진행률 바 (0~100%) + 취소(✕) 버튼 |
+| 2단계 | 분석 중 | 상태 텍스트 "분석 중..." + 진행률 바 완료 표시 |
+| 3단계 성공 | 인식 완료 | 초록색 박스 "결과지를 인식했어요! 강점 Top 5를 추출했어요. 다음으로 진행해주세요." |
+| 3단계 실패 | 인식 불가 | 빨간색 박스 "파일을 인식할 수 없어요" + "다시 시도하기" 버튼 |
+
+### 3.5 Bottom CTA `v1.2 수정`
+
+- 카드 A 선택 시: "다음으로 →" — 카드 선택 즉시 활성화
+- 카드 B 선택 시: **"결과 확인하기 →"** — 파일 업로드 + 파싱 완료 시에만 활성화
+  - 업로드 경로임을 사용자에게 명확히 인지시키는 문구로 변경 (기존 "다음으로 →"에서 수정)
+
+---
 
 ## 4. 기능 및 인터랙션
 
 | 기능 | 동작 |
 | --- | --- |
-| 카드 A 선택 | 강조 → 다음 클릭 시 05 강점 인터뷰 진입 (별도 세션 생성 없음 — 대화는 브라우저 메모리에서만 진행) |
-| 카드 B 선택 | 강조 + 파일 업로드 영역 노출 |
+| 카드 A 선택 | 강조 표시 → 다음 클릭 시 05 강점 인터뷰 진입 (별도 세션 생성 없음 — 대화는 브라우저 메모리에서만 진행) |
+| 카드 B 선택 | 강조 표시 + 파일 업로드 영역 노출 |
 | 파일 업로드 | Supabase Storage 업로드 + 서버사이드 파싱 (PDF/이미지) |
-| 파싱 성공 | 강점 Top 5 데이터 추출 → `strength_analyses`에 `method='gallup_upload'`로 저장 → 다음 클릭 시 06 직행 |
-| 파싱 실패 | 에러 안내 + 재업로드 또는 AI 인터뷰로 변경 권장 |
-| 카드 전환 | 카드 B → A로 변경 시 업로드 데이터 초기화(확인 다이얼로그) |
+| 파싱 성공 | 강점 Top 5 데이터 추출 → `strength_analyses`에 `method='gallup_upload'`로 저장 → CTA 활성화 → 클릭 시 06 직행 |
+| 파싱 실패 | 에러 UI 노출 + "다시 시도하기" 버튼 또는 AI 인터뷰 전환 권장 |
+| 카드 B → A 전환 | 업로드 데이터 초기화 (확인 다이얼로그 없이 즉시 초기화, 업로드 영역 숨김) |
+
+---
 
 ## 5. 파일 파싱 정책
 
 - **서버사이드 파싱 권장**: PDF.js 또는 OCR(이미지) → 갤럽 34 테마 키워드 매칭
 - **파싱 실패 시 fallback**: AI에게 OCR 텍스트 전달 → 강점 5개 추출 시도
-- **보안**: 업로드 파일은 파싱 후 30일 보관 후 자동 삭제(원본 PDF 유지 불필요)
+- **보안**: 업로드 파일은 파싱 후 30일 보관 후 자동 삭제 (원본 미보존)
 - **개인정보**: 결과지에 이름·이메일 포함 가능 → 파싱 시 PII 제거
+
+---
 
 ## 6. 예외 처리
 
@@ -87,44 +113,50 @@
 | --- | --- |
 | 카드 미선택 상태 다음 클릭 | CTA disabled |
 | 파일 형식 미지원 | "PDF 또는 이미지 파일만 업로드 가능해요" |
-| 파일 크기 초과(>10MB) | "10MB 이하 파일만 업로드 가능해요" |
-| 업로드 실패 | 재시도 버튼 + 에러 메시지 |
-| 파싱 실패 (텍스트 인식 불가) | "결과지를 인식할 수 없어요. AI 인터뷰로 진행하시겠어요?" |
-| 갤럽 형식이 아닌 파일 | "갤럽 CliftonStrengths 결과지가 맞는지 확인해주세요" |
+| 파일 크기 초과 (>10MB) | "10MB 이하 파일만 업로드 가능해요" |
+| 업로드 실패 | "다시 시도하기" 버튼 + 에러 메시지 |
+| 파싱 실패 (텍스트 인식 불가) | "결과지를 인식할 수 없어요. AI 인터뷰로 진행하시겠어요?" + 카드 A 전환 유도 |
+| 갤럽 형식이 아닌 파일 | "갤럽 CliftonStrengths 결과지가 맞는지 확인 후 다시 업로드해주세요" |
 | 강점 Top 5 미만 추출 | "일부 강점만 인식되었어요. AI 인터뷰로 보완하시겠어요?" |
-| 네트워크 오류 | NEW05 |
+| 네트워크 오류 | NEW05 네트워크 오류 화면 |
 | 세션 생성 실패 | 토스트 + 재시도 |
+
+---
 
 ## 7. 데이터 정책
 
-- 카드 A 경로: DB 저장 없음. 대화는 브라우저 메모리에서만 진행, 인터뷰 완료 후 `strength_analyses` INSERT
-- 카드 B 경로: `strength_analyses` 신규 INSERT (`method='gallup_upload'`, `file_url` 보관)
-- 업로드 파일: Supabase Storage의 private 버킷, 사용자별 접근 권한
-- 파싱 결과: `strengths` JSONB로 저장 `[{rank, name_ko, name_en, description}]`
+- **카드 A 경로**: DB 저장 없음. 대화는 브라우저 메모리에서만 진행, 인터뷰 완료 후 `strength_analyses` INSERT
+- **카드 B 경로**: `strength_analyses` 신규 INSERT (`method='gallup_upload'`, `file_url` 보관)
+- **업로드 파일**: Supabase Storage private 버킷, 사용자별 접근 권한
+- **파싱 결과 저장 포맷**: `strengths` JSONB `[{rank, name_ko, name_en, description}]`
 
-> ⚠️ **schema 불일치 수정**:
-> - `coaching_sessions` 테이블은 v0.2에서 삭제됨 (대화 원문 미저장 정책)
+> ⚠️ **schema 불일치 수정 완료**:
+> - `coaching_sessions` 테이블 삭제됨 (v0.2, 대화 원문 미저장 정책)
 > - `strength_results` → `strength_analyses` (테이블명)
 > - `source` → `method` (컬럼명), 허용값: `ai_interview` / `gallup_upload`
 > - `raw_file_url` → `file_url` (컬럼명)
 > - `themes` → `strengths` (컬럼명)
 
+---
+
 ## 8. 분석 이벤트
 
 | 이벤트 | 속성 |
 | --- | --- |
-| strength_choice_view | - |
-| strength_choice_selected | method=interview/upload |
-| file_uploaded | file_type, file_size, parse_success |
-| file_parse_failed | reason |
-| strength_choice_confirmed | method |
+| `strength_choice_view` | — |
+| `strength_choice_selected` | `method=interview/upload` |
+| `file_uploaded` | `file_type`, `file_size`, `parse_success` |
+| `file_parse_failed` | `reason` |
+| `strength_choice_confirmed` | `method` |
+
+---
 
 ## 9. 접근성
 
-- 카드 선택은 radio group 패턴 (role="radiogroup")
+- 카드 선택은 radio group 패턴 (`role="radiogroup"`)
 - 파일 업로드 영역은 키보드로도 트리거 가능
 - 드래그앤드롭 외에 버튼 클릭 대안 제공
-- 업로드 진행률은 aria-live로 알림
+- 업로드 진행률 및 상태 변경은 `aria-live="polite"`로 스크린 리더 알림
 
 ---
 
@@ -132,5 +164,6 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
-| v1.1 | 2026-05-05 | schema 검증 반영: `strength_results.is_active` → `strength_analyses.is_latest` 수정, 카드A 인터뷰 세션 생성 제거(브라우저 메모리 방식 명시), `coaching_sessions` 테이블 삭제됨 명시, 테이블·컬럼명 전반 수정(`strength_results`→`strength_analyses`, `source`→`method`, `raw_file_url`→`file_url`, `themes`→`strengths`) |
+| v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: 허용 파일 포맷 확정 (PDF/JPG/PNG, 10MB) / 업로드 진행 상태 UI 3단계 명세 신규 추가 (업로드 중→분석 중→성공/실패) / 카드 B CTA 텍스트 "결과 확인하기 →"로 확정 / 상단 바 프로그레스 "2 / 5 단계 (40%)" 추가 / 인트로 타이틀·설명 프로토타입 기준으로 수정 / 카드 A·B 부가 태그 텍스트 확정 |
+| v1.1 | 2026-05-05 | schema 검증 반영: `strength_results.is_active` → `strength_analyses.is_latest` 수정, 카드 A 인터뷰 세션 생성 제거(브라우저 메모리 방식 명시), `coaching_sessions` 테이블 삭제됨 명시, 테이블·컬럼명 전반 수정 (`strength_results`→`strength_analyses`, `source`→`method`, `raw_file_url`→`file_url`, `themes`→`strengths`) |
 | v1.0 | 2026-05-04 | 최초 작성 |
