@@ -288,7 +288,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 화면 목적 | AI가 도출한 커리어 방향(역량목표) 후보 5가지를 제시하고, 유저가 원하는 방향을 선택하게 한다. |
 | 주요 UI | 커리어 방향 카드 5개 (제목 + 설명 + 강점 연관 이유), 선택 체크, "액션 아이템 받기" CTA, "인터뷰 다시하기" 링크 |
 | 핵심 동작 | 방향 선택 → CTA 활성화 → 선택값 저장 → 10 이동 / "인터뷰 다시하기" → 08 재진입 |
-| 기술 키워드 | "목표 추천받기" 버튼 → AI가 `career_interview_results.recommended_goal_categories` UPDATE → `goal_title` 후보 3~5개 제시 → 유저 선택 시 `goals` INSERT (`goal_category`, `goal_title`, `status='active'`, `started_at=today`) |
+| 기술 키워드 | "목표 추천받기" 버튼 → 결정적 매칭으로 `career_interview_results.recommended_competencies` UPDATE (5개 고정, JSONB) → 유저에게 5개 옵션 카드 제시 → 유저 선택 시 `goals` INSERT (`competency_code`, `domain`, `goal_title` 앱 상수, `status='active'`, `started_at=today`) |
 
 ### ── DO (10 + NEW02 + NEW04) ──
 
@@ -481,7 +481,7 @@ Supabase (PostgreSQL 기반) — 인증(Auth)과 데이터베이스 모두 Supab
 
 ```
 profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_latest 트리거)
-          ├─ career_interview_results  ── (커리어 인터뷰 결과, recommended_goal_categories)
+          ├─ career_interview_results  ── (커리어 인터뷰 결과, recommended_competencies JSONB)
           ├─ goals                     ── (12주 목표 + 사이클 상태 관리)
           │    └─ action_items         ── (주차별 액션 아이템, week_number)
           │         └─ action_completions ── (일일 액션 완료 기록)
@@ -498,7 +498,8 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 
 ### 8.3 주요 테이블 명세
 
-> ⚠️ **v1.2 → v1.3 schema 전면 검증 완료** (2026-05-05): 실제 Supabase 스키마(`spec-schema.md` v0.6)와 불일치하는 테이블/컬럼명 전체 수정. 상세 내용은 각 화면 정의서 변경 이력 참조.
+> ⚠️ **v1.3 schema 전면 검증 완료** (2026-05-05): 실제 Supabase 스키마(`spec-schema.md` v0.6)와 불일치하는 테이블/컬럼명 전체 수정.  
+> ⚠️ **v1.4 schema v0.7 반영** (2026-05-07): `goal_category`→`competency_code`+`domain`, `recommended_goal_categories`→`recommended_competencies`, `career_level` enum화, `profile_completed` 추가, `source_seed_id` 추가.
 
 #### ① profiles (구 users)
 
@@ -506,12 +507,16 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | --- | --- | --- |
 | id | UUID | Supabase Auth UID (PK) |
 | nickname | TEXT | 유저 이름 (03에서 입력) |
-| age_range | TEXT | 나이대 |
+| birthdate | DATE | 생년월일 (nullable) |
+| gender | TEXT | 성별 (nullable) |
 | job_field | TEXT | 직군 |
-| career_level | TEXT | 경력 수준 |
+| career_level | TEXT | 경력 단계 enum (`junior_new` / `junior` / `senior_mid` / `senior`) |
 | main_concern | TEXT | 현재 커리어 고민 |
-| profile_completed | BOOLEAN | 03 기본 정보 입력 완료 여부 |
+| profile_completed | BOOLEAN | 03 기본 정보 입력 완료 여부 (온보딩 라우팅 기준) |
+| avatar_url | TEXT | 프로필 이미지 URL (nullable) |
+| streak_days | INT | 연속 접속일 |
 | created_at | TIMESTAMP | 계정 생성 시각 |
+| updated_at | TIMESTAMP | 마지막 수정 시각 |
 
 #### ② strength_analyses (구 strength_results)
 
@@ -531,9 +536,9 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | --- | --- | --- |
 | id | UUID | PK |
 | user_id | UUID | FK → profiles.id |
-| key_insights | TEXT | AI가 추출한 핵심 인사이트 요약 |
+| key_insights | JSONB | AI가 추출한 핵심 인사이트 요약 |
 | ai_summary | TEXT | 커리어 인터뷰 전체 요약 |
-| recommended_goal_categories | JSONB | 09 화면에서 AI가 생성한 목표 카테고리 후보 |
+| recommended_competencies | JSONB | 09 화면 결정적 매칭 결과 ({code, match_score, badge} × 5개 고정) |
 | created_at | TIMESTAMP | 저장 시각 |
 
 > 대화 원문 미저장 (v0.2 정책). 브라우저 sessionStorage에서만 관리.
@@ -545,8 +550,9 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | id | UUID | PK |
 | user_id | UUID | FK → profiles.id |
 | career_interview_id | UUID | FK → career_interview_results.id |
-| goal_title | TEXT | 유저가 선택한 목표명 |
-| goal_category | TEXT | 목표 카테고리 |
+| competency_code | TEXT | 12개 역량 코드 (T-1~E-3, CHECK 제약) |
+| domain | TEXT | 역량 도메인 (T/I/R/E) |
+| goal_title | TEXT | competency_code 매핑 한글명 (앱 상수) |
 | status | TEXT | `active` / `paused` / `completed` / `abandoned` |
 | current_week | INT | 현재 진행 주차 (1~12, 매주 월요일 자동 증가) |
 | total_weeks | INT | 전체 주차 (기본 12) |
@@ -565,9 +571,11 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | title | TEXT | 액션 제목 |
 | description | TEXT | 액션 설명 |
 | is_custom | BOOLEAN | 유저 직접 입력 여부 |
+| source_seed_id | TEXT | 파생 시드 식별자 (예: `T-1-junior-2`, nullable, 디버깅용) |
 | created_at | TIMESTAMP | 생성 시각 |
 
-> 각 액션 아이템이 별도 row로 저장됨 (JSONB 배열 방식 아님).
+> 각 액션 아이템이 별도 row로 저장됨 (JSONB 배열 방식 아님).  
+> v0.7: `competency_action_map.md` 시드 기반 AI 재해석으로 생성.
 
 #### ⑥ action_completions (일일 액션 완료 기록)
 
@@ -576,7 +584,7 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | id | UUID | PK |
 | action_item_id | UUID | FK → action_items.id |
 | user_id | UUID | FK → profiles.id |
-| completed_at | DATE | 완료일 |
+| completed_date | DATE | 완료일 |
 | created_at | TIMESTAMP | 기록 시각 |
 
 > 체크 시 INSERT, 체크 해제 시 DELETE. 7일 이내만 수정 가능.
@@ -615,6 +623,8 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | --- | --- | --- |
 | id | UUID | PK |
 | user_id | UUID | FK → profiles.id |
+| goal_id | UUID | FK → goals.id |
+| weekly_retro_id | UUID | FK → weekly_retros.id |
 | week_number | INT | 해당 주차 |
 | topic | TEXT | 다룬 주제 (한 줄) |
 | pattern_insight | TEXT | 발견한 패턴 (1~2문장) |
@@ -630,7 +640,7 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | 필드명 | 타입 | 설명 |
 | --- | --- | --- |
 | id | UUID | PK |
-| user_id | UUID | FK → users.id |
+| user_id | UUID | FK → profiles.id |
 | endpoint | TEXT | 푸시 엔드포인트 URL |
 | keys | JSONB | p256dh, auth 등 푸시 키 |
 | daily_action | BOOLEAN | 일일 액션 알림 수신 여부 |
@@ -713,6 +723,35 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 
 ---
 
+## 부록. v1.4 → v1.5 변경 이력
+
+### v1.5 (2026-05-07) — schema v0.7.1/v0.7.2 반영
+
+`spec-schema.md` v0.7.1/v0.7.2 업데이트 내용을 공통 스펙에 동기화.
+
+- **`action_completions.completed_at`** → **`completed_date`** (컬럼명 수정)
+- **`coaching_insights`**: `goal_id`(FK → goals.id), `weekly_retro_id`(FK → weekly_retros.id) 컬럼 추가
+- **`push_subscriptions.user_id`**: `FK → users.id` → **`FK → profiles.id`** (오타 수정)
+
+---
+
+## 부록. v1.3 → v1.4 변경 이력
+
+### v1.4 (2026-05-07) — schema v0.7 반영
+
+`spec-schema.md` v0.7 역량 분류 체계 전환 내용을 공통 스펙에 동기화.
+
+- **`goals.goal_category`(7개) 제거** → `competency_code`(12개 T/I/R/E 코드) + `domain`(4개 도메인) 컬럼으로 교체
+- **`goals.goal_title`**: LLM 자유 생성 → `competency_code` 기반 앱 상수 한글명으로 변경
+- **`career_interview_results.recommended_goal_categories`(text[]) 제거** → `recommended_competencies`(JSONB, code+match_score+badge, 5개 고정)로 교체
+- **`profiles.career_level`**: 한글 텍스트 → 표준 enum(`junior_new`/`junior`/`senior_mid`/`senior`) + NOT NULL
+- **`profiles`**: `age_range` → `birthdate`+`gender`로 교체, `avatar_url`+`streak_days`+`updated_at` 추가 (spec-schema.md 기준 동기화)
+- **`action_items.source_seed_id`**: 시드 추적용 컬럼 신규 추가 (nullable)
+- **09 화면 기술 키워드**: AI 자유 추천 → 결정적 매칭(코드) + AI 카드 문구 개인화 구조 반영
+- **8.3 테이블 명세**: 상기 변경사항 전체 반영
+
+---
+
 ## 부록. v1.2 → v1.3 변경 이력
 
 ### v1.3 (2026-05-05) — schema 전면 검증
@@ -764,4 +803,4 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 
 ---
 
-— 문서 끝 | CareerPT Product Spec v1.2 (FLOW 정렬판)
+— 문서 끝 | CareerPT Product Spec v1.5 (schema v0.7.1/v0.7.2 반영)
