@@ -10,7 +10,7 @@
 | 페이즈 | MAINTAIN |
 | 역할 | 회고 데이터 기반 AI 코칭 + 다음 주 방향 설계 |
 | 진입 경로 | 12 주말 모드, 11 알림 카드 |
-| 다음 화면 | 11 (확정 후 insight_history 저장) |
+| 다음 화면 | 11 (확정 후 `coaching_insights` 저장) |
 
 ## 2. 진입 조건
 
@@ -131,6 +131,7 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-09 | schema v0.7.2 정합성 정렬: **1번 화면 개요 다음 화면** — 옛 테이블명 잔존 정리 (`insight_history` → `coaching_insights`). v1.1에서 본문은 정리됐으나 1번 표 한 곳에 옛 명칭이 남아있어 일괄 정렬. |
 | v1.2 | 2026-05-07 | schema v0.7.1 반영: **3.6항 CTA** — `insight_history 저장` → `coaching_insights 저장`, `weekly_actions(week_num+1)` → `action_items(week_number+1)` |
 | v1.1 | 2026-05-05 | schema 검증 반영: `coaching_sessions` 삭제됨(대화 원문 미저장), 컨텍스트 주입 테이블명 수정(`weekday_memos`→`daily_memos`, `strength_results`→`strength_analyses`, `career_results`→`career_interview_results`, `insight_history`→`coaching_insights`), 확정 시 `coaching_insights` INSERT + `action_items` INSERT 명시, `coaching_insights` 저장 컬럼 목록 추가 |
 | v1.0 | 2026-05-04 | 최초 작성 |
