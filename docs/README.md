@@ -71,15 +71,15 @@ CareerPT는 세 가지를 하나로 연결합니다.
 | 커리어 연결 | ❌ | ✅ | ❌ | ✅ |
 | 실행 추적 | ❌ | ❌ | ✅ | ✅ |
 | 패턴 누적 | ❌ | ❌ | ❌ | ✅ |
-| 접근 비용 | 저 | 고 (15~30만원/회) | 저 | 저 |
+| 접근 비용 | 저 | 고 | 저 | 저 |
 
 ---
 
 ## 어떻게 작동하는가
 
 ```
-DISCOVER → DIRECTION → DO → MAINTAIN
-강점 발견    커리어 방향    실행 시작   12주 회고 루프
+DISCOVER   →   DIRECTION   →   DO   →   MAINTAIN
+강점 발견      방향 설정       실행      12주 회고 루프
 ```
 
 **DISCOVER** — AI 인터뷰 또는 갤럽 결과지 업로드로 Top 5 강점을 언어화합니다.
@@ -88,8 +88,7 @@ DISCOVER → DIRECTION → DO → MAINTAIN
 
 **DO** — 선택한 방향에 맞는 액션 아이템으로 12주 코칭을 시작합니다.
 
-**MAINTAIN** — 매일 액션 체크, 매주 AI 회고 코칭, 히스토리 누적.  
-12주가 쌓이면 자기 패턴이 보입니다.
+**MAINTAIN** — 매일 액션 체크, 매주 AI 회고 코칭, 히스토리 누적. 12주가 쌓이면 자기 패턴이 보입니다.
 
 ---
 
@@ -100,4 +99,4 @@ DISCOVER → DIRECTION → DO → MAINTAIN
 
 ---
 
-*CareerPT · README v0.3 · 2026-05*
+*CareerPT · README v1.0 · 2026-05*
