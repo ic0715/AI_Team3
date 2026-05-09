@@ -55,7 +55,7 @@
 | 역량 코드 (`competency_code`) | 12개 고정값 중 하나 (예: `T-2`, `I-2`) |
 | 도메인 (`domain`) | T/I/R/E 중 하나 |
 | 설명 | AI가 생성한 개인화 문구 (`personalized_text`, DB 미저장) |
-| 강점 연관 이유 | `match_score` 기반 — Top 5 강점과 역량 연계 강점의 교집합 수 |
+| 강점 연관 이유 | `match_score` 기반 — 도메인(T/I/R/E) 기준 어느 강점과 연관되는지 |
 | fit badge | `badge` 필드값 기반 (아래 허용값 참조) |
 | 선택 체크 UI | 기본 / Hover / Selected 상태 |
 
@@ -156,15 +156,14 @@
 
 ---
 
-## Option B (rank 제거) 확정 시 추가 수정 사항
+## ✅ Option B (rank 제거) 확정 반영 완료
 
-> ⚠️ **미결 사항 — 팀 결정 후 반영**
-> 강점 rank 제거(Option B) 확정 시 본 파일에서 아래 항목을 추가 수정할 것.
+> **확정 (2026-05-09)**: 강점 번호는 표시하되 순위(rank)는 아님. 카드의 "강점 연관 이유"는 "도메인(T/I/R/E) 기준 어느 강점과 연관되는지"로 표현.
 
-| 위치 | 현행 | 수정 내용 |
-| --- | --- | --- |
-| 3.4항 카드 구성 "강점 연관 이유" | Top 5 중 어느 강점과 연관되는지 | "도메인(E/I/R/T) 기준 어느 강점과 연관되는지"로 표현 변경 |
-| 7번 분석 이벤트 | `card_index`, `selected_index` | 이미 rank 미참조로 선반영 완료 — 추가 수정 없음 |
+| 위치 | 변경 내용 |
+| --- | --- |
+| 3.4항 카드 구성 "강점 연관 이유" | ✅ "도메인(T/I/R/E) 기준 어느 강점과 연관되는지"로 수정 완료 |
+| 7번 분석 이벤트 | ✅ `card_index`, `selected_index`로 선반영 완료 — 추가 수정 없음 |
 
 ---
 
@@ -172,6 +171,7 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.4 | 2026-05-09 | 팀 결정사항 반영: **Option B 확정** — 강점 번호 표시, 랭킹(순위) 아님. **3.4항** "강점 연관 이유" → "도메인(T/I/R/E) 기준 어느 강점과 연관되는지"로 수정. "Option B 확정 시 추가 수정 사항" 섹션 → 확정 완료로 전환 |
 | v1.3 | 2026-05-07 | schema v0.7.1 반영: **3.4항 목표 후보 카드** — `goal_category`(7개 대분류) → `competency_code`(12개 역량 코드)+`domain`(T/I/R/E) 구조로 변경, `recommended_goal_categories` → `recommended_competencies`, 카드 5개 고정, fit badge 3종 schema `badge` 필드값으로 확정 (`strength_match`/`user_interest`/`growth_potential`) / **4번 기능** — 2단계 흐름 → 3단계 흐름으로 수정 ("목표 추천받기" → "역량 방향 받기" 버튼) / **5번 데이터** — `goal_category` → `competency_code`+`domain`, `recommended_goal_categories` → `recommended_competencies` / **7번 분석 이벤트** — `goal_category` → `competency_code` |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: **3.4항 fit badge 허용값 3종 신규 추가** (강점 연계 높음/성장 잠재력 높음/추천, 스타일 및 사용 조건 명세) / **3.5항 CTA 텍스트 "액션 아이템 받기 →"로 확정** (프로토타입 기준, 기존 "이 목표로 시작하기 →"에서 변경) / 4번 기능 항목에 프로토타입 수정 권고 주석 추가 (2단계 흐름 미구현) / 7번 분석 이벤트에서 rank 속성 제거 후 `card_index`/`selected_index`로 선반영 / Option B 확정 시 추가 수정 사항 별도 섹션으로 명시 |
 | v1.1 | 2026-05-05 | schema 검증 반영: 화면 흐름 2단계 분리 명시(버튼 클릭 후 AI 분석 시작), 방향 5개→목표 후보 3~5개로 수정, `career_results`→`career_interview_results`, `directions`/`selected_direction` 컬럼 없음 명시, 목표 선택 시 `goals` INSERT 구조 명시, `users.coaching_start_at`→`goals.started_at` 수정 |
