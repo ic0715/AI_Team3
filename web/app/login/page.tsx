@@ -266,7 +266,7 @@ export default function LoginPage() {
                 style={inputStyle}
               />
             </div>
-            <button type="submit" disabled={resetLoading || !resetEmail} style={primaryBtnStyle}>
+            <button type="submit" disabled={resetLoading || !resetEmail} style={{ ...primaryBtnStyle, opacity: resetEmail ? 1 : 0.4, cursor: resetEmail ? 'pointer' : 'not-allowed' }}>
               {resetLoading ? '전송 중...' : '재설정 링크 보내기'}
             </button>
           </form>
@@ -318,7 +318,7 @@ export default function LoginPage() {
                   <input
                     type="email"
                     value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
+                    onChange={(e) => { setLoginEmail(e.target.value); setLoginError(''); }}
                     placeholder="example@email.com"
                     autoComplete="username"
                     style={inputStyle}
@@ -330,7 +330,7 @@ export default function LoginPage() {
                     <input
                       type={showLoginPassword ? 'text' : 'password'}
                       value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
+                      onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
                       placeholder="비밀번호 입력"
                       autoComplete="current-password"
                       style={{ ...inputStyle, paddingRight: '44px' }}
