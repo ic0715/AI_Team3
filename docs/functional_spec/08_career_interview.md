@@ -54,9 +54,9 @@ UI 구조와 자동 저장/재개 정책은 05와 동일. 다음 차이점만 �
 ### 3.4 인터뷰 완료 시 동작
 
 - AI가 대화에서 핵심 인사이트 추출 → `career_interview_results` INSERT
-  - `key_insights` (JSONB): 현재 만족/불만, 미래 비전, 가치관, 업무 스타일 등
+  - `key_insights` (JSONB): 현재 만족/불만, 미래 비전, 가치관, 업무 스타일 + **`mentioned_competencies`** (인터뷰에서 사용자가 직접 언급한 12역량 코드 배열, schema v0.7.2 신규 키) 등
   - `ai_summary` (text): 인터뷰 종합 한 줄 요약
-  - `recommended_goal_categories`는 **이 단계에서 저장하지 않음** (09 화면에서 별도 버튼으로 생성)
+  - `recommended_competencies`는 **이 단계에서 저장하지 않음** (09 화면에서 [역량 방향 받기] 버튼 클릭 시 결정적 매칭 + AI 카드 문구 개인화 후 별도 UPDATE)
 - 분석 시작 (예상 5~12초, 로딩 메시지 노출)
 - 분석 완료 시 09로 자동 이동
 
@@ -130,6 +130,7 @@ UI 구조와 자동 저장/재개 정책은 05와 동일. 다음 차이점만 �
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-09 | schema v0.7.1/v0.7.2 정합성 정렬: **3.4항 인터뷰 완료 시 동작** — (1) `recommended_goal_categories` → `recommended_competencies`로 환원 (v0.7.1 변경 누락분 처리, 09번 v1.3과 정합) / (2) `key_insights` JSONB 설명에 **`mentioned_competencies`** 키 추가 (v0.7.2 신규 — 인터뷰에서 사용자가 직접 언급한 12역량 코드 배열, 09번 결정적 매칭의 입력으로 사용됨) / (3) `recommended_competencies` 저장 시점 안내 — "09 화면에서 별도 버튼으로 생성" → "09 [역량 방향 받기] 버튼 클릭 시 결정적 매칭 + AI 카드 문구 개인화 후 별도 UPDATE"로 흐름 명시. |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: 3.2항 코어 질문 공식 확정 순서 명시 주석 추가 / 3.3항 follow-up 카운트 제외 원칙 추가 / **3.5항 완료 감지 조건 및 UI 전환 동작 확정** (코어 질문 카운터 6 도달 시 입력창 숨김 + 버튼 영역 노출, 상태 전환 테이블 신규 추가) / Option B 확정 시 추가 수정 사항 별도 섹션으로 명시 |
 | v1.1 | 2026-05-05 | schema 검증 반영: `coaching_sessions` 삭제됨 명시, 이어하기 sessionStorage 기반 수정, `users`→`profiles` 정정, `career_results`→`career_interview_results`, 저장구조 `directions`→`key_insights`+`ai_summary`, `recommended_goal_categories` 미저장(09에서 처리) 명시 |
 | v1.0 | 2026-05-04 | 최초 작성 |
