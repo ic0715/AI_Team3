@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 // 비밀번호 강도 계산
 function getPasswordStrength(password: string): { level: 0 | 1 | 2 | 3; label: string; color: string } {
@@ -28,6 +30,7 @@ type TabType = 'login' | 'signup';
 type PanelType = 'tabs' | 'reset';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('login');
   const [panel, setPanel] = useState<PanelType>('tabs');
 
@@ -72,7 +75,7 @@ export default function LoginPage() {
   const signupEnabled = consentPrivacy && consentTerms && consentAge &&
     signupEmail && signupPassword.length >= 8 && signupBirthdate;
 
-  // 로그인 처리 (추후 Supabase 연동)
+  // 로그인 처리
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -80,11 +83,26 @@ export default function LoginPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail)) { setLoginError('올바른 이메일 형식이 아니에요'); return; }
     if (!loginPassword) { setLoginError('비밀번호를 입력해주세요'); return; }
     setLoginLoading(true);
-    // TODO: Supabase signInWithPassword 연동
-    setTimeout(() => setLoginLoading(false), 1000);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+    setLoginLoading(false);
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        setLoginError('이메일 또는 비밀번호가 올바르지 않아요');
+      } else if (error.message.includes('Email not confirmed')) {
+        router.push('/verify-email');
+      } else {
+        setLoginError('로그인에 실패했어요. 다시 시도해주세요');
+      }
+      return;
+    }
+    // 로그인 성공 → 사용자 상태 기반 라우팅
+    await handlePostAuthRouting();
   };
 
-  // 회원가입 처리 (추후 Supabase 연동)
+  // 회원가입 처리
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignupError('');
@@ -94,8 +112,28 @@ export default function LoginPage() {
     if (!isOver14(signupBirthdate)) { setSignupError('만 14세 이상만 가입할 수 있어요'); return; }
     if (!consentPrivacy || !consentTerms || !consentAge) { setSignupError('필수 항목에 동의해주세요'); return; }
     setSignupLoading(true);
-    // TODO: Supabase signUp 연동 → NEW01으로 이동
-    setTimeout(() => setSignupLoading(false), 1000);
+    const { error } = await supabase.auth.signUp({
+      email: signupEmail,
+      password: signupPassword,
+      options: {
+        data: {
+          birthdate: signupBirthdate,
+          consent_marketing: consentMarketing,
+        },
+      },
+    });
+    setSignupLoading(false);
+    if (error) {
+      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+        setSignupError('이미 가입된 이메일이에요. 로그인을 시도해보세요');
+        setActiveTab('login');
+      } else {
+        setSignupError('가입에 실패했어요. 다시 시도해주세요');
+      }
+      return;
+    }
+    // 가입 성공 → 이메일 인증 화면으로 이동
+    router.push('/verify-email');
   };
 
   // 비밀번호 재설정 처리
@@ -104,11 +142,46 @@ export default function LoginPage() {
     setResetMessage('');
     if (!resetEmail) return;
     setResetLoading(true);
-    // TODO: Supabase resetPasswordForEmail 연동
-    setTimeout(() => {
-      setResetMessage('재설정 링크를 이메일로 보냈어요');
-      setResetLoading(false);
-    }, 1000);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) {
+      setResetMessage('오류가 발생했어요. 다시 시도해주세요');
+    } else {
+      setResetMessage('재설정 링크를 이메일로 보냈어요 ✅');
+    }
+  };
+
+  // 인증 성공 후 라우팅 (02_login.md 5번 라우팅 로직)
+  const handlePostAuthRouting = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // 1. 이메일 인증 미완료
+    if (!user.email_confirmed_at) {
+      router.push('/verify-email');
+      return;
+    }
+
+    // 2~4. goals 상태 확인
+    const { data: goals } = await supabase
+      .from('goals')
+      .select('status, current_week, total_weeks')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    const activeGoal = goals?.find((g) => g.status === 'active');
+    const pausedGoal = goals?.find((g) => g.status === 'paused');
+    const completedGoal = goals?.find(
+      (g) => g.status === 'completed' && g.current_week >= g.total_weeks
+    );
+
+    if (activeGoal || pausedGoal) { router.push('/home'); return; }
+    if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
+
+    // 5. 온보딩 진행 중 → 기본 정보 입력으로
+    router.push('/basic-info');
   };
 
   return (
@@ -463,9 +536,17 @@ function Divider() {
 }
 
 function GoogleButton({ label = 'Google로 계속하기' }: { label?: string }) {
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+  };
+
   return (
     <button
       type="button"
+      onClick={handleGoogleLogin}
       style={{
         width: '100%', padding: '12px 16px', background: 'var(--surface)',
         color: 'var(--text-primary)', border: '1.5px solid var(--border)',
