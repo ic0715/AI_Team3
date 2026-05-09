@@ -136,6 +136,7 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-09 | 5개 메인 뼈대(schema v0.7.2 / 00_flow.md v1.7 / 00_common.md v1.8) 정합성 검토. **충돌 1건 미결 보류**: 2번 진입 조건의 NEW03 12주 완료 → [기본 정보 업데이트] 보조 버튼 항목은 00_flow.md v1.7에서 제거됐으나, 00_common.md v1.8과 동일하게 본 문서도 미결로 보류 (다음 사이클에서 결정). 본문 변경 없음. |
 | v1.2 | 2026-05-05 | UX 강화: 수정 모드 진입 경로 신규 추가 (15 프로필, NEW03에서 진입) / 인트로 메시지 신규/수정 모드 분기 / 폼 필드 표에 수정 모드 컬럼 추가 (생년월일 🔒 잠금) / Bottom CTA 신규/수정 분기 ("다음으로" / "저장" + "취소") / 분석 이벤트 `profile_info_updated` 추가 (changed_fields, source 속성) / `onboarding_step_view`에 mode=new/edit 속성 추가 / 저장 정책에 수정 모드 동작 명시 |
 | v1.1 | 2026-05-05 | schema 검증 반영: 진입 조건 `users.basic_info_completed_at` → `profiles.profile_completed`로 수정, 저장 테이블명 `users` → `profiles` 정정, 저장 컬럼 명시, `job_categories` 테이블 미존재 명시(클라이언트 상수 관리), birthdate nullable 불일치 및 nickname UNIQUE 제약 검토 필요 항목 명시 |
 | v1.0 | 2026-05-04 | 최초 작성 |

@@ -28,7 +28,7 @@
 | 제품명 | CareerPT |
 | 전략 방향 | SLC (Simple · Lovable · Complete) |
 | 플랫폼 | 모바일 웹 (390px 기준, 반응형) |
-| 화면 수 | 총 21개 화면 (기존 15개 + 신규 6개) |
+| 화면 수 | 총 22개 화면 (기존 15개 + 신규 7개) |
 | 인증/저장 | Supabase (Auth + PostgreSQL) |
 | AI 엔진 | Claude API |
 | AI 설계 기반 | MCC 코칭 철학 + 갤럽 CliftonStrengths 34 테마 |
@@ -103,7 +103,7 @@ CareerPT는 MVP(Minimum Viable Product) 대신 **SLC(Simple·Lovable·Complete)*
 
 ## 5. 유저 플로우 (User Flow)
 
-사용자는 **온보딩(01 ~ 03 + NEW01) → 강점 발견(04 ~ 06) → 커리어 방향(07 ~ 09) → 액션 설정(10) + 시작 안내(NEW02 ~ NEW04) → 12주 실행 루프(11 ~ 15)**를 거치며, 12주 완주 시 **NEW03**로 진입합니다.
+사용자는 **온보딩(01 ~ 03 + NEW01) → 강점 발견(04 ~ 06) → 커리어 방향(07 ~ 09) → 액션 설정(10) + 시작 안내(NEW02) → 12주 실행 루프(11 ~ 15 + NEW04 + NEW07)**를 거치며, 12주 완주 시 **NEW03**로 진입합니다.
 
 ### 5.1 페이즈 범례
 
@@ -112,8 +112,8 @@ CareerPT는 MVP(Minimum Viable Product) 대신 **SLC(Simple·Lovable·Complete)*
 | ONBOARDING | 01, 02, NEW01, 03 |
 | DISCOVER | 04, 05, 06 |
 | DIRECTION | 07, 08, 09 |
-| DO | 10, NEW02, NEW04 |
-| MAINTAIN | 11, 12, 13, 14, 15 |
+| DO | 10, NEW02 |
+| MAINTAIN | 11, 12, 13, 14, 15, NEW04, NEW07 |
 | CYCLE END | NEW03 |
 | ERROR (전역) | NEW05, NEW06 |
 
@@ -139,16 +139,17 @@ CareerPT는 MVP(Minimum Viable Product) 대신 **SLC(Simple·Lovable·Complete)*
 | 14 | 히스토리 | MAINTAIN | 과거 강점·커리어·액션·패턴 아카이브 조회 |
 | 15 | 프로필 | MAINTAIN | 강점 요약·기본정보 수정·알림 설정·로그아웃·탈퇴 |
 
-#### 신규 화면 (NEW01~NEW06)
+#### 신규 화면 (NEW01~NEW07)
 
 | 화면 | 화면명 | 페이즈 | 핵심 목적 |
 | --- | --- | --- | --- |
 | NEW01 | 이메일 인증 안내 | ONBOARDING | 회원가입 후 이메일 인증 메일 확인 및 재발송 |
 | NEW02 | 12주 여정 시작 안내 | DO | 10 직후 1회 노출되는 시작 동기 부여 화면 |
 | NEW03 | 12주 완료 화면 | CYCLE END | 12주 완주 축하 + 다음 사이클 진입 유도 |
-| NEW04 | 푸시 알림 권한 요청 | DO | 코칭 일정 알림을 위한 푸시 권한 요청 |
+| NEW04 | 푸시 알림 권한 요청 | MAINTAIN | 15 프로필 알림 설정에서 진입, 코칭 일정 알림용 푸시 권한 요청 |
 | NEW05 | 네트워크 오류 화면 | ERROR | 서버/네트워크 연결 실패 시 안내 + 재시도 |
 | NEW06 | 일반 오류 화면 | ERROR | 404/런타임 오류 통합 fallback 화면 |
+| NEW07 | 비밀번호 변경 | MAINTAIN | 15 프로필에서 진입, 현재 비밀번호 재인증 후 새 비밀번호 설정 |
 
 ### 5.3 분기 플로우
 
@@ -157,11 +158,11 @@ CareerPT는 MVP(Minimum Viable Product) 대신 **SLC(Simple·Lovable·Complete)*
 - **04 강점 진단 방식** → 경로 A(인터뷰): 05로 / 경로 B(파일 업로드): 갤럽 결과지 파싱 후 06 직행
 - **06 강점 결과** → 다음(07) 또는 다시 분석(04로 복귀)
 - **09 커리어 방향 결과** → 다음(10) 또는 인터뷰 다시하기(08로 재진입)
-- **10 액션아이템 완료** → NEW02 12주 시작 안내 → NEW04 푸시 권한 → 11 홈
+- **10 액션아이템 완료** → NEW02 12주 시작 안내 → 11 홈
 - **11 홈** ↔ 탭바: 12 회고, 14 히스토리, 15 프로필
 - **12 회고** → 주말 회고 완료 시: 13 회고 코칭으로 이동 (평일은 메모만)
 - **13 회고 코칭** → "맞아요" 확정 시 11로 복귀 / "다시 다듬기" 클릭 시 13 내부 복귀
-- **15 프로필** → 강점 재분석(04) / 커리어 재인터뷰(07) / 로그아웃(01) / 회원 탈퇴(01)
+- **15 프로필** → 강점 재분석(04) / 커리어 방향 재설정(07) / 알림 설정(NEW04) / 비밀번호 변경(NEW07) / 정보 수정(15 화면 내 인라인 편집) / 로그아웃(01) / 회원 탈퇴(01)
 - **12주 완주 시** → 다음 진입에서 NEW03로 자동 라우팅
 - **NEW03** → 새 12주 시작(07) / 강점부터 다시(04) / 히스토리(14)
 
@@ -285,12 +286,12 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 
 | 항목 | 내용 |
 | --- | --- |
-| 화면 목적 | AI가 도출한 커리어 방향(역량목표) 후보 5가지를 제시하고, 유저가 원하는 방향을 선택하게 한다. |
-| 주요 UI | 커리어 방향 카드 5개 (제목 + 설명 + 강점 연관 이유), 선택 체크, "액션 아이템 받기" CTA, "인터뷰 다시하기" 링크 |
-| 핵심 동작 | 방향 선택 → CTA 활성화 → 선택값 저장 → 10 이동 / "인터뷰 다시하기" → 08 재진입 |
-| 기술 키워드 | "목표 추천받기" 버튼 → 결정적 매칭으로 `career_interview_results.recommended_competencies` UPDATE (5개 고정, JSONB) → 유저에게 5개 옵션 카드 제시 → 유저 선택 시 `goals` INSERT (`competency_code`, `domain`, `goal_title` 앱 상수, `status='active'`, `started_at=today`) |
+| 화면 목적 | 08 인터뷰 종료 후 "역량 방향 받기" 버튼을 누른 유저에게 결정적 매칭으로 산출된 5개 역량 방향 옵션을 제시하고, 유저가 1개를 선택하게 한다. |
+| 주요 UI | "[역량 방향 받기]" 버튼 (인터뷰 저장 완료 화면), 5개 역량 방향 카드 (슬롯 1~3 = `strength_match` badge "강점에 잘 맞아요" / 슬롯 4 = `user_interest` badge "직접 언급하셨어요" / 슬롯 5 = `growth_potential` badge "도전해 볼 만해요", 각 카드에 AI가 생성한 `personalized_text`), 선택 체크, "액션 아이템 받기" CTA, "인터뷰 다시하기" 링크 |
+| 핵심 동작 | "역량 방향 받기" 버튼 클릭 → **Step 1 결정적 매칭** (코드 로직, AI 미사용 — Top 5 강점 ∩ 12역량 연계 강점 매칭으로 5개 슬롯 결정) → **Step 2 AI 카드 문구 개인화** (1회 AI 호출, `personalized_text` 메모리/세션 저장, DB 미저장) → **Step 3 DB 저장** (`recommended_competencies` UPDATE) → 5개 카드 제시 → 유저 선택 → CTA 활성화 → `goals` INSERT → 10 이동 / "인터뷰 다시하기" → 08 재진입 |
+| 기술 키워드 | "역량 방향 받기" 버튼 → 결정적 매칭(코드, AI 미사용)으로 `career_interview_results.recommended_competencies` UPDATE (5개 슬롯 고정, JSONB, badge 3종) → AI 카드 문구 개인화(메모리/세션, DB 미저장) → 유저 선택 시 `goals` INSERT (`competency_code`, `domain`, `goal_title` 앱 상수, `status='active'`, `started_at=today`) |
 
-### ── DO (10 + NEW02 + NEW04) ──
+### ── DO (10 + NEW02) ──
 
 #### 10. 액션 아이템 선택 [DO]
 
@@ -298,7 +299,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | --- | --- |
 | 화면 목적 | 선택한 커리어 방향에 맞는 실행 과제(액션 아이템)를 추천·선택하고 12주 코칭을 시작한다. 첫 액션은 즉시 적용되어 W1이 시작된다. |
 | 주요 UI | 추천 액션 카드 리스트, 직접 입력 추가 UI, 선택 체크(다중 선택), "홈으로 시작하기 🚀" CTA |
-| 핵심 동작 | AI 추천 또는 사전 정의 목록 제공 → 유저 선택 → action_items 저장 + users.coaching_start_at 기록 + W1 weekly_actions 생성 → NEW02 이동 |
+| 핵심 동작 | AI 추천 또는 사전 정의 목록 제공 → 유저 선택 → `action_items` 저장 + `goals.started_at` 기록 + W1 액션 아이템 생성 → NEW02 이동 |
 | 기술 키워드 | AI가 `action_items` INSERT (week_number=1, is_custom=false) 자동 생성, `goals.started_at` 기록, 트랜잭션 처리 |
 
 #### NEW02. 12주 여정 시작 안내 [DO] 🆕
@@ -307,19 +308,10 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | --- | --- |
 | 화면 목적 | 10 액션 선택 완료 직후 1회 노출. 사용자가 선택한 강점·커리어 방향·액션을 종합 요약하고 본격 12주 시작을 알린다. |
 | 주요 UI | 메인 타이틀, 요약 카드(강점 Top 5 + 방향 + 첫 액션), 일정 표시(시작일/종료일), "홈으로 가기 →" CTA |
-| 핵심 동작 | CTA 클릭 → NEW04 푸시 권한 또는 11 홈으로 이동 / 재방문 시 노출되지 않음 |
+| 핵심 동작 | CTA 클릭 → 11 홈으로 이동 / 재방문 시 노출되지 않음 |
 | 기술 키워드 | `goals.started_at` 직후 1회 노출, 1회 노출 플래그 관리 |
 
-#### NEW04. 푸시 알림 권한 요청 [DO] 🆕
-
-| 항목 | 내용 |
-| --- | --- |
-| 화면 목적 | 코칭 일정 알림(매일 액션, 주간 회고, 코칭 30분 전)을 위한 푸시 권한을 요청한다. |
-| 주요 UI | 일러스트, 알림 종류 안내, "알림 받기" CTA(권한 요청), "나중에" CTA |
-| 핵심 동작 | 권한 허용 시 푸시 토큰 서버 저장 / 거부 시 7일 쿨다운 후 11 진입 시 재요청 (최대 2회) |
-| 기술 키워드 | Web Push API, push_subscriptions 테이블, 권한 거부 카운터 관리 |
-
-### ── MAINTAIN (11 ~ 15) ──
+### ── MAINTAIN (11 ~ 15 + NEW04 + NEW07) ──
 
 #### 11. 홈 — 12주 코칭 대시보드 [MAINTAIN]
 
@@ -327,7 +319,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | --- | --- |
 | 화면 목적 | 유저가 매일 방문하여 12주 코칭 진행 현황·오늘의 액션·주간 타임라인을 확인하고 동기를 유지한다. |
 | 주요 UI | 인사말(이름+요일+현재 주차), 12주 테마 카드(테마명+12주 도트), 오늘의 액션 체크 카드(액션 텍스트 + 토글 + 7일 그리드), 알림 카드(평일=메모 / 주말=회고 유도), 12주 타임라인(W1~W12 흐름) |
-| 핵심 동작 | 오늘의 액션 토글 → weekly_actions.daily_done 업데이트 / 7일 그리드 클릭 → 해당 요일 체크 / 타임라인 "회고하기" → 12 회고 이동 / 12주 완주 시 자동 NEW03로 라우팅 |
+| 핵심 동작 | 오늘의 액션 토글 → `action_completions` INSERT/DELETE / 7일 그리드 클릭 → 해당 요일 체크 / 타임라인 "회고하기" → 12 회고 이동 / 12주 완주 시 자동 NEW03로 라우팅 |
 | 기술 키워드 | `profiles` + `goals` + `action_items` + `action_completions` 조회, 주차 계산(`goals.started_at` 기준), 체크 토글 → `action_completions` INSERT/DELETE, 탭바 네비게이션 |
 
 #### 12. 회고 [MAINTAIN]
@@ -336,7 +328,7 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | --- | --- |
 | 화면 목적 | 평일에는 짧은 일일 메모를 작성하고, 주말에는 한 주 메모를 기반으로 주간 회고를 완성한다. |
 | 주요 UI | **[평일 모드 (월~금)]** 오늘의 메모 textarea + "메모 저장" 버튼, 이번 주 메모 리스트, "회고 코칭 미리하기" 카드<br>**[주말 모드 (토·일)]** 이번 주 액션 요약 카드, 평일 메모 컨텍스트 카드, 한 줄 회고 textarea, "코치와 이야기 나누기 →" CTA |
-| 핵심 동작 | 평일 메모 저장 → weekday_memos 누적 / 주말 "코치와 이야기 나누기" → 13 회고 코칭 / 평일 "회고 코칭 미리 하기" → 13 (다음 주 적용 모드) |
+| 핵심 동작 | 평일 메모 저장 → `daily_memos` 누적 / 주말 "코치와 이야기 나누기" → 13 회고 코칭 / 평일 "회고 코칭 미리 하기" → 13 (다음 주 적용 모드) |
 | 기술 키워드 | `daily_memos` INSERT (평일 메모, `memo_date` + `week_number`), `weekly_retros` INSERT (주간 회고, `completion_count`/`target_count` 프론트 집계), 요일 기반 자동 분기, 평일 메모는 회고 코칭 컨텍스트로 자동 주입 |
 
 #### 13. 회고 코칭 (AI 채팅) [MAINTAIN]
@@ -362,9 +354,27 @@ NEW05·NEW06은 어떤 화면에서도 발생 가능. 복귀는 사용자 상태
 | 항목 | 내용 |
 | --- | --- |
 | 화면 목적 | 유저의 강점 요약·커리어 방향·기본정보를 확인하고, 알림 설정·재인터뷰·로그아웃·회원 탈퇴를 제공한다. |
-| 주요 UI | 내 강점 Top 5 섹션, 커리어 방향 섹션(재인터뷰 링크), 기본정보 섹션(정보 수정), 설정 섹션(알림 시간 / 비밀번호 변경 / 데이터 다운로드 / 약관), Danger Zone(로그아웃 / 회원 탈퇴) |
-| 핵심 동작 | 강점 재분석 → 04 이동 / 커리어 재인터뷰 → 07 이동 / 알림 설정 저장 / 로그아웃 → 02 이동 / 탈퇴 → 데이터 삭제 확인 모달(2단계) → 01 이동 |
-| 기술 키워드 | `strength_analyses`(is_latest=true)·`career_interview_results`·`profiles` 조회, Supabase signOut, 회원 탈퇴: `profiles` 데이터 삭제 + Supabase Auth deleteUser, 알림: Web Push 또는 서버 스케줄러 |
+| 주요 UI | 내 강점 Top 5 섹션, 커리어 방향 섹션(재인터뷰 링크), 기본정보 섹션(정보 수정), 설정 섹션(알림 설정 → NEW04 / 비밀번호 변경 → NEW07 / 데이터 다운로드 / 약관), Danger Zone(로그아웃 / 회원 탈퇴) |
+| 핵심 동작 | 강점 재분석 → 04 이동 / 커리어 방향 재설정 → 확인 다이얼로그 → 07 이동 / 알림 설정 → NEW04 이동 / 비밀번호 변경 → NEW07 이동 / 정보 수정 → 15 화면 내 인라인 편집 모드 (별도 화면 이동 없음, 저장 시 토스트) / 로그아웃 → 02 이동 / 탈퇴 → 데이터 삭제 확인 모달(2단계) → 01 이동 |
+| 기술 키워드 | `strength_analyses`(is_latest=true)·`career_interview_results`·`profiles` 조회, Supabase signOut, 회원 탈퇴: `profiles` 데이터 삭제 + Supabase Auth deleteUser, 알림: Web Push (`push_subscriptions`) |
+
+#### NEW04. 푸시 알림 권한 요청 [MAINTAIN] 🆕
+
+| 항목 | 내용 |
+| --- | --- |
+| 화면 목적 | 15 프로필의 [알림 설정] 버튼에서 진입. 코칭 일정 알림(매일 액션, 주간 회고, 코칭 30분 전)을 위한 푸시 권한을 요청한다. |
+| 주요 UI | 일러스트, 알림 종류 안내(daily_action / weekly_review / coaching_reminder / marketing 토글), "알림 받기" CTA(권한 요청), "나중에" CTA |
+| 핵심 동작 | 권한 허용 시 `push_subscriptions` UPSERT(엔드포인트, 키, 알림 종류별 on/off) → 15 복귀 / "나중에" → 15 복귀 |
+| 기술 키워드 | Web Push API, `push_subscriptions` 테이블 (UPSERT, user_id 기준 1:1), 알림 종류별 BOOLEAN 컬럼, 마케팅은 명시 동의 후에만 true |
+
+#### NEW07. 비밀번호 변경 [MAINTAIN] 🆕
+
+| 항목 | 내용 |
+| --- | --- |
+| 화면 목적 | 15 프로필의 [비밀번호 변경] 버튼에서 진입. 현재 비밀번호 재인증 후 새 비밀번호로 변경한다. |
+| 주요 UI | 현재 비밀번호 입력 필드, 새 비밀번호·확인 입력 필드, "비밀번호 변경" CTA, "취소" 버튼 |
+| 핵심 동작 | 현재 비밀번호 재인증 통과 시 새 비밀번호로 업데이트 → 현재 세션 유지 + 다른 디바이스만 자동 로그아웃 → **11 홈으로 이동** (보안성 강조 + 변경 직후 다음 행동을 자연스럽게 시작) / 취소 → 15 복귀 |
+| 기술 키워드 | Supabase Auth `updateUser({ password })`, 현재 비밀번호 재인증, 다른 디바이스 토큰 무효화. 별도 화면(모달 X) — 모바일 키보드/패스워드 매니저 호환 고려 |
 
 ### ── CYCLE END (NEW03) ──
 
@@ -680,10 +690,10 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 
 ### 9.4 홈 / 회고 (11·12)
 
-- 12주 코칭 시작일이 없는 유저가 11 홈 접근 → 10 액션아이템으로 리디렉션
+- 12주 코칭 시작 정보(`goals.started_at`)가 없는 유저가 11 홈 접근 → 10 액션아이템으로 리디렉션
 - 12 회고에서 메모 미작성 상태로 주간 회고 시도 → 최소 1개 메모 필요 안내
 - 주간 회고 저장 실패 → 로컬 임시 저장 후 재전송 유도
-- 다음 주 적용 액션이 큐에 있는데 또 회고를 시도할 경우 → 마지막 결정만 유효
+- 13 회고 코칭 확정 후 같은 주에 재시도할 경우 → 마지막 결정만 유효 (`coaching_insights` UPSERT, 다음 주 `action_items` 갱신)
 - 12주 완주 시 다음 진입에서 NEW03로 자동 라우팅 🆕
 
 ### 9.5 프로필 (15)
@@ -717,90 +727,27 @@ profiles ─┬─ strength_analyses         ── (강점 분석 결과, is_la
 | 12 회고 메모 최소 글자 수 또는 분량 기준 존재 여부 | 미결 |
 | 14 히스토리 카드 상세 펼침 UX: 인라인 펼침 vs 별도 상세 화면 | 미결 |
 | 15 재인터뷰 시 기존 강점 결과 덮어쓰기 vs 히스토리 보존 방식 | `strength_analyses.is_latest` 트리거로 이력 보존 (v1.3) |
-| **NEW02 푸시 권한 노출 시점**: NEW02 직후 강제 vs 11 첫 진입 | 🆕 미결 |
-| **NEW03 → 새 12주 진입 시 03 기본정보 재진입 옵션 제공 여부** | 🆕 미결 |
-| **15 커리어 재인터뷰**: 기존 액션(10) 유지 vs 새로 선택 | 🆕 미결 |
+| **NEW02 푸시 권한 노출 시점**: NEW02 직후 강제 vs 11 첫 진입 vs 15 프로필 진입 | **✅ 15 프로필 [알림 설정] 진입으로 확정 (v1.6, NEW02 직후 강제 노출 안 함)** |
+| **NEW03 → 새 12주 진입 시 03 기본정보 재진입 옵션 제공 여부** | **✅ 옵션 제공 (강제 X, 권장 O) — NEW03 보조 카드로 노출 (v1.6)** |
+| **15 커리어 방향 재설정**: 기존 액션(10) 유지 vs 새로 선택 | **✅ 기존 사이클 종료(`abandoned`) + 새 사이클 시작(강제 새로 선택) 으로 확정 (v1.6)** |
+
 
 ---
 
-## 부록. v1.4 → v1.5 변경 이력
+## 변경 이력
 
-### v1.5 (2026-05-07) — schema v0.7.1/v0.7.2 반영
-
-`spec-schema.md` v0.7.1/v0.7.2 업데이트 내용을 공통 스펙에 동기화.
-
-- **`action_completions.completed_at`** → **`completed_date`** (컬럼명 수정)
-- **`coaching_insights`**: `goal_id`(FK → goals.id), `weekly_retro_id`(FK → weekly_retros.id) 컬럼 추가
-- **`push_subscriptions.user_id`**: `FK → users.id` → **`FK → profiles.id`** (오타 수정)
-
----
-
-## 부록. v1.3 → v1.4 변경 이력
-
-### v1.4 (2026-05-07) — schema v0.7 반영
-
-`spec-schema.md` v0.7 역량 분류 체계 전환 내용을 공통 스펙에 동기화.
-
-- **`goals.goal_category`(7개) 제거** → `competency_code`(12개 T/I/R/E 코드) + `domain`(4개 도메인) 컬럼으로 교체
-- **`goals.goal_title`**: LLM 자유 생성 → `competency_code` 기반 앱 상수 한글명으로 변경
-- **`career_interview_results.recommended_goal_categories`(text[]) 제거** → `recommended_competencies`(JSONB, code+match_score+badge, 5개 고정)로 교체
-- **`profiles.career_level`**: 한글 텍스트 → 표준 enum(`junior_new`/`junior`/`senior_mid`/`senior`) + NOT NULL
-- **`profiles`**: `age_range` → `birthdate`+`gender`로 교체, `avatar_url`+`streak_days`+`updated_at` 추가 (spec-schema.md 기준 동기화)
-- **`action_items.source_seed_id`**: 시드 추적용 컬럼 신규 추가 (nullable)
-- **09 화면 기술 키워드**: AI 자유 추천 → 결정적 매칭(코드) + AI 카드 문구 개인화 구조 반영
-- **8.3 테이블 명세**: 상기 변경사항 전체 반영
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.8 | 2026-05-09 | 00_flow.md v1.7(프로토타입 정합성 정렬)과 정합성 정렬. (1) 5.3 분기 플로우 + 6.15 핵심 동작 — "정보 수정 → 03 수정 모드" → "정보 수정 → 15 화면 내 인라인 편집 모드(별도 화면 이동 없음)"로 변경. (2) 6.NEW07 핵심 동작 — 변경 성공 시 "15 복귀" → "11 홈으로 이동"(보안성 + 다음 행동 시작 용이성)으로 변경, 취소는 15 복귀 유지. **충돌 3(NEW03 보조 카드 결정사항: v1.6에서 ✅ 옵션 제공으로 결정됐으나 flow v1.7에서 보조 카드 항목 자체 제거)는 미결로 보류.** 5.2 화면 표 라인 140의 15 한 줄 정의는 그대로 유지(사용자 결정). |
+| v1.7 | 2026-05-09 | (사용자 결정 변경, 옵션 A) schema 무수정 원칙 확정 → schema 파일을 v0.7.2 원본으로 완전 복구. v1.6에서 진행했던 사용자 향 명칭 "목표 추천받기" 통일 작업 무효화 → 6.09 화면 명세 본문(`화면 목적`/`주요 UI`/`핵심 동작`/`기술 키워드` 4개 행)의 "목표 추천받기" 표현을 schema 본문 표현인 "역량 방향 받기"로 재정렬. **09 화면명 통일("커리어 방향 결과")은 유지** (schema에 영향 없음). 본문 외 변경 이력 부록 라인은 역사 기록으로 그대로 보존. |
+| v1.6 | 2026-05-09 | 5개 메인 문서 간 정렬 + 00_common.md 내부 일관성 정리. NEW07 비밀번호 변경 화면 누락 보완(총 21→22개, 신규 6→7개). NEW04 진입 위치 정리(DO→MAINTAIN, 15 프로필에서 진입). 이미 결정된 미결사항 3건(NEW02 푸시 노출 시점/NEW03 03 재진입/15 커리어 재설정) ✅ 결정 표기. 옛 테이블·컬럼명 정리(`weekday_memos`→`daily_memos`, `weekly_actions`→`action_items`+`action_completions`, `users.coaching_start_at`→`goals.started_at`). 6.09 화면 명세를 schema #3의 Step 1(결정적 매칭)/Step 2(AI 카드 문구 개인화)/Step 3(DB 저장) 3-Step 흐름과 5개 슬롯 badge 3종으로 정렬. |
+| v1.5 | 2026-05-07 | schema v0.7.1/v0.7.2 반영. `action_completions.completed_at`→`completed_date` 컬럼명 정렬. `coaching_insights`에 `goal_id`(FK→goals.id), `weekly_retro_id`(FK→weekly_retros.id) 컬럼 추가. `push_subscriptions.user_id` FK 오타 수정(`users.id`→`profiles.id`). |
+| v1.4 | 2026-05-07 | schema v0.7 역량 분류 체계 전환 반영. `goals.goal_category`(7개) 제거→`competency_code`(12개) + `domain`(4개) 컬럼으로 교체. `goals.goal_title`: LLM 자유 생성→competency_code 기반 앱 상수 한글명. `recommended_goal_categories`(text[])→`recommended_competencies`(JSONB, 5개 슬롯 고정)로 교체. `profiles.career_level` 표준 enum화(`junior_new`/`junior`/`senior_mid`/`senior`) + NOT NULL. `profiles`: `age_range`→`birthdate`+`gender`로 교체, `avatar_url`+`streak_days`+`updated_at` 추가. `action_items.source_seed_id` 시드 추적용 컬럼 신규. 09 화면 기술 키워드: AI 자유 추천→결정적 매칭(코드)+AI 카드 문구 개인화 구조 반영. |
+| v1.3 | 2026-05-05 | schema 전면 검증(v0.6 기준). 테이블명 변경: `users`→`profiles`, `strength_results`→`strength_analyses`, `career_results`→`career_interview_results`, `weekday_memos`→`daily_memos`, `insight_history`→`coaching_insights`. 삭제된 테이블: `coaching_sessions`(대화 원문 미저장), `career_focus`(→`goals` 통합), `weekly_actions`(→`action_items`+`action_completions` 분리). 신규 테이블: `goals`, `action_completions`, `weekly_retros`. 컬럼명 수정: `is_active`→`is_latest`(트리거 자동), `themes`→`strengths`, `source`→`method`, `week_num`→`week_number`. 사용자 상태 라우팅 조건 정렬. 09 화면 2단계 플로우 명시. |
+| v1.2 | 2026-05-05 | 신규 화면 6종 추가(NEW01 이메일 인증, NEW02 12주 시작 안내, NEW03 12주 완료, NEW04 푸시 권한, NEW05 네트워크 오류, NEW06 일반 오류). 사용자 상태별 진입 라우팅(5.4) 신규. 에러 화면 진입 정책(5.5) 신규. AI 안전장치(7.6) 신규(위기 신호/PII/부적절 응답 필터). `push_subscriptions` 테이블 신규. AI 엔진 "Claude API 또는 GPT API"→"Claude API"로 확정. 화면 수 15개→21개. 페이즈 범례에 CYCLE END/ERROR 추가. |
+| v1.1 | 2026-05-05 | (이전 작업, 상세 미기재) |
+| v1.0 | 2026-05-04 | 최초 작성 |
 
 ---
 
-## 부록. v1.2 → v1.3 변경 이력
-
-### v1.3 (2026-05-05) — schema 전면 검증
-
-실제 Supabase 스키마(`spec-schema.md` v0.6) 대조 후 전체 불일치 수정.
-
-- **테이블명 변경**: `users`→`profiles`, `strength_results`→`strength_analyses`, `career_results`→`career_interview_results`, `weekday_memos`→`daily_memos`, `insight_history`→`coaching_insights`
-- **삭제된 테이블**: `coaching_sessions`(대화 원문 미저장), `career_focus`(→`goals`로 통합), `weekly_actions`(→`action_items`+`action_completions`로 분리)
-- **컬럼명 수정**: `is_active`→`is_latest`(트리거 자동), `themes`→`strengths`, `source`→`method`, `week_num`→`week_number`
-- **신규 테이블 추가**: `goals`, `action_completions`, `weekly_retros`
-- **사용자 상태 라우팅**: `users.basic_info_completed_at` → `profiles.profile_completed`, `coaching_start_at + 84일` → `goals.status='completed'`
-- **AI 저장 정책**: 모든 인터뷰 대화 원문 미저장(sessionStorage 전용) 반영
-- **09 화면 2단계 플로우**: `career_results.selected_direction` → "목표 추천받기" 버튼 → `goals` INSERT 흐름 명시
-
----
-
-## 부록. v1.1 → v1.2 변경 이력
-
-### 추가된 항목
-
-- **신규 화면 6종 추가** (1.2, 5.2, 5.3, 6, 8.2, 9.6 등 전반)
-  - NEW01 이메일 인증 안내 (ONBOARDING)
-  - NEW02 12주 시작 안내 (DO)
-  - NEW03 12주 완료 화면 (CYCLE END)
-  - NEW04 푸시 권한 요청 (DO)
-  - NEW05 네트워크 오류 화면 (ERROR)
-  - NEW06 일반 오류 화면 (ERROR)
-- **사용자 상태별 진입 라우팅** (5.4) 신규 정의
-- **에러 화면 진입 정책** (5.5) 신규 정의
-- **AI 안전장치** (7.6) 신규 추가
-- **push_subscriptions 테이블** (8.3 ⑩) 신규 추가
-- **users.basic_info_completed_at, strength_results.is_active, weekly_actions.reflection** 컬럼 추가
-
-### 변경된 항목
-
-- AI 엔진: "Claude API 또는 GPT API" → **"Claude API"로 확정**
-- 화면 수: "총 15개 화면" → "총 21개 화면 (기존 15개 + 신규 6개)"
-- 5번 유저 플로우: NEW01~06 진입 시점 명시
-- 9번 예외 처리: 운영·전역 예외(9.6) 신규 항목 추가
-- 페이즈 범례: CYCLE END, ERROR 신규 추가
-
-### 유지된 항목 (v1.1과 동일)
-
-- SLC 전략, MCC 코칭 철학, 갤럽 CliftonStrengths 34 테마
-- 강점 Top 5, 커리어 방향 5개
-- 04 분기 (AI 인터뷰 vs 갤럽 결과지 업로드)
-- 시간 정책 (즉시 / 다음 주 월요일)
-- 코칭 모드 (General / Retro) 분리
-
----
-
-— 문서 끝 | CareerPT Product Spec v1.5 (schema v0.7.1/v0.7.2 반영)
+— 문서 끝 | CareerPT Product Spec v1.8 (00_flow.md v1.7 정합성 정렬, NEW03 보조 카드 충돌은 미결 보류)

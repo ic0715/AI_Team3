@@ -1,22 +1,22 @@
 # NEW04. 푸시 알림 권한 요청 (신규)
 
-> 앱 사용자(웹 푸시 또는 모바일 앱) 대상으로 알림 권한을 요청하는 화면.
+> 코칭 일정 알림(매일 액션, 주간 회고, 코칭 30분 전)을 위한 푸시 권한을 요청하는 화면. 15 프로필 [알림 설정]에서만 진입.
 
 ## 1. 화면 개요
 
 | 항목 | 내용 |
 | --- | --- |
 | 화면 ID | NEW04_push_permission |
-| 페이즈 | DO |
-| 역할 | 푸시 알림 권한 요청 + 알림 종류 안내 |
-| 진입 경로 | NEW02 직후 1회, 이후 거부 시 재요청 (최대 2회) |
-| 다음 화면 | 11 홈 |
+| 페이즈 | MAINTAIN |
+| 역할 | 푸시 알림 권한 요청 + 알림 종류별 on/off 설정 |
+| 진입 경로 | 15 프로필 → [알림 설정] 버튼 |
+| 다음 화면 | 15 프로필 (권한 허용 또는 "나중에" 선택 시 복귀) |
 
 ## 2. 노출 시점
 
-- NEW02 시작 안내 직후 1회
-- 거부 후 일정 기간(7일) 후 11 진입 시 재요청
-- 최대 2회까지만 노출
+- 사용자가 **15 프로필 → [알림 설정] 버튼**을 명시적으로 클릭한 경우에만 노출
+- ~~NEW02 직후 자동 노출~~ → 폐지 (00_flow.md v1.7 결정사항: NEW02 직후 강제 노출 안 함)
+- ~~거부 후 7일 쿨다운 + 11 진입 시 재요청 (최대 2회)~~ → 폐지. 사용자가 15에서 다시 진입하면 됨
 
 ## 3. UI 구성
 
@@ -36,17 +36,17 @@
 
 ## 4. 기능
 
-- 권한 허용 시 푸시 토큰을 서버에 저장 (push_subscriptions 테이블)
-- 거부 시 재요청 쿨다운 7일
-- 운영 알림 vs 마케팅 알림은 별도 동의
+- 권한 허용 시 푸시 토큰을 서버에 저장 (`push_subscriptions` 테이블, `user_id` UNIQUE — UPSERT 패턴)
+- "나중에" 선택 시 → 15 프로필 복귀 (재요청 쿨다운 없음, 사용자가 원할 때 15에서 다시 진입 가능)
+- 운영 알림(`daily_action` / `weekly_review` / `coaching_reminder`) vs 마케팅 알림(`marketing`)은 별도 동의 (마케팅은 명시 동의 후에만 true)
 
 ### 설정 변경
 
-- 15 프로필 → 알림 설정에서 항목별 on/off 가능
-- · 일일 액션 알림
-- · 주간 회고 알림
-- · 코칭 일정 알림
-- · 마케팅 알림 (별도)
+- 15 프로필 → 알림 설정에서 항목별 on/off 가능 (`push_subscriptions` 테이블의 boolean 컬럼)
+- · 일일 액션 알림 (`daily_action`)
+- · 주간 회고 알림 (`weekly_review`)
+- · 코칭 일정 알림 (`coaching_reminder`)
+- · 마케팅 알림 (`marketing`, 별도 동의 필수)
 
 ## 5. 예외 처리
 
@@ -60,5 +60,14 @@
 
 | 이벤트 | 속성 |
 | --- | --- |
-| push_permission_view | attempt(1/2) |
-| notification_permission_response | granted(boolean) |
+| `push_permission_view` | `from_screen=profile` |
+| `notification_permission_response` | `granted(boolean)` |
+
+---
+
+## 변경 이력
+
+| 버전 | 날짜 | 변경 내용 |
+| --- | --- | --- |
+| v1.1 | 2026-05-09 | 00_flow.md v1.7(프로토타입 정합성) 정렬 + schema v0.7.2 반영: **1번 화면 개요 페이즈** DO → MAINTAIN / **진입 경로** "NEW02 직후 1회 + 거부 후 7일 쿨다운 재요청 (최대 2회)" → "**15 프로필 → [알림 설정] 버튼**"으로 변경 / **다음 화면** "11 홈" → "15 프로필" / **2번 노출 시점** 통째 재작성: NEW02 직후 자동 노출 폐지, 사용자가 명시적으로 알림 설정을 원할 때만 진입 / **4번 기능** — 거부 시 쿨다운 로직 폐지, `push_subscriptions` 테이블(schema v0.7.2 신규) UPSERT 패턴 명시, boolean 컬럼명 명시(`daily_action`/`weekly_review`/`coaching_reminder`/`marketing`) / **6번 분석 이벤트** `push_permission_view` 속성 `attempt(1/2)` → `from_screen=profile`로 변경 (15_profile.md의 `notification_permission_requested` 이벤트와 일관성 유지). |
+| v1.0 | 2026-05-04 | 최초 작성 |

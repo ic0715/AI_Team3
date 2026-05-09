@@ -85,7 +85,7 @@ v2 구현 내용:
 - 코칭 인사이트: `coaching_insights` (13 회고 코칭 완료 시 자동 저장)
   - 컬럼: `week_number`, `topic`, `pattern_insight`, `next_action_title`, `next_action_reason`, `strength_link`
 - 목표 이력: `goals` (status='completed' 또는 'abandoned')
-  - 컬럼: `goal_title`, `goal_category`, `status`, `started_at`, `ended_at`, `final_completion_rate`
+  - 컬럼: `goal_title`, `competency_code`, `domain`, `status`, `started_at`, `ended_at`, `final_completion_rate`
   - `final_completion_rate`가 종료 시 이미 저장되어 있어 JOIN 없이 조회 가능
 - 사이클별 그룹핑 가능 (`goals.id` 기준)
 - 개인정보 최소화: 대화 원문 저장 안 함, 요약 컬럼만 표시
@@ -128,6 +128,7 @@ v2 구현 내용:
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-09 | schema v0.7.2 정합성 정렬: **5번 데이터** — 목표 이력 컬럼 표기에서 `goal_category` 제거 → `competency_code` + `domain`(T/I/R/E) 추가. v0.7에서 7개 대분류 → 12개 역량 코드 + 4개 도메인으로 전환된 schema 변경 반영. |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: **① 헤더 타이틀 "인사이트 보관함 📚"로 확정** (기존 "Archive 📚"에서 변경) / **② 필터 UI v2 구현 대상으로 명시** — v1에서는 필터 없이 전체 최신순 표시 / **③ 카드 탭 상세 모달 v2 구현 대상으로 명시** / 4번 기능 테이블에 구현 시점 컬럼 추가 |
 | v1.1 | 2026-05-05 | schema 검증 반영: `insight_history`→`coaching_insights`(테이블명), 필드명 수정(`week_num`→`week_number`, `pattern`→`pattern_insight`, `action`→`next_action_title`, `strength_ref`→`strength_link`, `insight`→`topic`), 목표 이력(`goals` WHERE status IN ('completed','abandoned')) 및 `final_completion_rate` 조회 추가, RLS 자동 필터 명시 |
 | v1.0 | 2026-05-04 | 최초 작성 |
