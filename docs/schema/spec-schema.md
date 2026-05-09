@@ -202,7 +202,7 @@ auth.users (Supabase 관리)
 | `profile_completed` | `boolean` | NOT NULL, default false | 03 기본 정보 입력 완료 여부. 앱 라우팅의 핵심 조건 | `false` |
 | `main_concern` | `text` | nullable | 가장 큰 커리어 고민 (자유 입력) | `이직을 해야 하는지 모르겠어요` |
 | `avatar_url` | `text` | nullable | 프로필 이미지 URL | `https://...` |
-| `streak_days` | `int` | default 0 | 연속 접속일 | `7` |
+| `streak_days` | `int` | default 0 | 연속 접속일 (v1 후순위 — 갱신 정책 미확정, 프로필 UI에서 미표시) | `7` |
 | `created_at` | `timestamptz` | default now() | 가입 일시 | `2026-04-16 09:00:00+09` |
 | `updated_at` | `timestamptz` | default now() | 마지막 수정 일시 | `2026-04-23 18:30:00+09` |
 
@@ -215,12 +215,13 @@ auth.users (Supabase 관리)
 
 | DB 값 | 표시 라벨 | seed_level 매핑 (#4 액션 시드 조회용) |
 | --- | --- | --- |
-| `junior_new` | 신입 (1년 미만) | `junior` |
-| `junior` | 주니어 (1~3년) | `junior` |
-| `senior_mid` | 미들 (4~7년) | `senior` |
-| `senior` | 시니어 (8년+) | `senior` |
+| `junior_new` | 신입(0년) | `junior` |
+| `junior` | 주니어(1~3년) | `junior` |
+| `senior_mid` | 미드(4~7년) | `senior` |
+| `senior` | 시니어(8년+) | `senior` |
 
 > ⚠️ "취업 준비 중"은 사용자 대상에서 제외 — drop-down에서도 제거.
+> UI 레이블 확정 (2026-05-09): 신입(0년) / 주니어(1~3년) / 미드(4~7년) / 시니어(8년+) — 4개 옵션으로 통일.
 
 ---
 
@@ -682,7 +683,7 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 ```
 입력 (필수):
   - goals.competency_code + goals.current_week
-  - profiles.career_level (junior/senior 매핑용)
+  - profiles.career_level (junior/senior 매핑용 — `junior_new`·`junior` → junior급, `senior_mid`·`senior` → senior급, 시니어 = 8년 이상)
   - 정적 데이터: competency_action_map.md의 시드 액션 6개
                 (해당 competency_code × seed_level)
 입력 (선택):
