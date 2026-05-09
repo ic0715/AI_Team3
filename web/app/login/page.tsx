@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -32,6 +32,15 @@ type PanelType = 'tabs' | 'reset';
 export default function LoginPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('login');
+
+  // Google OAuth 콜백에서 돌아왔을 때 자동 라우팅
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('oauth') === 'success') {
+      handlePostAuthRouting();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [panel, setPanel] = useState<PanelType>('tabs');
 
   // 로그인 폼
@@ -83,7 +92,7 @@ export default function LoginPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail)) { setLoginError('올바른 이메일 형식이 아니에요'); return; }
     if (!loginPassword) { setLoginError('비밀번호를 입력해주세요'); return; }
     setLoginLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
       password: loginPassword,
     });
