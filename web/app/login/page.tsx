@@ -36,13 +36,26 @@ export default function LoginPage() {
   // Google OAuth / 이메일 인증 콜백에서 돌아왔을 때 처리
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Google OAuth 완료
     if (params.get('oauth') === 'success') {
       handlePostAuthRouting();
+      return;
     }
-    if (params.get('verified') === 'true') {
-      setVerifiedSuccess(true);
-      // 2초 후 앱으로 자동 이동
-      setTimeout(() => handlePostAuthRouting(), 2000);
+
+    // 이메일 인증 완료 (PKCE code 또는 implicit hash 토큰이 URL에 있는 경우)
+    // Supabase 클라이언트가 자동으로 세션을 감지함
+    const hasCode = !!params.get('code');
+    const hasHash = window.location.hash.includes('access_token');
+    if (hasCode || hasHash) {
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          authListener.subscription.unsubscribe();
+          setVerifiedSuccess(true);
+          setTimeout(() => handlePostAuthRouting(), 2000);
+        }
+      });
+      return;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,7 +148,7 @@ export default function LoginPage() {
       email: signupEmail,
       password: signupPassword,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?type=email`,
+        emailRedirectTo: `${window.location.origin}/login`,
         data: {
           birthdate: signupBirthdate,
           consent_marketing: consentMarketing,
