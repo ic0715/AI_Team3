@@ -48,11 +48,16 @@ export default function LoginPage() {
     const hasCode = !!params.get('code');
     const hasHash = window.location.hash.includes('access_token');
     if (hasCode || hasHash) {
-      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           authListener.subscription.unsubscribe();
+          const verifiedEmail = session.user.email ?? '';
+          // 이메일 인증 완료 후 자동 진입 대신 사용자가 직접 로그인하도록 세션 제거
+          await supabase.auth.signOut();
+          setLoginEmail(verifiedEmail); // 이메일 미리 채워주기
           setVerifiedSuccess(true);
-          setTimeout(() => handlePostAuthRouting(), 2000);
+          setPanel('tabs');
+          setActiveTab('login');
         }
       });
       return;
@@ -391,7 +396,7 @@ export default function LoginPage() {
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                   <polyline points="22 4 12 14.01 9 11.01"/>
                 </svg>
-                <span>이메일 인증이 완료되었어요! 잠시 후 이동합니다.</span>
+                <span>이메일 인증이 완료되었습니다. 로그인해주세요.</span>
               </div>
             )}
 
