@@ -27,17 +27,22 @@ function isOver14(birthdate: string): boolean {
 }
 
 type TabType = 'login' | 'signup';
-type PanelType = 'tabs' | 'reset';
+type PanelType = 'tabs' | 'reset' | 'verify-email';
 
 export default function LoginPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('login');
 
-  // Google OAuth 콜백에서 돌아왔을 때 자동 라우팅
+  // Google OAuth / 이메일 인증 콜백에서 돌아왔을 때 처리
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('oauth') === 'success') {
       handlePostAuthRouting();
+    }
+    if (params.get('verified') === 'true') {
+      setVerifiedSuccess(true);
+      // 2초 후 앱으로 자동 이동
+      setTimeout(() => handlePostAuthRouting(), 2000);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -63,6 +68,10 @@ export default function LoginPage() {
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentAge, setConsentAge] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
+
+  // 이메일 인증 대기
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
   // 비밀번호 재설정
   const [resetEmail, setResetEmail] = useState('');
@@ -101,7 +110,8 @@ export default function LoginPage() {
       if (error.message.includes('Invalid login credentials')) {
         setLoginError('이메일 또는 비밀번호가 올바르지 않아요');
       } else if (error.message.includes('Email not confirmed')) {
-        router.push('/verify-email');
+        setPendingEmail(loginEmail);
+        setPanel('verify-email');
       } else {
         setLoginError('로그인에 실패했어요. 다시 시도해주세요');
       }
@@ -125,6 +135,7 @@ export default function LoginPage() {
       email: signupEmail,
       password: signupPassword,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?type=email`,
         data: {
           birthdate: signupBirthdate,
           consent_marketing: consentMarketing,
@@ -141,8 +152,9 @@ export default function LoginPage() {
       }
       return;
     }
-    // 가입 성공 → 이메일 인증 화면으로 이동
-    router.push('/verify-email');
+    // 가입 성공 → 이메일 인증 안내 패널로 전환 (페이지 이동 없음)
+    setPendingEmail(signupEmail);
+    setPanel('verify-email');
   };
 
   // 비밀번호 재설정 처리
@@ -169,7 +181,8 @@ export default function LoginPage() {
 
     // 1. 이메일 인증 미완료
     if (!user.email_confirmed_at) {
-      router.push('/verify-email');
+      setPendingEmail(user.email ?? '');
+      setPanel('verify-email');
       return;
     }
 
@@ -280,6 +293,40 @@ export default function LoginPage() {
         </div>
       )}
 
+      {/* 이메일 인증 대기 패널 */}
+      {panel === 'verify-email' && (
+        <div style={{ flex: 1, padding: '0 24px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+          {/* 이메일 아이콘 */}
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '50%',
+            background: '#EEF2FF', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', marginBottom: '20px',
+          }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '10px' }}>
+            이메일을 확인해주세요
+          </div>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '8px' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{pendingEmail}</span>으로<br />
+            인증 링크를 보냈어요.
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '32px' }}>
+            링크를 클릭하면 가입이 완료돼요.<br />
+            메일이 안 보이면 스팸함을 확인해주세요.
+          </div>
+          <button
+            onClick={() => { setPanel('tabs'); setActiveTab('login'); }}
+            style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', padding: '12px', fontFamily: 'inherit' }}
+          >
+            ← 로그인으로 돌아가기
+          </button>
+        </div>
+      )}
+
       {/* 탭 + 폼 패널 */}
       {panel === 'tabs' && (
         <>
@@ -310,6 +357,22 @@ export default function LoginPage() {
           <div style={{ flex: 1, padding: '0 24px 40px', overflowY: 'auto' }}>
 
             {/* 로그인 패널 */}
+            {/* 이메일 인증 완료 배너 */}
+            {verifiedSuccess && (
+              <div style={{
+                padding: '14px 16px', borderRadius: 'var(--radius-md)',
+                background: '#ecfdf5', border: '1.5px solid #6ee7b7',
+                fontSize: '14px', color: '#065f46', marginBottom: '16px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span>이메일 인증이 완료되었어요! 잠시 후 이동합니다.</span>
+              </div>
+            )}
+
             {activeTab === 'login' && (
               <form onSubmit={handleLogin}>
                 {loginError && <ErrorBox message={loginError} />}
