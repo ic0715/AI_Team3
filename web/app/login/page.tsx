@@ -157,11 +157,20 @@ export default function LoginPage() {
     });
     setSignupLoading(false);
     if (error) {
-      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
         setSignupError('이미 가입된 이메일이에요. 로그인을 시도해보세요');
         setActiveTab('login');
+      } else if (msg.includes('rate limit') || msg.includes('only request this once') || msg.includes('too many')) {
+        setSignupError('잠시 후 다시 시도해주세요 (이메일 발송 횟수 제한)');
+      } else if (msg.includes('invalid email') || msg.includes('unable to validate')) {
+        setSignupError('올바른 이메일 형식이 아니에요');
+      } else if (msg.includes('password') && msg.includes('weak')) {
+        setSignupError('비밀번호가 너무 간단해요. 영문+숫자 조합으로 바꿔주세요');
       } else {
-        setSignupError('가입에 실패했어요. 다시 시도해주세요');
+        // 개발 중 실제 에러 확인용 (나중에 제거해도 됨)
+        console.error('[Signup error]', error.message);
+        setSignupError('가입에 실패했어요. 잠시 후 다시 시도해주세요');
       }
       return;
     }
