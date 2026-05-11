@@ -11,7 +11,7 @@
 | 화면 ID | 02_login |
 | 페이즈 | ONBOARDING |
 | 역할 | 인증 + 가입 + 비밀번호 재설정 |
-| 진입 경로 | 01 랜딩의 Primary CTA("동의하고 시작하기") → 회원가입 탭 / Secondary CTA("이미 계정이 있어요") → 로그인 탭 / 직접 URL |
+| 진입 경로 | 01 랜딩의 Primary CTA("동의하고 시작하기") → 02 진입 (탭 기본값: 회원가입) / 기존 사용자는 02 진입 후 로그인 탭 전환 / 직접 URL |
 | 다음 화면 | NEW01(미인증) / 03~10(온보딩 진행 중) / 11(코칭 진행 중) / NEW03(12주 완료) |
 
 ---
@@ -47,8 +47,9 @@
 | 이메일 input | type=email, autocomplete=username |
 | 비밀번호 input | type=password, autocomplete=current-password |
 | 로그인 버튼 | Primary, full-width |
-| Google 로그인 버튼 | Outline, Google 아이콘 포함 |
 | "비밀번호를 잊으셨나요?" 링크 | 탭 영역 숨김 후 비밀번호 재설정 패널 노출 |
+
+> v1.3: Google 로그인 버튼 + "또는" 디바이더 제거. OAuth 흐름 자체를 spec에서 제외 (Google/Apple 등 소셜 로그인은 당분간 미도입).
 
 ### 3.4 회원가입 패널 — 입력 필드
 
@@ -77,7 +78,8 @@
 ### 3.6 회원가입 액션
 
 - 회원가입 버튼 (Primary, full-width): 필수 동의 3개 모두 체크 시에만 활성화
-- "Google로 시작하기" 버튼 (Outline, full-width)
+
+> v1.3: "Google로 시작하기" 버튼 제거 (3.3 참조).
 
 ### 3.7 비밀번호 정책
 
@@ -112,7 +114,6 @@
 | --- | --- | --- |
 | 로그인 | Supabase Auth `signInWithPassword` | rate limit: IP당 10회/시간 |
 | Enter 로그인 | Enter 키로 폼 제출 | Shift+Enter 제외 |
-| Google 로그인 | OAuth redirect → 사용자 상태 기반 라우팅 | — |
 | 회원가입 | 이메일 인증 메일 자동 발송 → NEW01으로 이동 | — |
 | 전체 동의 토글 | 모든 하위 항목 동기화 | — |
 | 동의 시각 기록 | `consent_*_at` 컬럼에 `timestamptz` 저장 (약관 버전 포함) | schema 반영 필요 |
@@ -155,8 +156,6 @@ Supabase Auth 인증 성공 후 다음 순서로 사용자 상태를 확인하�
 | 중복 이메일 | "이미 가입된 이메일이에요. 로그인을 시도해보세요" + 로그인 탭 전환 CTA |
 | 등록되지 않은 이메일 (재설정) | "가입된 계정이 없어요" |
 | 이메일 인증 미완료 | NEW01으로 라우팅, 별도 메시지 미노출 |
-| OAuth 실패 | "Google 로그인에 실패했어요. 다시 시도해주세요" |
-| Google OAuth 팝업 차단 | "팝업이 차단되었어요. 브라우저 설정을 확인해주세요" 토스트 + 이메일 로그인 유도 |
 | 네트워크 오류 | NEW05 네트워크 오류 화면 |
 | Rate limit 초과 | "잠시 후 다시 시도해주세요" |
 | 중복 클릭 | 버튼 disabled로 차단 |
@@ -172,7 +171,6 @@ Supabase Auth 인증 성공 후 다음 순서로 사용자 상태를 확인하�
 | 저장 항목 (가입 시) | `auth.users`: email, password(hash), birthdate / `profiles`: nickname은 03에서 수집 후 저장 |
 | 동의 항목 저장 | `consent_privacy_at`, `consent_terms_at`, `consent_marketing_at`, `policy_version` → **schema 반영 필요** (`profiles` 테이블에 컬럼 추가 또는 `auth.users.raw_user_meta_data`에 저장 방식 확정 필요) |
 | 세션 관리 | Supabase JWT (access 1h, refresh 30d) |
-| OAuth Provider | Google (이후 Apple 검토) |
 | 비밀번호 정책 | 최소 8자, 평문 저장 금지 |
 | 이메일 인증 | 가입 후 인증 메일 자동 발송, 인증 전까지 UNVERIFIED 상태 |
 
@@ -190,8 +188,6 @@ Supabase Auth 인증 성공 후 다음 순서로 사용자 상태를 확인하�
 | `login_succeeded` | 로그인 성공 | `method`, `redirect_target` |
 | `login_failed` | 로그인 실패 | `error_type` |
 | `password_reset_requested` | 재설정 메일 요청 | — |
-| `oauth_started` | OAuth 시작 | `provider` |
-| `oauth_completed` | OAuth 완료 | `provider`, `is_new_user` |
 
 ---
 
@@ -220,8 +216,8 @@ Supabase Auth 인증 성공 후 다음 순서로 사용자 상태를 확인하�
 | 항목 | 내용 | 우선순위 |
 | --- | --- | --- |
 | 동의 컬럼 저장 위치 | `profiles` 테이블 컬럼 추가 vs `auth.users.raw_user_meta_data` 중 확정 필요 | 🟡 개발 전 |
-| 비밀번호 재설정 패널 | 프로토타입 v6 미구현. 다음 버전에 추가 필요 | 🟡 다음 버전 |
-| Apple OAuth | 추후 검토 대상 (현재 Google만 지원) | 🟢 v2 |
+| 비밀번호 재설정 패널 | NEW 프로토타입 v1 미구현. 다음 버전에 추가 필요 | 🟡 다음 버전 |
+| 소셜 로그인 (Google/Apple 등) | v1.3에서 spec 제외. 향후 도입 시 별도 검토 | 🟢 향후 검토 |
 
 ---
 
@@ -229,6 +225,7 @@ Supabase Auth 인증 성공 후 다음 순서로 사용자 상태를 확인하�
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.3 | 2026-05-10 | NEW 프로토타입 v1 정합성 정렬: **소셜 로그인 (Google OAuth) 흐름 spec에서 전체 제거** — 3.3 로그인 패널 Google 버튼 + "또는" 디바이더 제거 / 3.6 회원가입 액션 "Google로 시작하기" 버튼 제거 / 4번 기능 Google 로그인 행 제거 / 6번 예외 처리 OAuth 실패·팝업 차단 항목 제거 / 7번 데이터 정책 OAuth Provider 항목 제거 / 8번 분석 이벤트 oauth_started·oauth_completed 제거. **진입 경로** Secondary CTA "이미 계정이 있어요" 제거 (01번 v1.5와 정합성). **미결사항** "Apple OAuth"를 "소셜 로그인 (Google/Apple 등) — 향후 검토"로 통합. |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 및 팀 결정 반영: 회원가입 폼 이름 필드 제거 확정 (Option B 채택) — 닉네임은 03에서만 수집 / 비밀번호 정책 필수·권장 구분 명확화 (8자 필수, 영문+숫자 혼합 권장) / 비밀번호 재설정 패널 진입 방식·위치 확정 / Google OAuth 팝업 차단 예외 처리 추가 / 접근성 항목 보강 (aria-pressed, aria-live) |
 | v1.1 | 2026-05-05 | schema 검증 반영: PAUSED 상태 진입 조건 추가, 라우팅 로직(5번) `users.coaching_start_at` → `goals` 테이블 기반으로 수정 및 schema 불일치 명시, 사용자 테이블명 `users` → `profiles` 정정, 동의 항목 컬럼 schema 반영 필요 명시 |
 | v1.0 | 2026-05-04 | 최초 작성 |

@@ -12,7 +12,7 @@
 | 페이즈 | DO |
 | 역할 | 12주 첫 주 액션 확정 + 12주 코칭 시작 |
 | 이전 화면 | 09 커리어 방향 결과 |
-| 다음 화면 | NEW02 12주 시작 안내 → 11 홈 |
+| 다음 화면 | NEW02 커리어 방향 설정 완료 → 11 홈 |
 
 ---
 
@@ -75,7 +75,7 @@
 
 ### 3.7 Bottom CTA
 
-- **"홈으로 시작하기 🚀"** (1개 선택 시 활성화) → NEW02 시작 안내로 이동
+- **"시작하기 🚀"** (1개 선택 시 활성화) → NEW02로 이동
 - 미선택 시: disabled 상태 유지
 
 ---
@@ -94,7 +94,7 @@
 | 추천 액션 선택 | 단일 선택 (radio 패턴). 선택 시 상단 badge +1, 다른 항목 자동 해제 |
 | 커스텀 액션 추가 | `action_items` INSERT (`is_custom=true`). 추가 후 자동 선택 상태로 전환 |
 | 커스텀 액션 삭제 | 해당 row 삭제. 선택 상태이던 경우 선택 해제 |
-| "홈으로 시작하기" 클릭 | 선택된 액션 `action_items` INSERT (week_number=1) → `goals.started_at` 기록 → NEW02 이동 |
+| "시작하기" 클릭 | 선택된 액션 `action_items` INSERT (week_number=1) → `goals.started_at` 기록 → NEW02 이동 |
 
 ---
 
@@ -153,6 +153,7 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.4 | 2026-05-10 | NEW 프로토타입 v1 정합성 정렬: **3.7 Bottom CTA** + **4번 기능** CTA 텍스트 "홈으로 시작하기 🚀" → "시작하기 🚀"로 변경. 다음 화면(NEW02 → 11 홈) 흐름은 production 풀 스펙으로 그대로 유지. |
 | v1.3 | 2026-05-07 | schema v0.7.1 반영: **5번 데이터** — `goal_category` → `competency_code, domain` / **7번 분석 이벤트** `cycle_started` 속성 `goal_category` → `competency_code` |
 | v1.2 | 2026-05-07 | 프로토타입 v6 대조 반영: **① 화면 성격 확정** — "AI 자동 생성 로딩 화면" 정의 삭제, 유저가 직접 1개 선택하는 UX로 확정 / **② 선택 개수 1개로 확정** (프로토타입 기준) — 3.3 안내 패널·3.4 카드·3.7 CTA 전반 수정 / **③ 커스텀 maxlength 5~50자로 확정** (기존 5~80자에서 수정) / **④ 하단 summary 영역 프로토타입 기준으로 변경** — "12주 시작 준비 완료!" 문구 삭제, 목표명 pill + 선택 수 badge 구성으로 변경 / **⑤ 상단 goal pill 선택 수 badge 명세 추가** (3.2항 신규) |
 | v1.1 | 2026-05-05 | schema 검증 반영: 화면 역할 재정의(유저 선택→AI 자동 생성 로딩 화면), `career_results.selected_direction`→`goals.goal_title`, `career_focus`·`weekly_actions` 테이블 없음(→`goals`·`action_items`), `action_items.items JSONB`→별도 row 구조, `users.coaching_start_at`→`goals.started_at` 수정 |
