@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 // ── 상수 ──────────────────────────────────────────────────────
 const JOB_OPTIONS = [
@@ -105,7 +105,7 @@ function BasicInfoContent() {
 
         // 신규 진입인데 이미 완료된 경우 → 라우팅
         if (!isEditMode && profile.profile_completed) {
-          router.push('/strength-choice');
+          router.push('/onboarding/strengths');
           return;
         }
       }
@@ -212,7 +212,7 @@ function BasicInfoContent() {
       router.back();
     } else {
       // 신규: 다음 단계로
-      router.push('/strength-choice');
+      router.push('/onboarding/strengths');
     }
   };
 
@@ -319,7 +319,7 @@ function BasicInfoContent() {
               ...inputStyle,
               opacity: isEditMode ? 0.5 : 1,
               cursor: isEditMode ? 'not-allowed' : 'auto',
-              background: isEditMode ? '#F7F7F5' : 'var(--surface)',
+              background: isEditMode ? 'var(--bg)' : 'var(--surface)',
             }}
           />
           {birthdateError && <ErrorMsg id="birthdate-error">{birthdateError}</ErrorMsg>}
@@ -467,7 +467,7 @@ function FormGroup({
 
 function ErrorMsg({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <div id={id} role="alert" style={{ fontSize: '12px', color: '#EF4444', marginTop: '2px' }}>
+    <div id={id} role="alert" style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '2px' }}>
       {children}
     </div>
   );
@@ -529,4 +529,3 @@ const bottomBarStyle: React.CSSProperties = {
   paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
   background: 'var(--surface)', borderTop: '1px solid var(--border)', flexShrink: 0,
 };
-
