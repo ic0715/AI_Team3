@@ -111,15 +111,23 @@ function BasicInfoContent() {
       }
 
       // sessionStorage 임시 저장 복원 (새로고침 대비)
+      // 1시간 이상 된 draft는 무시 (오래된 데이터가 최신 DB 값을 덮어쓰는 문제 방지)
       const draft = sessionStorage.getItem('draft_basic_info');
       if (draft && !isEditMode) {
         try {
           const parsed = JSON.parse(draft);
-          if (parsed.nickname) setNickname(parsed.nickname);
-          if (parsed.gender)   setGender(parsed.gender);
-          if (parsed.jobField) setJobField(parsed.jobField);
-          if (parsed.careerLevel) setCareerLevel(parsed.careerLevel);
-          if (parsed.mainConcern) setMainConcern(parsed.mainConcern);
+          const ONE_HOUR = 60 * 60 * 1000;
+          const isRecentDraft = parsed.savedAt && (Date.now() - parsed.savedAt < ONE_HOUR);
+          if (isRecentDraft) {
+            if (parsed.nickname) setNickname(parsed.nickname);
+            if (parsed.gender)   setGender(parsed.gender);
+            if (parsed.jobField) setJobField(parsed.jobField);
+            if (parsed.careerLevel) setCareerLevel(parsed.careerLevel);
+            if (parsed.mainConcern) setMainConcern(parsed.mainConcern);
+          } else {
+            // 오래된 draft 삭제
+            sessionStorage.removeItem('draft_basic_info');
+          }
         } catch { /* 무시 */ }
       }
 
@@ -136,6 +144,7 @@ function BasicInfoContent() {
     const timer = setInterval(() => {
       sessionStorage.setItem('draft_basic_info', JSON.stringify({
         nickname, gender, jobField, careerLevel, mainConcern,
+        savedAt: Date.now(),
       }));
     }, 60_000);
     return () => clearInterval(timer);
@@ -166,7 +175,7 @@ function BasicInfoContent() {
     setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+    if (!user) { setLoading(false); router.push('/login'); return; }
 
     // 저장할 필드 구성
     const updates: Record<string, unknown> = {
@@ -521,7 +530,3 @@ const bottomBarStyle: React.CSSProperties = {
   background: 'var(--surface)', borderTop: '1px solid var(--border)', flexShrink: 0,
 };
 
-// CSS 변수에 --danger 추가 (globals.css에 없는 경우 대비)
-const dangerColor = '#EF4444';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _ = dangerColor;
