@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 // 비밀번호 강도 계산
 function getPasswordStrength(password: string): { level: 0 | 1 | 2 | 3; label: string; color: string } {
@@ -230,7 +230,7 @@ export default function LoginPage() {
     if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
 
     // 5. 온보딩 진행 중 → 기본 정보 입력으로
-    router.push('/basic-info');
+    router.push('/onboarding/profile');
   };
 
   return (
