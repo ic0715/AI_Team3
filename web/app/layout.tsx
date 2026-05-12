@@ -27,6 +27,13 @@ export default function RootLayout({
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Pretendard 폰트 — globals.css @import 대신 link 태그로 로드 */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

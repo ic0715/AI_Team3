@@ -254,28 +254,6 @@ export default function LandingPage() {
           동의하고 시작하기 →
         </button>
 
-        {/* Secondary CTA: 이미 계정이 있어요 → 로그인 탭 (spec 3.5) */}
-        <button
-          onClick={() => router.push('/login?tab=login')}
-          style={{
-            width: '100%', marginTop: '10px', padding: '14px',
-            borderRadius: '12px', background: 'transparent',
-            color: 'var(--text-secondary)',
-            border: '1.5px solid var(--border-strong)',
-            fontFamily: 'inherit', fontSize: '14px', fontWeight: 600,
-            cursor: 'pointer', transition: 'background .15s, border-color .15s',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = '#F7F7F5';
-            e.currentTarget.style.borderColor = 'var(--text-secondary)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.borderColor = 'var(--border-strong)';
-          }}
-        >
-          이미 계정이 있어요
-        </button>
       </footer>
     </div>
   );
