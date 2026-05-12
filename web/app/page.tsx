@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 // ── 코칭 원칙 카드 데이터 (spec 01_landing.md 3.3 기준) ──────────
 const principles = [
@@ -63,7 +63,7 @@ export default function LandingPage() {
         .eq('id', user.id)
         .single();
 
-      if (!profile?.profile_completed) { router.push('/basic-info'); return; }
+      if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
 
       const { data: strengths } = await supabase
         .from('strength_analyses')
@@ -72,7 +72,7 @@ export default function LandingPage() {
         .eq('is_latest', true)
         .limit(1);
 
-      if (!strengths?.length) { router.push('/strength-choice'); return; }
+      if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
 
       const { data: interviews } = await supabase
         .from('career_interview_results')
@@ -80,11 +80,11 @@ export default function LandingPage() {
         .eq('user_id', user.id)
         .limit(1);
 
-      if (!interviews?.length) { router.push('/career-intro'); return; }
-      if (!interviews[0].recommended_competencies) { router.push('/career-result'); return; }
+      if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
+      if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
 
       // 온보딩 마지막 단계 → 액션 아이템 선택
-      router.push('/action-items');
+      router.push('/onboarding/action-items');
     };
 
     checkAuth();
@@ -190,7 +190,7 @@ export default function LandingPage() {
             style={{
               padding: '18px 20px', marginBottom: '12px',
               border: '1px solid var(--border)', borderRadius: '20px',
-              background: '#F7F7F5',
+              background: 'var(--bg)',
               display: 'grid', gridTemplateColumns: '40px 1fr',
               gap: '14px', alignItems: 'flex-start',
             }}
@@ -246,7 +246,7 @@ export default function LandingPage() {
             fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
             cursor: 'pointer', transition: 'background .2s, transform .1s',
           }}
-          onMouseOver={(e) => (e.currentTarget.style.background = 'var(--accent-dark)')}
+          onMouseOver={(e) => (e.currentTarget.style.background = 'var(--accent-deep)')}
           onMouseOut={(e) => (e.currentTarget.style.background = 'var(--accent)')}
           onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.99)')}
           onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
