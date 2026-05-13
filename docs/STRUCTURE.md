@@ -1,7 +1,7 @@
 # 레포지토리 구조 현황 및 체크리스트
 
-> 최종 업데이트: 2026-05-13
-> 기준 브랜치: `main` (최신 머지 반영)
+> 최종 업데이트: 2026-05-13 (fix/cleanup-auth-supabase 반영)
+> 기준 브랜치: `main` + 정리 작업 포함
 
 ---
 
@@ -40,7 +40,7 @@ AI_Team3/                               ← 레포 루트
 │   │   │   ├── 08_career_interview.md  → app/onboarding/career-interview/ ⬜ 미구현
 │   │   │   ├── 09_career_result.md     → app/onboarding/career-result/   ⬜ 미구현
 │   │   │   ├── 10_action_items.md      → app/onboarding/action-items/    ⬜ 미구현
-│   │   │   ├── NEW01_email_verify.md   → app/(auth)/verify-email/        ⬜ 미구현
+│   │   │   ├── NEW01_email_verify.md   → app/verify-email/               ⬜ 미구현
 │   │   │   ├── NEW02_cycle_start.md    → app/onboarding/complete/        ⬜ 미구현
 │   │   │   ├── NEW05_network_error.md  → app/error/network/page.tsx      ✅ 구현
 │   │   │   └── NEW06_general_error.md  → app/error.tsx + not-found.tsx   ✅ 구현
@@ -70,9 +70,7 @@ AI_Team3/                               ← 레포 루트
     │   │   └── callback/
     │   │       └── route.ts            ✅ Google OAuth 콜백 처리
     │   │
-    │   ├── (auth)/                     ⚠️  하단 이슈 #1 참고
-    │   │   ├── login/                  ⚠️  .gitkeep만 존재 (실제 login은 app/login/)
-    │   │   └── verify-email/           ⬜ NEW01 미구현
+    │   ├── verify-email/               ⬜ NEW01 미구현
     │   │
     │   ├── onboarding/
     │   │   ├── profile/
@@ -92,9 +90,8 @@ AI_Team3/                               ← 레포 루트
     │   └── ui/                         ⬜ 공통 컴포넌트 미구현
     │
     ├── lib/
-    │   ├── supabase.ts                 ⚠️  하단 이슈 #2 참고 (사용 안 함, 삭제 대상)
     │   ├── supabase/
-    │   │   └── client.ts               ✅ 실제 사용 중인 Supabase 클라이언트
+    │   │   └── client.ts               ✅ Supabase 클라이언트 (모든 페이지 사용)
     │   ├── constants/
     │   │   ├── strengths.ts            ✅ 갤럽 34개 테마 + 4개 도메인
     │   │   ├── competencies.ts         ✅ 5개 역량 카드
@@ -138,13 +135,13 @@ app/layout.tsx          ← 폰트, metadata, body 기본 스타일
     │   ├── action-items/            [p10]           ⬜  ← lib/constants/seeds.ts 사용 예정
     │   └── complete/                [NEW02]         ⬜
     │
-    ├── app/(auth)/verify-email/     [NEW01]         ⬜
+    ├── app/verify-email/            [NEW01]         ⬜
     ├── app/error/network/page.tsx   [NEW05]         ✅
     ├── app/error.tsx                [NEW06 런타임]  ✅
     └── app/not-found.tsx            [NEW06 404]     ✅
 
 공통 레이어
-    ├── lib/supabase/client.ts       ← 모든 페이지가 사용하는 Supabase 클라이언트
+    ├── lib/supabase/client.ts       ← Supabase 클라이언트
     ├── lib/constants/               ← 데이터 상수 (하드코딩 제거)
     ├── lib/types/                   ← DB / API 타입 (미작성)
     ├── lib/hooks/                   ← useAuth, useOnboardingGuard (미구현)
@@ -156,20 +153,12 @@ app/layout.tsx          ← 폰트, metadata, body 기본 스타일
 
 ## 4. 이슈 체크리스트
 
-### 🔴 즉시 수정 필요
+### ✅ 완료된 정리 작업
 
-#### 이슈 #1 — `app/(auth)/login/` 라우트 불일치
-- **상황**: 기존 설계는 `app/(auth)/login/page.tsx`였으나, 실제 구현은 `app/login/page.tsx`에 있음
-- **영향**: `app/(auth)/login/`에 `.gitkeep`만 남아있어 혼란 유발. `verify-email`도 `(auth)` 안에 있는데 `login`만 밖으로 나온 상태.
-- **선택지**:
-  - A. `app/login/`을 `app/(auth)/login/`으로 이동 → 설계 원칙 유지
-  - B. `(auth)` 라우트 그룹 폐기 → `verify-email`도 `app/verify-email/`로 이동
-- **권장**: A안 — `(auth)` 라우트 그룹이 레이아웃 공유에 유리
-
-#### 이슈 #2 — `lib/supabase.ts` 중복 (사용 안 함)
-- **상황**: `web/lib/supabase.ts` (루트)와 `web/lib/supabase/client.ts` (폴더) 두 개가 공존. 모든 페이지는 `@/lib/supabase/client`를 import하므로 `lib/supabase.ts`는 사용되지 않음.
-- **영향**: 신규 개발자가 어떤 파일을 써야 하는지 혼동
-- **조치**: `web/lib/supabase.ts` 삭제
+| 작업 | 내용 |
+|------|------|
+| `app/(auth)/` 폴더 삭제 | 실제 구현(`app/login/`)과 불일치하는 빈 폴더 제거. `verify-email`은 `app/verify-email/`로 위치 정리 |
+| `lib/supabase.ts` 삭제 | `lib/supabase/client.ts`가 실제 사용되므로 중복 파일 제거 |
 
 ---
 
@@ -214,7 +203,7 @@ app/layout.tsx          ← 폰트, metadata, body 기본 스타일
 | 08_career_interview | `app/onboarding/career-interview/page.tsx` | ⬜ 미구현 | |
 | 09_career_result | `app/onboarding/career-result/page.tsx` | ⬜ 미구현 | |
 | 10_action_items | `app/onboarding/action-items/page.tsx` | ⬜ 미구현 | |
-| NEW01_email_verify | `app/(auth)/verify-email/page.tsx` | ⬜ 미구현 | |
+| NEW01_email_verify | `app/verify-email/page.tsx` | ⬜ 미구현 | |
 | NEW02_cycle_start | `app/onboarding/complete/page.tsx` | ⬜ 미구현 | |
 | NEW05_network_error | `app/error/network/page.tsx` | ✅ 완료 | |
 | NEW06_general_error | `app/error.tsx` + `app/not-found.tsx` | ✅ 완료 | |
