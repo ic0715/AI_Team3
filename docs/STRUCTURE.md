@@ -1,7 +1,7 @@
 # 레포지토리 구조 현황 및 체크리스트
 
-> 최종 업데이트: 2026-05-12
-> 작성 기준 브랜치: `docs/reorganize-functional-spec` (main PR 대기 중)
+> 최종 업데이트: 2026-05-13
+> 기준 브랜치: `main` (최신 머지 반영)
 
 ---
 
@@ -9,184 +9,227 @@
 
 1. **단일 Next.js 앱 (`web/`)** — 구현 코드는 `web/` 하나에만 존재. 나머지는 모두 문서.
 2. **`docs/functional_spec/` 분리** — `_mvp/`(지금 구현) / `_post_mvp/`(보존) 폴더로 상태 표시.
-3. **`web/lib/constants/` 중앙화** — 프로토타입에서 하드코딩된 데이터를 상수 파일로 분리.
+3. **`web/lib/constants/` 중앙화** — 하드코딩 데이터를 상수 파일로 분리해 페이지 간 공유.
 
 ---
 
-## 2. 현재 폴더 구조 (완료)
+## 2. 현재 폴더 구조 (GitHub main 기준)
 
 ```
-AI_Team3/                          ← 레포 루트
-├── .env.example                   ✅ 환경변수 템플릿 (Supabase URL/KEY)
-├── .gitignore                     ✅
-├── config.example.js              ⚠️  하단 체크리스트 참고
+AI_Team3/                               ← 레포 루트
+├── .env.example                        ✅ 환경변수 템플릿 (루트 위치)
+├── .gitignore                          ✅
+├── config.example.js                   ⚠️  하단 이슈 #3 참고
 │
-├── docs/                          ← 문서 전용 (구현 코드 없음)
-│   ├── README.md
-│   ├── MANIFESTO.md
-│   ├── STRUCTURE.md               ← 이 파일
+├── docs/                               ← 문서 전용 (구현 코드 없음)
+│   ├── README.md                       ✅
+│   ├── MANIFESTO.md                    ✅
+│   ├── STRUCTURE.md                    ✅ 이 파일
+│   ├── PREMORTEM.md                    ✅
+│   ├── WHYTREE.md                      ✅
 │   │
 │   ├── functional_spec/
-│   │   ├── _mvp/                  ✅ 지금 구현할 화면 스펙 (14개)
+│   │   ├── _mvp/                       ✅ 현재 구현 대상 스펙 (14개)
 │   │   │   ├── 00_common.md
 │   │   │   ├── 00_flow.md
-│   │   │   ├── 01_landing.md
-│   │   │   ├── 02_login.md
-│   │   │   ├── 03_basic_info.md
-│   │   │   ├── 04_strength_choice.md
-│   │   │   ├── 07_career_intro.md
-│   │   │   ├── 08_career_interview.md
-│   │   │   ├── 09_career_result.md
-│   │   │   ├── 10_action_items.md
-│   │   │   ├── NEW01_email_verify.md
-│   │   │   ├── NEW02_cycle_start.md
-│   │   │   ├── NEW05_network_error.md
-│   │   │   └── NEW06_general_error.md
+│   │   │   ├── 01_landing.md           → app/page.tsx          ✅ 구현
+│   │   │   ├── 02_login.md             → app/login/page.tsx    ✅ 구현
+│   │   │   ├── 03_basic_info.md        → app/onboarding/profile/page.tsx ✅ 구현
+│   │   │   ├── 04_strength_choice.md   → app/onboarding/strengths/       ⬜ 미구현
+│   │   │   ├── 07_career_intro.md      → app/onboarding/career-intro/    ⬜ 미구현
+│   │   │   ├── 08_career_interview.md  → app/onboarding/career-interview/ ⬜ 미구현
+│   │   │   ├── 09_career_result.md     → app/onboarding/career-result/   ⬜ 미구현
+│   │   │   ├── 10_action_items.md      → app/onboarding/action-items/    ⬜ 미구현
+│   │   │   ├── NEW01_email_verify.md   → app/(auth)/verify-email/        ⬜ 미구현
+│   │   │   ├── NEW02_cycle_start.md    → app/onboarding/complete/        ⬜ 미구현
+│   │   │   ├── NEW05_network_error.md  → app/error/network/page.tsx      ✅ 구현
+│   │   │   └── NEW06_general_error.md  → app/error.tsx + not-found.tsx   ✅ 구현
 │   │   │
-│   │   └── _post_mvp/             ✅ MVP 이후 보존 (10개, 건드리지 않음)
-│   │       ├── 05_strength_interview.md
-│   │       ├── 06_strength_result.md
-│   │       ├── 11_home.md
-│   │       ├── 12_reflect.md
-│   │       ├── 13_reflect_coaching.md
-│   │       ├── 14_history.md
-│   │       ├── 15_profile.md
-│   │       ├── NEW03_cycle_complete.md
-│   │       ├── NEW04_push_permission.md
-│   │       └── NEW07_password_change.md
+│   │   └── _post_mvp/                  ✅ MVP 이후 보존 (10개, 건드리지 않음)
 │   │
-│   ├── ai_prompt/                 ✅ AI 프롬프트 문서 (변경 없음)
-│   ├── schema/                    ✅ DB/API 스키마 문서 (변경 없음)
-│   └── prototypes/                ✅ 프로토타입 HTML 아카이브
-│       ├── (Pivoted)CareerPT_prototype_v4_0511.html
-│       └── CareerPT_prototype_v9_260509.html
+│   ├── ai_prompt/                      ✅ AI 프롬프트 문서
+│   ├── schema/                         ✅ DB/API 스키마 문서
+│   └── prototypes/                     ✅ 프로토타입 HTML 아카이브
 │
-└── web/                           ← Next.js App Router (구현 코드)
-    ├── next-env.d.ts
+└── web/                                ← Next.js App Router (구현 코드)
+    ├── package.json                    ✅ next 16, react 19, supabase, tailwind 4
+    ├── tsconfig.json                   ✅ strict mode, @/* 경로 alias
+    ├── postcss.config.mjs              ✅ Tailwind v4 설정
+    ├── next-env.d.ts                   ✅
     │
     ├── app/
-    │   ├── (auth)/
-    │   │   ├── login/             ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   └── verify-email/      ✅ 폴더 생성 완료 (page.tsx 미구현)
+    │   ├── layout.tsx                  ✅ 루트 레이아웃 (Pretendard, metadata)
+    │   ├── page.tsx                    ✅ p01 랜딩 (인증 상태 기반 라우팅 포함)
+    │   ├── error.tsx                   ✅ NEW06 런타임 Error Boundary
+    │   ├── not-found.tsx               ✅ NEW06 404 화면
+    │   │
+    │   ├── login/                      ✅ p02 로그인/회원가입 (이메일+Google OAuth)
+    │   │   └── page.tsx
+    │   │
+    │   ├── auth/
+    │   │   └── callback/
+    │   │       └── route.ts            ✅ Google OAuth 콜백 처리
+    │   │
+    │   ├── (auth)/                     ⚠️  하단 이슈 #1 참고
+    │   │   ├── login/                  ⚠️  .gitkeep만 존재 (실제 login은 app/login/)
+    │   │   └── verify-email/           ⬜ NEW01 미구현
     │   │
     │   ├── onboarding/
-    │   │   ├── profile/           ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   ├── strengths/         ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   ├── career-intro/      ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   ├── career-interview/  ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   ├── career-result/     ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   ├── action-items/      ✅ 폴더 생성 완료 (page.tsx 미구현)
-    │   │   └── complete/          ✅ 폴더 생성 완료 (page.tsx 미구현)
+    │   │   ├── profile/
+    │   │   │   └── page.tsx            ✅ p03 기본 정보 입력
+    │   │   ├── strengths/              ⬜ p04 미구현
+    │   │   ├── career-intro/           ⬜ p07 미구현
+    │   │   ├── career-interview/       ⬜ p08 미구현
+    │   │   ├── career-result/          ⬜ p09 미구현
+    │   │   ├── action-items/           ⬜ p10 미구현
+    │   │   └── complete/               ⬜ NEW02 미구현
     │   │
-    │   ├── error/
-    │   │   └── network/
-    │   │       └── page.tsx       ✅ NEW05 네트워크 오류 화면 구현
-    │   │
-    │   ├── error.tsx              ✅ NEW06 런타임 Error Boundary 구현
-    │   └── not-found.tsx          ✅ NEW06 404 화면 구현
+    │   └── error/
+    │       └── network/
+    │           └── page.tsx            ✅ NEW05 네트워크 오류
     │
     ├── components/
-    │   └── ui/                    ✅ 폴더 생성 완료 (컴포넌트 미구현)
+    │   └── ui/                         ⬜ 공통 컴포넌트 미구현
     │
     ├── lib/
-    │   ├── supabase.ts            ✅ Supabase 클라이언트 초기화
+    │   ├── supabase.ts                 ⚠️  하단 이슈 #2 참고 (사용 안 함, 삭제 대상)
+    │   ├── supabase/
+    │   │   └── client.ts               ✅ 실제 사용 중인 Supabase 클라이언트
     │   ├── constants/
-    │   │   ├── strengths.ts       ✅ 갤럽 34개 테마 + 4개 도메인 상수
-    │   │   ├── competencies.ts    ✅ 5개 역량 카드 데이터
-    │   │   └── seeds.ts           ✅ 역량별 액션 아이템 25개
+    │   │   ├── strengths.ts            ✅ 갤럽 34개 테마 + 4개 도메인
+    │   │   ├── competencies.ts         ✅ 5개 역량 카드
+    │   │   └── seeds.ts                ✅ 역량별 액션 아이템 25개
     │   ├── types/
-    │   │   ├── database.ts        ✅ 생성 완료 (타입 정의 미작성)
-    │   │   └── api.ts             ✅ 생성 완료 (타입 정의 미작성)
+    │   │   ├── database.ts             ⬜ 파일만 존재, 타입 미작성
+    │   │   └── api.ts                  ⬜ 파일만 존재, 타입 미작성
     │   └── hooks/
-    │       ├── useAuth.ts         ⬜ 미생성
-    │       └── useOnboardingGuard.ts ⬜ 미생성
+    │       ├── useAuth.ts              ⬜ 미구현
+    │       └── useOnboardingGuard.ts   ⬜ 미구현
     │
     └── styles/
-        ├── globals.css            ✅ tokens.css import 포함
-        └── tokens.css             ✅ :root {} 껍데기 생성
+        ├── globals.css                 ✅ CSS 변수 + Tailwind import + body 스타일
+        └── tokens.css                  ⚠️  하단 이슈 #4 참고 (비어있음)
 ```
 
 ---
 
-## 3. 체크리스트 — 팀 확인 필요
+## 3. 아키텍처 개요
 
-### 🔴 Critical: 지금 없으면 앱 실행 불가
+```
+사용자 요청
+    │
+    ▼
+app/layout.tsx          ← 폰트, metadata, body 기본 스타일
+    │
+    ├── app/page.tsx                 [p01 랜딩]
+    │       └── Supabase auth 상태 확인 → 상태별 라우팅
+    │
+    ├── app/login/page.tsx           [p02 로그인/회원가입]
+    │       ├── 이메일 로그인 / 회원가입
+    │       ├── Google OAuth (→ app/auth/callback/route.ts)
+    │       └── 비밀번호 재설정 / 이메일 인증 패널
+    │
+    ├── app/onboarding/
+    │   ├── profile/page.tsx         [p03 기본 정보] ✅
+    │   ├── strengths/               [p04 강점 선택] ⬜  ← lib/constants/strengths.ts 사용 예정
+    │   ├── career-intro/            [p07]           ⬜
+    │   ├── career-interview/        [p08]           ⬜
+    │   ├── career-result/           [p09]           ⬜  ← lib/constants/competencies.ts 사용 예정
+    │   ├── action-items/            [p10]           ⬜  ← lib/constants/seeds.ts 사용 예정
+    │   └── complete/                [NEW02]         ⬜
+    │
+    ├── app/(auth)/verify-email/     [NEW01]         ⬜
+    ├── app/error/network/page.tsx   [NEW05]         ✅
+    ├── app/error.tsx                [NEW06 런타임]  ✅
+    └── app/not-found.tsx            [NEW06 404]     ✅
 
-다음 4개 파일이 없습니다. `npx create-next-app`으로 생성하거나 팀 기존 설정을 가져와야 합니다.
-
-| 파일 | 역할 | 담당 |
-|------|------|------|
-| `web/package.json` | 의존성 정의. 없으면 npm install 불가 | |
-| `web/tsconfig.json` | TypeScript 컴파일 설정 | |
-| `web/next.config.ts` | Next.js 설정 (이미지 도메인, 리다이렉트 등) | |
-| `web/app/layout.tsx` | App Router 필수 루트 레이아웃. 없으면 모든 페이지 렌더 안 됨 | |
-
-> **권장**: 팀원 중 한 명이 `web/` 안에서 `npx create-next-app@latest . --typescript --tailwind --app --src-dir no` 실행 후 불필요한 boilerplate 파일 제거.
-
----
-
-### 🟡 혼란 유발: 수정 or 삭제 결정 필요
-
-#### ① `.env.example` copy 경로 불일치
-
-`.env.example`은 레포 **루트**에 있지만, Next.js는 `web/` 안의 `.env.local`을 읽습니다.
-
-```bash
-# 현재 파일 안 안내 (잘못됨)
-cp .env.example .env.local
-
-# 올바른 명령어
-cp .env.example web/.env.local
+공통 레이어
+    ├── lib/supabase/client.ts       ← 모든 페이지가 사용하는 Supabase 클라이언트
+    ├── lib/constants/               ← 데이터 상수 (하드코딩 제거)
+    ├── lib/types/                   ← DB / API 타입 (미작성)
+    ├── lib/hooks/                   ← useAuth, useOnboardingGuard (미구현)
+    ├── components/ui/               ← 공통 UI 컴포넌트 (미구현)
+    └── styles/globals.css           ← CSS 변수, Tailwind, 전역 스타일
 ```
 
-→ `.env.example` 파일 상단 안내 문구 수정 필요. **또는** `.env.example`을 `web/`으로 다시 이동하는 방법도 있음. 팀 결정 후 반영.
+---
 
-#### ② `config.example.js` 중복 여부
+## 4. 이슈 체크리스트
 
-루트에 `config.example.js`가 존재하며 `.env.example`과 동일한 Supabase 값을 담고 있습니다. 단, vanilla JS 방식(`const SUPABASE_URL = ...`)으로 작성되어 Next.js 환경변수(`process.env.NEXT_PUBLIC_...`)와 방식이 다릅니다.
+### 🔴 즉시 수정 필요
 
-- **삭제 권장**: Next.js 앱은 `.env.local`만 사용하므로 `config.example.js`는 더 이상 필요 없음
-- **유지 결정 시**: 용도가 다르다면 파일 상단에 용도 명시 필요
+#### 이슈 #1 — `app/(auth)/login/` 라우트 불일치
+- **상황**: 기존 설계는 `app/(auth)/login/page.tsx`였으나, 실제 구현은 `app/login/page.tsx`에 있음
+- **영향**: `app/(auth)/login/`에 `.gitkeep`만 남아있어 혼란 유발. `verify-email`도 `(auth)` 안에 있는데 `login`만 밖으로 나온 상태.
+- **선택지**:
+  - A. `app/login/`을 `app/(auth)/login/`으로 이동 → 설계 원칙 유지
+  - B. `(auth)` 라우트 그룹 폐기 → `verify-email`도 `app/verify-email/`로 이동
+- **권장**: A안 — `(auth)` 라우트 그룹이 레이아웃 공유에 유리
+
+#### 이슈 #2 — `lib/supabase.ts` 중복 (사용 안 함)
+- **상황**: `web/lib/supabase.ts` (루트)와 `web/lib/supabase/client.ts` (폴더) 두 개가 공존. 모든 페이지는 `@/lib/supabase/client`를 import하므로 `lib/supabase.ts`는 사용되지 않음.
+- **영향**: 신규 개발자가 어떤 파일을 써야 하는지 혼동
+- **조치**: `web/lib/supabase.ts` 삭제
 
 ---
 
-### 🟢 문제 없음 (참고용)
+### 🟡 팀 결정 후 처리
 
-| 항목 | 이유 |
+#### 이슈 #3 — `config.example.js` 중복
+- **상황**: 루트에 `config.example.js`와 `.env.example` 두 파일이 공존. 동일한 Supabase 값을 담고 있으나 방식이 다름 (`const` vs `process.env`).
+- **조치**: `config.example.js` 삭제 권장. Next.js는 `.env.local`만 사용.
+
+#### 이슈 #4 — `styles/tokens.css` 빈 파일
+- **상황**: CSS 변수가 `globals.css`에 직접 작성됨. `tokens.css`는 비어있고 `globals.css`에서 import만 됨.
+- **선택지**:
+  - A. `tokens.css`에 CSS 변수를 이동하고 `globals.css`는 레이아웃/리셋만 유지
+  - B. `tokens.css` 삭제하고 `globals.css` 단일 파일로 유지
+- **현재 동작에는 문제 없음**. 파일 역할 정리 차원의 결정.
+
+#### 이슈 #5 — `.env.example` copy 경로 안내 오류
+- **상황**: 파일 안에 `cp .env.example .env.local`로 안내되어 있으나, Next.js는 `web/.env.local`을 읽음.
+- **조치**: 안내 문구를 `cp .env.example web/.env.local`로 수정.
+
+---
+
+### 🟢 정상 (오해할 수 있는 항목)
+
+| 항목 | 설명 |
 |------|------|
-| `web/app/error.tsx` + `web/app/error/network/` 공존 | Next.js에서 `error.tsx`는 라우트가 아닌 특수 파일이라 충돌 없음 |
-| `docs/PREMORTEM.md`, `docs/WHYTREE.md` | 문서 파일, 앱 동작에 영향 없음 |
-| `_mvp/` 안에 `.gitkeep` 파일 | Git 빈 폴더 추적용. 파일이 채워지면 자동으로 무의미해짐 |
+| `app/error.tsx` + `app/error/network/` 공존 | `error.tsx`는 Next.js 특수 파일(라우트 아님). 충돌 없음 |
+| `next.config.ts` 없음 | Next.js는 config 없이도 동작. 필요 시 추가 가능 |
+| `package-lock.json` 커밋됨 | npm 환경에서는 정상. yarn/pnpm 전환 시 재논의 필요 |
 
 ---
 
-## 4. 다음 구현 순서 (제안)
+## 5. 구현 진행 현황
 
-| 단계 | 작업 | 스펙 참고 |
-|------|------|----------|
-| 1 | `web/` Next.js 프로젝트 초기화 (package.json 등) | — |
-| 2 | `web/styles/tokens.css` CSS 변수 정의 | `_mvp/00_common.md` |
-| 3 | `web/app/layout.tsx` 루트 레이아웃 | `_mvp/00_common.md` |
-| 4 | `web/components/ui/` 공통 컴포넌트 | `_mvp/00_common.md` |
-| 5 | `web/lib/hooks/useAuth.ts` | `_mvp/02_login.md` |
-| 6 | `web/lib/hooks/useOnboardingGuard.ts` | `_mvp/00_flow.md` |
-| 7 | 각 페이지 `page.tsx` 구현 | `_mvp/` 각 스펙 |
+| 스펙 | 라우트 | 상태 | 담당 |
+|------|--------|------|------|
+| 01_landing | `app/page.tsx` | ✅ 완료 | |
+| 02_login | `app/login/page.tsx` | ✅ 완료 | |
+| 03_basic_info | `app/onboarding/profile/page.tsx` | ✅ 완료 | |
+| 04_strength_choice | `app/onboarding/strengths/page.tsx` | ⬜ 미구현 | |
+| 07_career_intro | `app/onboarding/career-intro/page.tsx` | ⬜ 미구현 | |
+| 08_career_interview | `app/onboarding/career-interview/page.tsx` | ⬜ 미구현 | |
+| 09_career_result | `app/onboarding/career-result/page.tsx` | ⬜ 미구현 | |
+| 10_action_items | `app/onboarding/action-items/page.tsx` | ⬜ 미구현 | |
+| NEW01_email_verify | `app/(auth)/verify-email/page.tsx` | ⬜ 미구현 | |
+| NEW02_cycle_start | `app/onboarding/complete/page.tsx` | ⬜ 미구현 | |
+| NEW05_network_error | `app/error/network/page.tsx` | ✅ 완료 | |
+| NEW06_general_error | `app/error.tsx` + `app/not-found.tsx` | ✅ 완료 | |
 
----
+**공통 레이어 진행 현황**
 
-## 5. 스펙 파일 ↔ 구현 파일 매핑
-
-| 스펙 | 라우트 경로 | 구현 상태 |
-|------|------------|----------|
-| 01_landing | `app/page.tsx` | ⬜ 미구현 |
-| 02_login | `app/(auth)/login/page.tsx` | ⬜ 미구현 |
-| 03_basic_info | `app/onboarding/profile/page.tsx` | ⬜ 미구현 |
-| 04_strength_choice | `app/onboarding/strengths/page.tsx` | ⬜ 미구현 |
-| 07_career_intro | `app/onboarding/career-intro/page.tsx` | ⬜ 미구현 |
-| 08_career_interview | `app/onboarding/career-interview/page.tsx` | ⬜ 미구현 |
-| 09_career_result | `app/onboarding/career-result/page.tsx` | ⬜ 미구현 |
-| 10_action_items | `app/onboarding/action-items/page.tsx` | ⬜ 미구현 |
-| NEW01_email_verify | `app/(auth)/verify-email/page.tsx` | ⬜ 미구현 |
-| NEW02_cycle_start | `app/onboarding/complete/page.tsx` | ⬜ 미구현 |
-| NEW05_network_error | `app/error/network/page.tsx` | ✅ 구현 완료 |
-| NEW06_general_error | `app/error.tsx` + `app/not-found.tsx` | ✅ 구현 완료 |
+| 파일 | 상태 |
+|------|------|
+| `lib/supabase/client.ts` | ✅ 완료 |
+| `lib/constants/strengths.ts` | ✅ 완료 (34개) |
+| `lib/constants/competencies.ts` | ✅ 완료 (5개) |
+| `lib/constants/seeds.ts` | ✅ 완료 (25개) |
+| `lib/types/database.ts` | ⬜ 파일만 존재 |
+| `lib/types/api.ts` | ⬜ 파일만 존재 |
+| `lib/hooks/useAuth.ts` | ⬜ 미구현 |
+| `lib/hooks/useOnboardingGuard.ts` | ⬜ 미구현 |
+| `components/ui/` 컴포넌트 | ⬜ 미구현 |
+| `styles/globals.css` | ✅ CSS 변수 + Tailwind + 전역 스타일 |
