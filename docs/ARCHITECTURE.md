@@ -1,7 +1,7 @@
 # CareerPT 아키텍처 문서
 
 > 최종 업데이트: 2026-05-13
-> 기준: `main` 최신 (PR #44 머지 완료)
+> 기준: `main` 최신 (908b956 커밋 완료)
 
 ---
 
@@ -302,7 +302,8 @@ npm run dev
 ## 12. 향후 추가 예정 (post-MVP)
 
 - `lib/supabase/server.ts` — 서버 컴포넌트용 Supabase 클라이언트
-- `lib/hooks/useAuth.ts` — 인증 상태 훅
-- `lib/hooks/useOnboardingGuard.ts` — 온보딩 단계 가드 훅
-- `lib/types/database.ts` — Supabase CLI로 자동 생성한 DB 타입
+- `lib/hooks/useAuth.ts` — 인증 상태 훅 (미구현)
+- `lib/types/database.ts` — Supabase CLI로 자동 생성한 DB 타입 (DB 스키마 확정 후)
 - `components/ui/` — TopBar, ProgressBar, StrengthChip, ActionItemCard 등 공통 컴포넌트
+
+> `lib/hooks/useOnboardingGuard.ts` — ✅ 구현 완료 (908b956)

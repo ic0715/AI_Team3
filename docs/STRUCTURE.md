@@ -1,7 +1,7 @@
 # 레포지토리 구조 현황 및 팀 체크리스트
 
 > 최종 업데이트: 2026-05-13
-> 기준: `main` 최신 (PR #44 머지 완료)
+> 기준: `main` 최신 (908b956 커밋 완료)
 
 ---
 
@@ -11,7 +11,6 @@
 AI_Team3/                                   ← 레포 루트
 ├── .env.example                            ✅ 환경변수 템플릿
 ├── .gitignore                              ✅
-├── config.example.js                       🟡 정리 필요 (하단 참고)
 │
 ├── docs/                                   ← 문서 전용 (코드 없음)
 │   ├── STRUCTURE.md                        ✅ 이 파일
@@ -64,11 +63,10 @@ AI_Team3/                                   ← 레포 루트
     │   │   └── api.ts                      🟡 파일만 존재 (타입 미작성)
     │   └── hooks/
     │       ├── useAuth.ts                  ⬜ 미구현
-    │       └── useOnboardingGuard.ts       ⬜ 미구현
+    │       └── useOnboardingGuard.ts       ✅ 온보딩 단계 가드 훅
     │
     └── styles/
-        ├── globals.css                     ✅ CSS 변수 + Tailwind import + 전역 스타일
-        └── tokens.css                      🟡 비어있음 (하단 참고)
+        └── globals.css                     ✅ CSS 변수 + Tailwind import + 전역 스타일
 ```
 
 ---
@@ -191,16 +189,13 @@ NEW01 스펙의 이메일 인증 화면을 별도 라우트(`/verify-email`)로 
 | 별도 라우트 유지 | URL로 직접 접근 가능, 명확한 상태 구분 | 로그인 페이지와 상태 공유 필요 |
 | 로그인 패널로 유지 | 이미 구현됨, 상태 공유 간단 | `/verify-email` 폴더가 사용 안 됨 |
 
-**② `config.example.js` 삭제**
+### ✅ 완료된 정리 작업
 
-`.env.example`과 동일한 내용을 담은 구식 파일. 현재 사용하는 곳 없음.
-삭제에 이견 없으면 PR로 제거 권장.
+**② `config.example.js` 삭제** — 완료 (908b956)
 
-**③ `styles/tokens.css` 처리**
+**③ `styles/tokens.css` 삭제** — 완료 (908b956). `globals.css` 단일 파일로 유지.
 
-현재 비어있음 (`:root {}`만 존재). CSS 변수가 `globals.css`에 직접 작성됨.
-- **A안**: `tokens.css` 삭제, `globals.css` 단일 파일 유지
-- **B안**: CSS 변수를 `tokens.css`로 이동, `globals.css`에서 import
+**⑦ `lib/hooks/useOnboardingGuard.ts` 구현** — 완료 (908b956). 각 온보딩 페이지에서 `const { ready } = useOnboardingGuard("strengths")` 형태로 사용.
 
 ### 🔵 구현 시 참고사항
 
@@ -222,7 +217,3 @@ cd web
 npx supabase gen types typescript --project-id <project-id> > lib/types/database.ts
 ```
 DB 스키마가 확정되면 생성 권장.
-
-**⑦ `lib/hooks/` 구현 시점**
-
-`useOnboardingGuard.ts`는 각 온보딩 페이지에서 "이전 단계 완료 여부 확인 후 리다이렉트" 로직을 공통화하는 훅. p04 구현 시작 전에 만들어두면 이후 페이지에서 재사용 가능.
