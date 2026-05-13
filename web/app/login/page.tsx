@@ -37,6 +37,11 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
+    // 랜딩 CTA "동의하고 시작하기"에서 ?tab=signup 으로 진입한 경우 → 회원가입 탭 활성화
+    if (params.get('tab') === 'signup') {
+      setActiveTab('signup');
+    }
+
     // Google OAuth 완료
     if (params.get('oauth') === 'success') {
       handlePostAuthRouting();

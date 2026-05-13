@@ -21,7 +21,7 @@ export const DOMAINS: DomainMeta[] = [
     key: "executing",
     label: "실행력",
     labelEn: "Executing",
-    description: "결과를 만들어내고 일을 해내는 데 능한 강점들. "어떻게(How) 일을 끝낼 것인가"에 집중.",
+    description: "결과를 만들어내고 일을 해내는 데 능한 강점들. \"어떻게(How) 일을 끝낼 것인가\"에 집중.",
     color: "#7C3AED",
     bgColor: "#F3EEFF",
   },
