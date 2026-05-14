@@ -150,7 +150,7 @@ export default function CareerIntroPage() {
         <div className="px-[22px] pt-[14px] pb-[22px] bg-[var(--surface)] border-t border-[var(--border)]">
           <button
             type="button"
-            onClick={() => router.push('/career-interview')}
+            onClick={() => router.push('/onboarding/career-interview')}
             className="w-full inline-flex items-center justify-center px-5 py-[14px] bg-[var(--accent)] text-white border-none font-bold text-[15px] rounded-[var(--radius-md)] cursor-pointer transition-all duration-150 hover:bg-[var(--accent-dark)]"
           >
             인터뷰 시작하기 →
