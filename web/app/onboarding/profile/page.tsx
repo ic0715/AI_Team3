@@ -73,6 +73,9 @@ function BasicInfoContent() {
   // 수정 모드: 원본 값 저장 (변경 여부 감지용)
   const originalValues = useRef({ nickname: '', gender: '', jobField: '', careerLevel: '', mainConcern: '' });
 
+  // 닉네임 필드 앵커링용
+  const nicknameRef = useRef<HTMLDivElement>(null);
+
   // ── 진입 시: 기존 프로필 데이터 불러오기 ──────────────────
   useEffect(() => {
     const fetchProfile = async () => {
@@ -171,7 +174,13 @@ function BasicInfoContent() {
     if (!isEditMode && !birthdate) { setBirthdateError('생년월일을 입력해주세요'); hasError = true; }
     if (!jobField) { setJobError('직업/분야를 선택해주세요'); hasError = true; }
     if (!careerLevel) { setCareerError('경력을 선택해주세요'); hasError = true; }
-    if (hasError) return;
+    if (hasError) {
+      // 닉네임 에러가 있으면 해당 필드로 스크롤
+      if (!nickname.trim() || nickname.trim().length > 10) {
+        nicknameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
 
     setLoading(true);
 
@@ -279,6 +288,7 @@ function BasicInfoContent() {
         </div>
 
         {/* ── 닉네임 ── */}
+        <div ref={nicknameRef}>
         <FormGroup label="닉네임" required error={nicknameError}>
           <div style={{ position: 'relative' }}>
             <input
@@ -308,6 +318,7 @@ function BasicInfoContent() {
           </div>
           {nicknameError && <ErrorMsg id="nickname-error">{nicknameError}</ErrorMsg>}
         </FormGroup>
+        </div>
 
         {/* ── 생년월일 ── */}
         <FormGroup
