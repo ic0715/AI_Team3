@@ -42,27 +42,28 @@ export default function LoginPage() {
       setActiveTab('signup');
     }
 
-    // Google OAuth 완료
-    if (params.get('oauth') === 'success') {
-      handlePostAuthRouting();
-      return;
-    }
-
-    // 이메일 인증 완료 (PKCE code 또는 implicit hash 토큰이 URL에 있는 경우)
-    // Supabase 클라이언트가 자동으로 세션을 감지함
+    // Google OAuth 완료 (auth/callback → /login?code=XXX&source=oauth)
+    // source=oauth: 브라우저에서 code를 exchange → 세션 생성 → 바로 라우팅
+    const isOAuthCallback = params.get('source') === 'oauth';
     const hasCode = !!params.get('code');
     const hasHash = window.location.hash.includes('access_token');
+
     if (hasCode || hasHash) {
       const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           authListener.subscription.unsubscribe();
-          const verifiedEmail = session.user.email ?? '';
-          // 이메일 인증 완료 후 자동 진입 대신 사용자가 직접 로그인하도록 세션 제거
-          await supabase.auth.signOut();
-          setLoginEmail(verifiedEmail); // 이메일 미리 채워주기
-          setVerifiedSuccess(true);
-          setPanel('tabs');
-          setActiveTab('login');
+
+          if (isOAuthCallback) {
+            // Google OAuth: 세션 유지 → 상태 기반 라우팅
+            await handlePostAuthRouting();
+          } else {
+            // 이메일 인증 완료: 자동 로그인 방지 → 수동 로그인 유도
+            await supabase.auth.signOut();
+            setLoginEmail(session.user.email ?? '');
+            setVerifiedSuccess(true);
+            setPanel('tabs');
+            setActiveTab('login');
+          }
         }
       });
       return;
