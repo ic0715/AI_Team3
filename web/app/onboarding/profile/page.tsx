@@ -167,6 +167,7 @@ function BasicInfoContent() {
     // 클라이언트 검증
     let hasError = false;
     if (!nickname.trim()) { setNicknameError('닉네임을 입력해주세요'); hasError = true; }
+    else if (nickname.trim().length > 10) { setNicknameError('닉네임은 10자 이하로 입력 가능합니다'); hasError = true; }
     if (!isEditMode && !birthdate) { setBirthdateError('생년월일을 입력해주세요'); hasError = true; }
     if (!jobField) { setJobError('직업/분야를 선택해주세요'); hasError = true; }
     if (!careerLevel) { setCareerError('경력을 선택해주세요'); hasError = true; }
@@ -283,7 +284,15 @@ function BasicInfoContent() {
             <input
               type="text"
               value={nickname}
-              onChange={(e) => { setNickname(e.target.value); setNicknameError(''); }}
+              onChange={(e) => {
+                const val = e.target.value;
+                setNickname(val);
+                if (val.trim().length > 10) {
+                  setNicknameError('닉네임은 10자 이하로 입력 가능합니다');
+                } else {
+                  setNicknameError('');
+                }
+              }}
               placeholder="어떻게 불러드릴까요?"
               maxLength={10}
               aria-describedby={nicknameError ? 'nickname-error' : undefined}
