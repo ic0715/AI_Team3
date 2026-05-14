@@ -16,9 +16,12 @@ export async function GET(request: NextRequest) {
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=no_code`)
+    // Implicit flow: hash의 access_token은 서버에서 읽을 수 없지만
+    // 리다이렉트 시 브라우저가 hash를 자동으로 보존함.
+    // source=oauth 를 전달해서 login 페이지가 OAuth 콜백임을 인식하게 함.
+    return NextResponse.redirect(`${origin}/login?source=oauth`)
   }
 
-  // code를 클라이언트로 포워드 — 브라우저에서 exchangeCodeForSession 처리
+  // PKCE flow: code를 클라이언트로 포워드 — 브라우저에서 exchangeCodeForSession 처리
   return NextResponse.redirect(`${origin}/login?code=${code}&source=oauth`)
 }

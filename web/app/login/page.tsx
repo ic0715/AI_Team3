@@ -42,11 +42,13 @@ export default function LoginPage() {
       setActiveTab('signup');
     }
 
-    // Google OAuth 완료 (auth/callback → /login?code=XXX&source=oauth)
-    // source=oauth: 브라우저에서 code를 exchange → 세션 생성 → 바로 라우팅
-    const isOAuthCallback = params.get('source') === 'oauth';
+    // Google OAuth 완료 콜백 감지:
+    // - PKCE flow:     auth/callback → /login?code=XXX&source=oauth
+    // - Implicit flow: auth/callback → /login?source=oauth#access_token=XXX
+    // 두 경우 모두 source=oauth 가 붙어서 오므로 이것만 체크.
     const hasCode = !!params.get('code');
     const hasHash = window.location.hash.includes('access_token');
+    const isOAuthCallback = params.get('source') === 'oauth';
 
     if (hasCode || hasHash) {
       const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
