@@ -120,9 +120,16 @@ function StrengthsContent() {
         domain: s.domain,
       }));
 
+      // 기존 최신 레코드를 is_latest: false로 변경 (재진단 대비)
+      await supabase
+        .from('strength_analyses')
+        .update({ is_latest: false })
+        .eq('user_id', user.id)
+        .eq('is_latest', true);
+
       const { error: dbError } = await supabase.from('strength_analyses').insert({
         user_id: user.id,
-        method: 'direct_select',
+        method: 'ai_interview',
         strengths: strengthsPayload,
         is_latest: true,
       });

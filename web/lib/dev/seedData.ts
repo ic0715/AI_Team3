@@ -64,6 +64,7 @@ export async function seedTestData(): Promise<{ ok: boolean; message: string }> 
     .from("strength_analyses")
     .insert({
       user_id: user.id,
+      method: "ai_interview",
       strengths: MOCK_STRENGTHS,
       is_latest: true,
     });
