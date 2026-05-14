@@ -11,6 +11,24 @@ const CUSTOM_MIN = 5;
 const CUSTOM_MAX = 50;
 const CUSTOM_SELECTED_ID = '__custom__';
 
+// DB는 competency_code를 T-1 등 스펙 형식으로 저장. 시드 lookup은 슬러그(constants) 기준이라 역매핑 필요.
+const CODE_TO_SLUG: Record<string, string> = {
+  'T-1': 'critical-thinking',
+  'T-2': 'data-analysis',
+  'I-1': 'communication',
+  'I-2': 'leadership',
+  'E-1': 'execution',
+};
+
+// 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
+function todayLocalISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // 시드 5개 표시용 타입
 interface DisplaySeed extends ActionItem {
   sourceSeedId: string; // `{competencyId}-{careerLevel}-{index}`
@@ -70,7 +88,6 @@ function ActionItemsContent() {
             .select('id, goal_title, competency_code, domain')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
           supabase
@@ -81,6 +98,9 @@ function ActionItemsContent() {
         ]);
 
         if (cancelled) return;
+
+        if (goalRes.error) console.error('[10] goals query error:', goalRes.error);
+        if (profileRes.error) console.error('[10] profiles query error:', profileRes.error);
 
         if (!goalRes.data) {
           throw new Error('활성 목표를 찾을 수 없어요.');
@@ -102,20 +122,27 @@ function ActionItemsContent() {
   }, [ready]);
 
   // ── 시드 5개 매핑 ───────────────────────────────────────
+  // DB의 competency_code(T-1 등) → 슬러그로 변환 후 시드 lookup
+  const seedSlug = useMemo(
+    () => (goal ? CODE_TO_SLUG[goal.competency_code] ?? goal.competency_code : null),
+    [goal],
+  );
+
   const seeds: DisplaySeed[] = useMemo(() => {
-    if (!goal) return [];
-    const seedSet = ACTION_SEEDS_BY_COMPETENCY[goal.competency_code];
+    if (!goal || !seedSlug) return [];
+    const seedSet = ACTION_SEEDS_BY_COMPETENCY[seedSlug];
     const items = seedSet?.items ?? [];
     return items.map((item, idx) => ({
       ...item,
+      // source_seed_id 형식은 스펙 코드 그대로 유지 (예: "T-1-junior-1")
       sourceSeedId: `${goal.competency_code}-${careerLevel}-${idx + 1}`,
     }));
-  }, [goal, careerLevel]);
+  }, [goal, seedSlug, careerLevel]);
 
   const seedEmoji = useMemo(() => {
-    if (!goal) return '🎯';
-    return ACTION_SEEDS_BY_COMPETENCY[goal.competency_code]?.emoji ?? '🎯';
-  }, [goal]);
+    if (!seedSlug) return '🎯';
+    return ACTION_SEEDS_BY_COMPETENCY[seedSlug]?.emoji ?? '🎯';
+  }, [seedSlug]);
 
   // ── 선택 핸들러 ─────────────────────────────────────────
   const handleSelectSeed = useCallback((seedId: string) => {
@@ -202,10 +229,26 @@ function ActionItemsContent() {
 
       if (insertError) throw insertError;
 
+      // 시작 날짜 = "시작하기 🚀" 클릭 시점 (스펙 10 4번)
+      // 이전 cycle/테스트의 stale started_at을 오늘로 갱신
+      const today = todayLocalISO();
+      const { error: updateError } = await supabase
+        .from('goals')
+        .update({ started_at: today })
+        .eq('id', goal.id);
+
+      if (updateError) {
+        console.error('[10] goals.started_at update error:', updateError);
+        // 갱신 실패해도 NEW02 흐름은 진행 (display는 stale 가능성 있지만 핵심 흐름 유지)
+      }
+
       router.push('/onboarding/complete');
     } catch (e) {
-      console.error(e);
-      setError('저장에 실패했어요. 다시 시도해주세요.');
+      console.error('[10 handleStart] error object:', e);
+      console.error('[10 handleStart] error JSON:', JSON.stringify(e, Object.getOwnPropertyNames(e ?? {})));
+      const errAny = e as { message?: string; details?: string; code?: string; hint?: string };
+      const detail = errAny?.message || errAny?.details || errAny?.hint || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      setError(`저장 실패: ${detail}`);
       setSaving(false);
     }
   }, [selectedId, saving, goal, customAdded, seeds, router]);
@@ -252,7 +295,9 @@ function ActionItemsContent() {
             {seedEmoji} {goal.goal_title}
           </div>
           <div style={infoDescStyle}>
-            AI가 추천하는 액션 아이템이에요. 지금 시작할 수 있는 것{' '}
+            AI가 추천하는 액션 아이템이에요.
+            <br />
+            지금 시작할 수 있는 것{' '}
             <strong style={{ color: 'var(--accent)' }}>1개</strong>를 골라주세요.
           </div>
         </div>
@@ -284,13 +329,20 @@ function ActionItemsContent() {
           </div>
 
           {/* 추가된 커스텀 항목 (있을 때만 표시) */}
+          {/* HTML 스펙상 <button> 안에 <button>을 둘 수 없어 외부는 div + radio 패턴 */}
           {customAdded && (
-            <button
+            <div
               role="radio"
               aria-checked={selectedId === CUSTOM_SELECTED_ID}
               aria-label={`${customAdded}, 직접 입력`}
-              type="button"
+              tabIndex={0}
               onClick={handleSelectCustom}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleSelectCustom();
+                }
+              }}
               style={{
                 ...cardStyle,
                 textAlign: 'left',
@@ -307,6 +359,7 @@ function ActionItemsContent() {
                 position: 'relative',
                 fontFamily: 'inherit',
                 paddingRight: '40px',
+                outline: 'none',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -327,7 +380,7 @@ function ActionItemsContent() {
               >
                 ×
               </button>
-            </button>
+            </div>
           )}
 
           {/* 입력 영역 (이미 추가된 항목이 있어도 다시 추가 가능 — 단, 동시에 1개만 가능하게 막거나 덮어쓰기) */}
@@ -347,7 +400,7 @@ function ActionItemsContent() {
                       handleAddCustom();
                     }
                   }}
-                  placeholder="나만의 액션 아이템 추가..."
+                  placeholder={`나만의 액션 (${CUSTOM_MIN}~${CUSTOM_MAX}자)`}
                   maxLength={CUSTOM_MAX}
                   aria-label="나만의 액션 아이템 추가"
                   style={customInputStyle}
@@ -356,6 +409,28 @@ function ActionItemsContent() {
                   {customText.length}/{CUSTOM_MAX}
                 </span>
               </div>
+
+              {/* 입력 가이드 (항상 표시) */}
+              <div
+                style={{
+                  marginTop: '6px',
+                  fontSize: '11.5px',
+                  color:
+                    customText.trim().length >= CUSTOM_MIN
+                      ? 'var(--accent)'
+                      : 'var(--text-muted)',
+                  textAlign: 'right',
+                  minHeight: '14px',
+                }}
+                aria-live="polite"
+              >
+                {customText.trim().length === 0
+                  ? `${CUSTOM_MIN}자 이상 입력하면 [추가] 버튼이 활성화돼요`
+                  : customText.trim().length < CUSTOM_MIN
+                  ? `${CUSTOM_MIN - customText.trim().length}자 더 입력해주세요 (현재 ${customText.trim().length}/${CUSTOM_MIN})`
+                  : '✓ 추가 가능 — 아래 버튼 또는 Enter'}
+              </div>
+
               <button
                 type="button"
                 onClick={handleAddCustom}

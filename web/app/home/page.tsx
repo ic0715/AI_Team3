@@ -43,7 +43,8 @@ function HomeContent() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const [profileRes, strengthRes, goalRes, actionRes] = await Promise.all([
+        // 1차: profile/strengths/goal 병렬 fetch
+        const [profileRes, strengthRes, goalRes] = await Promise.all([
           supabase
             .from('profiles')
             .select('nickname')
@@ -54,28 +55,22 @@ function HomeContent() {
             .select('strengths')
             .eq('user_id', user.id)
             .eq('is_latest', true)
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('goal_title, started_at')
+            .select('id, goal_title, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from('action_items')
-            .select('title')
-            .eq('user_id', user.id)
-            .eq('week_number', 1)
-            .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
         ]);
 
         if (cancelled) return;
+
+        if (profileRes.error) console.error('[11] profiles query error:', profileRes.error);
+        if (strengthRes.error) console.error('[11] strength_analyses query error:', strengthRes.error);
+        if (goalRes.error) console.error('[11] goals query error:', goalRes.error);
 
         if (!goalRes.data) {
           // 활성 goal 없음 → 진입 조건 위반 (스펙 6번)
@@ -83,6 +78,19 @@ function HomeContent() {
           router.replace('/error/network');
           return;
         }
+
+        // 2차: action_items를 활성 goal_id로 필터링 (테스트 계정에 누적된 옛 row 회피)
+        const actionRes = await supabase
+          .from('action_items')
+          .select('title')
+          .eq('user_id', user.id)
+          .eq('goal_id', goalRes.data.id)
+          .eq('week_number', 1)
+          .limit(1)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (actionRes.error) console.error('[11] action_items query error:', actionRes.error);
 
         setData({
           nickname: profileRes.data?.nickname ?? '',

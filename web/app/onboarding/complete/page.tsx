@@ -54,36 +54,43 @@ function CompleteContent() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const [strengthRes, goalRes, actionRes] = await Promise.all([
+        // 1차: strengths/goal 병렬 fetch
+        const [strengthRes, goalRes] = await Promise.all([
           supabase
             .from('strength_analyses')
             .select('strengths')
             .eq('user_id', user.id)
             .eq('is_latest', true)
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('goal_title, started_at')
+            .select('id, goal_title, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from('action_items')
-            .select('title')
-            .eq('user_id', user.id)
-            .eq('week_number', 1)
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
         ]);
 
         if (cancelled) return;
 
+        if (strengthRes.error) console.error('[NEW02] strength_analyses query error:', strengthRes.error);
+        if (goalRes.error) console.error('[NEW02] goals query error:', goalRes.error);
+
         if (!goalRes.data) throw new Error('목표 데이터를 찾을 수 없어요.');
+
+        // 2차: action_items를 활성 goal_id로 필터링 (테스트 계정에 누적된 옛 row 회피)
+        const actionRes = await supabase
+          .from('action_items')
+          .select('title')
+          .eq('user_id', user.id)
+          .eq('goal_id', goalRes.data.id)
+          .eq('week_number', 1)
+          .limit(1)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (actionRes.error) console.error('[NEW02] action_items query error:', actionRes.error);
 
         setData({
           strengths: strengthRes.data?.strengths ?? [],
@@ -161,7 +168,16 @@ function CompleteContent() {
         {/* 요약 카드 4행 (스펙 3.3) */}
         <div style={summaryCardStyle}>
           <SummaryRow label="🎯 강점">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'nowrap',
+                gap: '4px',
+                justifyContent: 'flex-end',
+                overflowX: 'auto',
+                paddingBottom: '2px',
+              }}
+            >
               {data.strengths.length === 0 ? (
                 <span style={fallbackTextStyle}>—</span>
               ) : (
@@ -332,12 +348,14 @@ const fallbackTextStyle: React.CSSProperties = {
 };
 
 const strengthChipStyle: React.CSSProperties = {
-  fontSize: '12px',
+  fontSize: '11px',
   fontWeight: 700,
-  padding: '4px 10px',
+  padding: '3px 8px',
   borderRadius: '999px',
   background: 'var(--accent-light)',
   color: 'var(--accent)',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
 const cheerBoxStyle: React.CSSProperties = {

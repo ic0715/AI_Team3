@@ -100,6 +100,33 @@ const COMPETENCY_DOMAIN: Record<CompetencyId, Domain> = {
   'execution':         'executing',
 };
 
+// DB는 스펙 형식(T-1 등) competency_code만 허용하는 CHECK constraint 보유.
+// 슬러그(constants/competencies.ts) → 스펙 코드 매핑.
+const COMPETENCY_CODE_BY_ID: Record<CompetencyId, string> = {
+  'critical-thinking': 'T-1',
+  'data-analysis':     'T-2',
+  'communication':     'I-1',
+  'leadership':        'I-2',
+  'execution':         'E-1',
+};
+
+// domain 컬럼도 T/I/R/E 단일 문자 CHECK 추정. 갤럽 도메인명 → 코드 매핑.
+const DOMAIN_CODE_BY_NAME: Record<Domain, string> = {
+  strategic:    'T',
+  influencing:  'I',
+  relationship: 'R',
+  executing:    'E',
+};
+
+// 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
+function todayLocalISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // ── 🤖 mock AI 개인화 함수 (TODO: Claude API 호출로 교체) ──────
 async function generatePersonalizedTexts(
   params: PersonalizationParams,
@@ -210,6 +237,7 @@ function CareerResultContent() {
   const [saving, setSaving] = useState(false);
   const [showRedoConfirm, setShowRedoConfirm] = useState(false);
   const [interviewId, setInterviewId] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Step1 + Step2 자동 트리거 (스펙 4번)
   useEffect(() => {
@@ -237,19 +265,21 @@ function CareerResultContent() {
             .select('strengths')
             .eq('user_id', user.id)
             .eq('is_latest', true)
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
           supabase
             .from('career_interview_results')
             .select('id, key_insights, recommended_competencies')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
         ]);
 
         if (cancelled) return;
+
+        if (profileRes.error) console.error('[09] profiles query error:', profileRes.error);
+        if (strengthRes.error) console.error('[09] strength_analyses query error:', strengthRes.error);
+        if (interviewRes.error) console.error('[09] career_interview_results query error:', interviewRes.error);
 
         if (!interviewRes.data) {
           throw new Error('인터뷰 결과를 불러올 수 없어요.');
@@ -305,9 +335,12 @@ function CareerResultContent() {
         setSlots(result.slots);
         setLoadingMatch(false);
       } catch (e) {
-        console.error(e);
+        console.error('[09 load] error object:', e);
+        console.error('[09 load] error JSON:', JSON.stringify(e, Object.getOwnPropertyNames(e ?? {})));
+        const errAny = e as { message?: string; details?: string; code?: string; hint?: string };
+        const detail = errAny?.message || errAny?.details || errAny?.hint || (typeof e === 'object' ? JSON.stringify(e) : String(e));
         if (!cancelled) {
-          setError('역량 추천 분석에 실패했어요. 다시 시도해주세요.');
+          setError(`역량 추천 분석 실패: ${detail}`);
           setLoadingMatch(false);
         }
       }
@@ -317,10 +350,17 @@ function CareerResultContent() {
     return () => {
       cancelled = true;
     };
-  }, [ready]);
+  }, [ready, retryKey]);
 
   const handleSelect = useCallback((slot: number) => {
     setSelectedSlot((prev) => (prev === slot ? null : slot));
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setError(null);
+    setSlots(null);
+    setLoadingMatch(true);
+    setRetryKey((k) => k + 1);
   }, []);
 
   const handleConfirm = useCallback(async () => {
@@ -337,7 +377,7 @@ function CareerResultContent() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const today = todayLocalISO(); // YYYY-MM-DD (로컬 timezone 기준)
 
       // 재시작 안전망: 기존 active goal abandoned 처리
       await supabase
@@ -348,8 +388,8 @@ function CareerResultContent() {
 
       const { error: insertError } = await supabase.from('goals').insert({
         user_id: user.id,
-        competency_code: chosen.competencyId,
-        domain: chosen.domain,
+        competency_code: COMPETENCY_CODE_BY_ID[chosen.competencyId] ?? chosen.competencyId,
+        domain: DOMAIN_CODE_BY_NAME[chosen.domain] ?? chosen.domain,
         goal_title: chosen.goalTitle,
         career_interview_id: interviewId,
         status: 'active',
@@ -358,10 +398,18 @@ function CareerResultContent() {
 
       if (insertError) throw insertError;
 
+      // 새 cycle 시작 → NEW02(complete) 재진입 차단 플래그 리셋
+      // 이렇게 해야 새 결과로 진행 시 NEW02가 다시 1회성 안내로 노출됨
+      try { localStorage.removeItem('mvp_completed'); } catch { /* ignore */ }
+
       router.push('/onboarding/action-items');
     } catch (e) {
-      console.error(e);
-      setError('저장에 실패했어요. 다시 시도해주세요.');
+      // Supabase 에러는 message/details/code/hint 필드를 가짐. JSON으로도 한번 더 찍어 정확한 원인 파악.
+      console.error('[09 handleConfirm] error object:', e);
+      console.error('[09 handleConfirm] error JSON:', JSON.stringify(e, Object.getOwnPropertyNames(e ?? {})));
+      const errAny = e as { message?: string; details?: string; code?: string; hint?: string };
+      const detail = errAny?.message || errAny?.details || errAny?.hint || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      setError(`저장 실패: ${detail}`);
       setSaving(false);
     }
   }, [selectedSlot, saving, slots, interviewId, router]);
@@ -414,7 +462,7 @@ function CareerResultContent() {
         {loadingMatch ? (
           <SkeletonCards />
         ) : error && !slots ? (
-          <ErrorRetry message={error} onRetry={() => location.reload()} />
+          <ErrorRetry message={error} onRetry={handleRetry} onBackToInterview={handleRedoInterview} />
         ) : slots ? (
           <div
             role="radiogroup"
@@ -576,9 +624,11 @@ function SkeletonCards() {
 function ErrorRetry({
   message,
   onRetry,
+  onBackToInterview,
 }: {
   message: string;
   onRetry: () => void;
+  onBackToInterview: () => void;
 }) {
   return (
     <div style={{ padding: '24px', textAlign: 'center' }}>
@@ -589,27 +639,47 @@ function ErrorRetry({
           color: 'var(--text-secondary)',
           marginBottom: '16px',
           lineHeight: 1.6,
+          wordBreak: 'break-word',
         }}
       >
         {message}
       </div>
-      <button
-        type="button"
-        onClick={onRetry}
-        style={{
-          padding: '12px 20px',
-          background: 'var(--accent-light)',
-          color: 'var(--accent)',
-          border: 'none',
-          borderRadius: '10px',
-          fontSize: '14px',
-          fontWeight: 700,
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-        }}
-      >
-        다시 분석하기
-      </button>
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            padding: '12px 18px',
+            background: 'var(--accent-light)',
+            color: 'var(--accent)',
+            border: 'none',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 700,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}
+        >
+          다시 시도하기
+        </button>
+        <button
+          type="button"
+          onClick={onBackToInterview}
+          style={{
+            padding: '12px 18px',
+            background: 'var(--surface)',
+            color: 'var(--text-secondary)',
+            border: '1.5px solid var(--border-strong)',
+            borderRadius: '10px',
+            fontSize: '14px',
+            fontWeight: 600,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}
+        >
+          인터뷰 다시하기
+        </button>
+      </div>
     </div>
   );
 }
