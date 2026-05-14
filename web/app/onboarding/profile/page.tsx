@@ -11,10 +11,10 @@ const JOB_OPTIONS = [
 ];
 
 const CAREER_OPTIONS = [
-  { value: '신입', label: '신입 (0년)' },
-  { value: '주니어', label: '주니어 (1~3년)' },
-  { value: '미드', label: '미드 (4~7년)' },
-  { value: '시니어', label: '시니어 (8년+)' },
+  { value: 'junior_new', label: '신입 (0년)' },
+  { value: 'junior',     label: '주니어 (1~3년)' },
+  { value: 'senior_mid', label: '미드 (4~7년)' },
+  { value: 'senior',     label: '시니어 (8년+)' },
 ];
 
 const GENDER_OPTIONS = [
