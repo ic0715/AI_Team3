@@ -42,6 +42,9 @@ export default function DevPanel() {
     setLoading(true);
     setMessage("");
     const result = await resetTestData();
+    // Supabase 데이터 외에 브라우저 저장소도 함께 초기화
+    localStorage.removeItem("selectedStrengths");
+    sessionStorage.removeItem("career_interview_session");
     setMessage(result.message);
     setLoading(false);
   }
