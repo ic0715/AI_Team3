@@ -11,10 +11,10 @@ const JOB_OPTIONS = [
 ];
 
 const CAREER_OPTIONS = [
-  { value: '신입', label: '신입 (0년)' },
-  { value: '주니어', label: '주니어 (1~3년)' },
-  { value: '미드', label: '미드 (4~7년)' },
-  { value: '시니어', label: '시니어 (8년+)' },
+  { value: 'junior_new', label: '신입 (0년)' },
+  { value: 'junior',     label: '주니어 (1~3년)' },
+  { value: 'senior_mid', label: '미드 (4~7년)' },
+  { value: 'senior',     label: '시니어 (8년+)' },
 ];
 
 const GENDER_OPTIONS = [
@@ -72,6 +72,9 @@ function BasicInfoContent() {
 
   // 수정 모드: 원본 값 저장 (변경 여부 감지용)
   const originalValues = useRef({ nickname: '', gender: '', jobField: '', careerLevel: '', mainConcern: '' });
+
+  // 닉네임 필드 앵커링용
+  const nicknameRef = useRef<HTMLDivElement>(null);
 
   // ── 진입 시: 기존 프로필 데이터 불러오기 ──────────────────
   useEffect(() => {
@@ -167,10 +170,17 @@ function BasicInfoContent() {
     // 클라이언트 검증
     let hasError = false;
     if (!nickname.trim()) { setNicknameError('닉네임을 입력해주세요'); hasError = true; }
+    else if (nickname.trim().length > 10) { setNicknameError('닉네임은 10자 이하로 입력 가능합니다'); hasError = true; }
     if (!isEditMode && !birthdate) { setBirthdateError('생년월일을 입력해주세요'); hasError = true; }
     if (!jobField) { setJobError('직업/분야를 선택해주세요'); hasError = true; }
     if (!careerLevel) { setCareerError('경력을 선택해주세요'); hasError = true; }
-    if (hasError) return;
+    if (hasError) {
+      // 닉네임 에러가 있으면 해당 필드로 스크롤
+      if (!nickname.trim() || nickname.trim().length > 10) {
+        nicknameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
 
     setLoading(true);
 
@@ -278,12 +288,21 @@ function BasicInfoContent() {
         </div>
 
         {/* ── 닉네임 ── */}
+        <div ref={nicknameRef}>
         <FormGroup label="닉네임" required error={nicknameError}>
           <div style={{ position: 'relative' }}>
             <input
               type="text"
               value={nickname}
-              onChange={(e) => { setNickname(e.target.value); setNicknameError(''); }}
+              onChange={(e) => {
+                const val = e.target.value;
+                setNickname(val);
+                if (val.trim().length > 10) {
+                  setNicknameError('닉네임은 10자 이하로 입력 가능합니다');
+                } else {
+                  setNicknameError('');
+                }
+              }}
               placeholder="어떻게 불러드릴까요?"
               maxLength={10}
               aria-describedby={nicknameError ? 'nickname-error' : undefined}
@@ -299,6 +318,7 @@ function BasicInfoContent() {
           </div>
           {nicknameError && <ErrorMsg id="nickname-error">{nicknameError}</ErrorMsg>}
         </FormGroup>
+        </div>
 
         {/* ── 생년월일 ── */}
         <FormGroup
