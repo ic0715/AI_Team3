@@ -238,9 +238,10 @@ function CareerInterviewContent() {
       };
       setContext(ctx);
 
-      // 세션 복원 확인
+      // 세션 복원 확인 — 유저가 실제로 답변한 경우에만 복원 팝업 표시
       const saved = loadSession();
-      if (saved && saved.messages.length > 0) {
+      const hasUserReply = saved?.messages.some((m) => m.role === 'user') ?? false;
+      if (saved && hasUserReply) {
         savedSessionRef.current = saved;
         setShowResumePrompt(true);
       } else {
