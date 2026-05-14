@@ -25,15 +25,6 @@ export const MOCK_STRENGTHS = [
   { name_ko: "공감 능력", name_en: "Empathy", domain: "relationship" },
 ];
 
-// ─── 온보딩 단계 정의 ──────────────────────────────────────────
-
-export const ONBOARDING_STEPS = [
-  { id: "profile",           label: "기본 정보 입력",    path: "/onboarding/profile" },
-  { id: "strengths",         label: "강점 선택",         path: "/onboarding/strengths" },
-  { id: "career-intro",      label: "커리어 인터뷰 인트로", path: "/onboarding/career-intro" },
-  { id: "career-interview",  label: "커리어 인터뷰",      path: "/onboarding/career-interview" },
-] as const;
-
 // ─── 시드 함수들 ───────────────────────────────────────────────
 
 /** 현재 로그인 유저의 프로필 + 강점 데이터를 Supabase에 upsert */

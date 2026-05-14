@@ -1,17 +1,20 @@
 /**
- * /dev — 개발자 전용 테스트 대시보드 (Server Component)
+ * DevPanelWrapper — 서버 컴포넌트
  *
- * NODE_ENV=development (npm run dev) 일 때만 접근 가능.
- * /app/onboarding/ 폴더를 자동 스캔해서 단계 목록을 DevPageClient에 전달.
- * 새 온보딩 페이지를 추가하면 자동으로 목록에 나타남.
+ * /app/onboarding/ 폴더를 자동으로 스캔해서
+ * page.tsx 가 있는 폴더 = 실제 페이지로 인식하고 Dev Panel에 전달.
+ *
+ * 새 온보딩 페이지를 추가하면 Dev Panel에 자동으로 나타나요.
+ * 한국어 이름만 STEP_LABELS에 추가하면 됩니다 (없으면 폴더명이 그대로 표시).
  */
 
 import fs from "fs";
 import path from "path";
-import DevPageClient from "./DevPageClient";
+import DevPanel from "./DevPanel";
 
 // ── 한국어 이름 매핑 ─────────────────────────────────────────
 // 새 페이지 추가 시 여기에만 한 줄 추가하면 됩니다.
+// 없어도 동작은 하지만, 폴더명(영어)이 그대로 표시돼요.
 const STEP_LABELS: Record<string, string> = {
   "profile":            "기본 정보 입력",
   "strengths":          "강점 선택",
@@ -23,6 +26,7 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 // ── 표시 순서 ─────────────────────────────────────────────────
+// 목록에 없는 페이지는 마지막에 알파벳 순으로 자동 추가돼요.
 const STEP_ORDER = [
   "profile",
   "strengths",
@@ -33,14 +37,8 @@ const STEP_ORDER = [
   "complete",
 ];
 
-export default function DevPage() {
-  if (process.env.NODE_ENV !== "development") {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        이 페이지는 개발 모드에서만 접근할 수 있어요.
-      </div>
-    );
-  }
+export default function DevPanelWrapper() {
+  if (process.env.NODE_ENV !== "development") return null;
 
   // /app/onboarding/ 하위 폴더 중 page.tsx 가 있는 것만 수집
   const onboardingDir = path.join(process.cwd(), "app", "onboarding");
@@ -56,7 +54,7 @@ export default function DevPage() {
       )
       .map((d) => ({
         id: d.name,
-        label: STEP_LABELS[d.name] ?? d.name,
+        label: STEP_LABELS[d.name] ?? d.name, // 매핑 없으면 폴더명 그대로
         path: `/onboarding/${d.name}`,
       }));
 
@@ -73,5 +71,5 @@ export default function DevPage() {
     // onboarding 폴더가 없으면 빈 배열로 진행
   }
 
-  return <DevPageClient steps={steps} />;
+  return <DevPanel steps={steps} />;
 }

@@ -1,29 +1,37 @@
 "use client";
 
 /**
- * 개발 모드 플로팅 패널
+ * 개발 모드 플로팅 패널 (Client Component)
  *
  * NODE_ENV=development (npm run dev) 일 때만 화면 우하단에 표시됨.
  * 배포 빌드(next build)에서는 자동으로 숨겨짐. 별도 설정 불필요.
- * 온보딩 단계 바로가기, 데이터 세팅/초기화 버튼 제공.
+ *
+ * steps는 DevPanelWrapper(서버)에서 파일시스템을 스캔해 자동으로 전달됨.
+ * 새 온보딩 페이지 추가 시 자동으로 목록에 나타남.
  */
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { ONBOARDING_STEPS, seedTestData, resetTestData } from "@/lib/dev/seedData";
+import { seedTestData, resetTestData } from "@/lib/dev/seedData";
 
-export default function DevPanel() {
+interface Step {
+  id: string;
+  label: string;
+  path: string;
+}
+
+interface DevPanelProps {
+  steps: Step[];
+}
+
+export default function DevPanel({ steps }: DevPanelProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 개발 모드(npm run dev)가 아니면 아무것도 렌더링하지 않음
-  if (process.env.NODE_ENV !== "development") return null;
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUserEmail(data.user?.email ?? null);
@@ -119,7 +127,7 @@ export default function DevPanel() {
           {/* 단계 바로가기 */}
           <div className="flex flex-col gap-1">
             <p className="text-xs text-gray-500 font-semibold">단계 바로가기</p>
-            {ONBOARDING_STEPS.map((step) => (
+            {steps.map((step) => (
               <button
                 key={step.id}
                 onClick={() => {
