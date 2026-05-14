@@ -3,7 +3,8 @@
 /**
  * 개발 모드 플로팅 패널
  *
- * NEXT_PUBLIC_DEV_MODE=true 일 때만 화면 우하단에 표시됨.
+ * NODE_ENV=development (npm run dev) 일 때만 화면 우하단에 표시됨.
+ * 배포 빌드(next build)에서는 자동으로 숨겨짐. 별도 설정 불필요.
  * 온보딩 단계 바로가기, 데이터 세팅/초기화 버튼 제공.
  */
 
@@ -19,8 +20,8 @@ export default function DevPanel() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 개발 모드가 아니면 아무것도 렌더링하지 않음
-  if (process.env.NEXT_PUBLIC_DEV_MODE !== "true") return null;
+  // 개발 모드(npm run dev)가 아니면 아무것도 렌더링하지 않음
+  if (process.env.NODE_ENV !== "development") return null;
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
@@ -147,7 +148,7 @@ export default function DevPanel() {
           )}
 
           <p className="text-[10px] text-gray-300 text-center">
-            NEXT_PUBLIC_DEV_MODE=true 일 때만 표시
+            npm run dev 환경에서만 표시돼요
           </p>
         </div>
       )}

@@ -26,15 +26,11 @@ export default function DevPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 개발 모드 아니면 404
-  if (process.env.NEXT_PUBLIC_DEV_MODE !== "true") {
+  // 개발 모드(npm run dev) 아니면 접근 불가
+  if (process.env.NODE_ENV !== "development") {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
         이 페이지는 개발 모드에서만 접근할 수 있어요.
-        <br />
-        <code className="text-sm bg-gray-100 px-2 py-1 rounded mt-2 block">
-          NEXT_PUBLIC_DEV_MODE=true
-        </code>
       </div>
     );
   }
@@ -92,8 +88,8 @@ export default function DevPage() {
             테스트 계정 로그인 → 데이터 심기 → 원하는 단계로 이동하세요
           </div>
           <div className="mt-3 text-xs bg-amber-50 text-amber-700 rounded-xl px-3 py-2 leading-relaxed">
-            ⚠️ 이 페이지는 <strong>NEXT_PUBLIC_DEV_MODE=true</strong> 환경에서만 보여요.
-            프로덕션 배포에는 절대 노출되지 않아요.
+            ⚠️ 이 페이지는 <strong>npm run dev</strong> 환경에서만 보여요.
+            배포(next build) 시에는 자동으로 숨겨져요.
           </div>
         </div>
 
@@ -222,13 +218,17 @@ export default function DevPage() {
 
         {/* 설정 안내 */}
         <div className="bg-white rounded-2xl p-5 shadow-sm flex flex-col gap-2">
-          <div className="font-bold text-gray-800">⚙️ .env.local 설정 방법</div>
-          <pre className="bg-gray-900 text-green-400 rounded-xl p-3 text-xs leading-relaxed overflow-x-auto">{`# 개발 모드 활성화
-NEXT_PUBLIC_DEV_MODE=true
+          <div className="font-bold text-gray-800">⚙️ 팀원 설정 방법</div>
+          <pre className="bg-gray-900 text-green-400 rounded-xl p-3 text-xs leading-relaxed overflow-x-auto">{`# 1. 레포 clone 후 의존성 설치
+npm install
 
-# 테스트 계정 (자동 채워짐)
-NEXT_PUBLIC_DEV_EMAIL=test@example.com
-NEXT_PUBLIC_DEV_PASSWORD=yourpassword`}</pre>
+# 2. .env.local 파일 생성 후 Supabase 키 입력
+# (팀 채널에서 공유된 키를 붙여넣기)
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+# 3. 서버 실행 → Dev Panel 자동 활성화!
+npm run dev`}</pre>
           <p className="text-xs text-gray-400 leading-relaxed">
             테스트 계정은 Supabase 대시보드 → Authentication → Users에서 직접 만들어요.
             이메일 인증 확인도 대시보드에서 할 수 있어요.
