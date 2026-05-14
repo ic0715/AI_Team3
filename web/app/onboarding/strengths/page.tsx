@@ -72,6 +72,11 @@ function StrengthsContent() {
     } catch {
       // localStorage 파싱 실패는 무시
     }
+
+    // 언마운트 시 디바운스 타이머 정리
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [router]);
 
   // 칩 토글 핸들러
@@ -246,7 +251,6 @@ function StrengthsContent() {
                   return (
                     <button
                       key={strength.id}
-                      role="button"
                       aria-pressed={isSelected}
                       disabled={isDisabled}
                       onClick={() => handleToggle(strength)}
