@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase/client";
 export const MOCK_PROFILE = {
   nickname: "테스터",
   job_field: "IT/개발",
-  career_level: "3-5년차",
+  career_level: "junior",
   main_concern: "커리어 방향",
   profile_completed: true,
 };
