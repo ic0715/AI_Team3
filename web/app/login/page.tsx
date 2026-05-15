@@ -221,7 +221,34 @@ export default function LoginPage() {
       return;
     }
 
-    // 2~4. goals 상태 확인
+    // 2. 온보딩 완료 여부 먼저 확인 (온보딩 미완료 → goals 체크 생략)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('profile_completed')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
+
+    const { data: strengths } = await supabase
+      .from('strength_analyses')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_latest', true)
+      .limit(1);
+
+    if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
+
+    const { data: interviews } = await supabase
+      .from('career_interview_results')
+      .select('id, recommended_competencies')
+      .eq('user_id', user.id)
+      .limit(1);
+
+    if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
+    if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
+
+    // 3. 온보딩 완료 → goals 상태 확인
     const { data: goals } = await supabase
       .from('goals')
       .select('status, current_week, total_weeks')
@@ -237,8 +264,8 @@ export default function LoginPage() {
     if (activeGoal || pausedGoal) { router.push('/home'); return; }
     if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
 
-    // 5. 온보딩 진행 중 → 기본 정보 입력으로
-    router.push('/onboarding/profile');
+    // 4. 온보딩은 끝났지만 아직 goal 없음 → 액션 아이템 선택
+    router.push('/onboarding/action-items');
   };
 
   return (
