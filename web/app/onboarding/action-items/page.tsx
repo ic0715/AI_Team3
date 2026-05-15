@@ -363,8 +363,27 @@ function ActionItemsContent() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                {/* 라디오버튼 */}
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: `2px solid ${selectedId === CUSTOM_SELECTED_ID ? 'var(--accent)' : 'var(--border-strong)'}`,
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'border-color .15s',
+                  }}
+                >
+                  {selectedId === CUSTOM_SELECTED_ID && (
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--accent)' }} />
+                  )}
+                </div>
                 <span style={customBadgeStyle}>직접 입력</span>
-                {selectedId === CUSTOM_SELECTED_ID && <SelectedDot />}
               </div>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.45 }}>
                 {customAdded}
@@ -552,32 +571,32 @@ function ActionCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-        {/* 체크박스 */}
+        {/* 라디오버튼 */}
         <div
           aria-hidden="true"
           style={{
             width: '20px',
             height: '20px',
-            borderRadius: '6px',
-            border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border-strong)'}`,
-            background: selected ? 'var(--accent)' : 'transparent',
+            borderRadius: '50%',
+            border: `2px solid ${selected ? 'var(--accent)' : 'var(--border-strong)'}`,
+            background: 'transparent',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
             marginTop: '2px',
+            transition: 'border-color .15s',
           }}
         >
           {selected && (
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M2 6l3 3 5-5"
-                stroke="#fff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <div
+              style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: 'var(--accent)',
+              }}
+            />
           )}
         </div>
 
