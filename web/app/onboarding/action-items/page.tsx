@@ -1,0 +1,880 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase/client';
+import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import { ACTION_SEEDS_BY_COMPETENCY, type ActionItem } from '@/lib/constants/seeds';
+
+// 커스텀 입력 길이 제한 (스펙 3.5)
+const CUSTOM_MIN = 5;
+const CUSTOM_MAX = 50;
+const CUSTOM_SELECTED_ID = '__custom__';
+
+// DB는 competency_code를 T-1 등 스펙 형식으로 저장. 시드 lookup은 슬러그(constants) 기준이라 역매핑 필요.
+const CODE_TO_SLUG: Record<string, string> = {
+  'T-1': 'critical-thinking',
+  'T-2': 'data-analysis',
+  'I-1': 'communication',
+  'I-2': 'leadership',
+  'E-1': 'execution',
+};
+
+// 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
+function todayLocalISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// 시드 5개 표시용 타입
+interface DisplaySeed extends ActionItem {
+  sourceSeedId: string; // `{competencyId}-{careerLevel}-{index}`
+}
+
+// goals row (간략)
+interface ActiveGoal {
+  id: string;
+  goal_title: string;
+  competency_code: string;
+  domain: string;
+}
+
+// ────────────────────────────────────────────────────────────
+
+export default function ActionItemsPage() {
+  return (
+    <Suspense fallback={<LoadingScreen text="불러오는 중..." />}>
+      <ActionItemsContent />
+    </Suspense>
+  );
+}
+
+function ActionItemsContent() {
+  const router = useRouter();
+  const { ready } = useOnboardingGuard('action-items');
+
+  const [goal, setGoal] = useState<ActiveGoal | null>(null);
+  const [careerLevel, setCareerLevel] = useState<string>('junior');
+  const [loadingData, setLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 단일 선택 상태 (시드 id 또는 CUSTOM_SELECTED_ID)
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // 커스텀 액션
+  const [customText, setCustomText] = useState('');
+  const [customAdded, setCustomAdded] = useState<string | null>(null);
+  const [customError, setCustomError] = useState<string | null>(null);
+
+  const [saving, setSaving] = useState(false);
+
+  // ── 초기 데이터 로드 ─────────────────────────────────────
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        setError(null);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const [goalRes, profileRes] = await Promise.all([
+          supabase
+            .from('goals')
+            .select('id, goal_title, competency_code, domain')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('profiles')
+            .select('career_level')
+            .eq('id', user.id)
+            .maybeSingle(),
+        ]);
+
+        if (cancelled) return;
+
+        if (goalRes.error) console.error('[10] goals query error:', goalRes.error);
+        if (profileRes.error) console.error('[10] profiles query error:', profileRes.error);
+
+        if (!goalRes.data) {
+          throw new Error('활성 목표를 찾을 수 없어요.');
+        }
+        setGoal(goalRes.data);
+        setCareerLevel(profileRes.data?.career_level ?? 'junior');
+        setLoadingData(false);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setError('데이터를 불러올 수 없어요. 다시 시도해주세요.');
+          setLoadingData(false);
+        }
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [ready]);
+
+  // ── 시드 5개 매핑 ───────────────────────────────────────
+  // DB의 competency_code(T-1 등) → 슬러그로 변환 후 시드 lookup
+  const seedSlug = useMemo(
+    () => (goal ? CODE_TO_SLUG[goal.competency_code] ?? goal.competency_code : null),
+    [goal],
+  );
+
+  const seeds: DisplaySeed[] = useMemo(() => {
+    if (!goal || !seedSlug) return [];
+    const seedSet = ACTION_SEEDS_BY_COMPETENCY[seedSlug];
+    const items = seedSet?.items ?? [];
+    return items.map((item, idx) => ({
+      ...item,
+      // source_seed_id 형식은 스펙 코드 그대로 유지 (예: "T-1-junior-1")
+      sourceSeedId: `${goal.competency_code}-${careerLevel}-${idx + 1}`,
+    }));
+  }, [goal, seedSlug, careerLevel]);
+
+  const seedEmoji = useMemo(() => {
+    if (!seedSlug) return '🎯';
+    return ACTION_SEEDS_BY_COMPETENCY[seedSlug]?.emoji ?? '🎯';
+  }, [seedSlug]);
+
+  // ── 선택 핸들러 ─────────────────────────────────────────
+  const handleSelectSeed = useCallback((seedId: string) => {
+    setSelectedId((prev) => (prev === seedId ? null : seedId));
+  }, []);
+
+  const handleAddCustom = useCallback(() => {
+    const trimmed = customText.trim();
+    if (trimmed.length < CUSTOM_MIN) {
+      setCustomError(`${CUSTOM_MIN}자 이상 입력해주세요.`);
+      return;
+    }
+    if (trimmed.length > CUSTOM_MAX) {
+      setCustomError(`${CUSTOM_MAX}자 이하로 입력해주세요.`);
+      return;
+    }
+    setCustomError(null);
+    setCustomAdded(trimmed);
+    setCustomText('');
+    // 추가 시 자동 선택, 추천 선택 자동 해제 (스펙 4번)
+    setSelectedId(CUSTOM_SELECTED_ID);
+  }, [customText]);
+
+  const handleSelectCustom = useCallback(() => {
+    setSelectedId((prev) => (prev === CUSTOM_SELECTED_ID ? null : CUSTOM_SELECTED_ID));
+  }, []);
+
+  const handleRemoveCustom = useCallback(() => {
+    setCustomAdded(null);
+    setSelectedId((prev) => (prev === CUSTOM_SELECTED_ID ? null : prev));
+  }, []);
+
+  // ── 시작하기 (action_items INSERT) ──────────────────────
+  const handleStart = useCallback(async () => {
+    if (!selectedId || saving || !goal) return;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요해요.');
+
+      let payload: {
+        user_id: string;
+        goal_id: string;
+        week_number: number;
+        title: string;
+        description: string | null;
+        tags: string[];
+        is_custom: boolean;
+        source_seed_id: string | null;
+      };
+
+      if (selectedId === CUSTOM_SELECTED_ID) {
+        if (!customAdded) throw new Error('커스텀 액션이 없어요.');
+        payload = {
+          user_id: user.id,
+          goal_id: goal.id,
+          week_number: 1,
+          title: customAdded,
+          description: null,
+          tags: [],
+          is_custom: true,
+          source_seed_id: null,
+        };
+      } else {
+        const seed = seeds.find((s) => s.id === selectedId);
+        if (!seed) throw new Error('선택한 액션을 찾을 수 없어요.');
+        payload = {
+          user_id: user.id,
+          goal_id: goal.id,
+          week_number: 1,
+          title: seed.title,
+          description: seed.description,
+          tags: seed.tags,
+          is_custom: false,
+          source_seed_id: seed.sourceSeedId,
+        };
+      }
+
+      const { error: insertError } = await supabase
+        .from('action_items')
+        .insert(payload);
+
+      if (insertError) throw insertError;
+
+      // 시작 날짜 = "시작하기 🚀" 클릭 시점 (스펙 10 4번)
+      // 이전 cycle/테스트의 stale started_at을 오늘로 갱신
+      const today = todayLocalISO();
+      const { error: updateError } = await supabase
+        .from('goals')
+        .update({ started_at: today })
+        .eq('id', goal.id);
+
+      if (updateError) {
+        console.error('[10] goals.started_at update error:', updateError);
+        // 갱신 실패해도 NEW02 흐름은 진행 (display는 stale 가능성 있지만 핵심 흐름 유지)
+      }
+
+      router.push('/onboarding/complete');
+    } catch (e) {
+      console.error('[10 handleStart] error object:', e);
+      console.error('[10 handleStart] error JSON:', JSON.stringify(e, Object.getOwnPropertyNames(e ?? {})));
+      const errAny = e as { message?: string; details?: string; code?: string; hint?: string };
+      const detail = errAny?.message || errAny?.details || errAny?.hint || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      setError(`저장 실패: ${detail}`);
+      setSaving(false);
+    }
+  }, [selectedId, saving, goal, customAdded, seeds, router]);
+
+  if (!ready || loadingData) return <LoadingScreen text="액션 아이템을 준비 중이에요..." />;
+  if (!goal) return <LoadingScreen text={error ?? '목표를 찾을 수 없어요.'} />;
+
+  const selectedCount = selectedId ? 1 : 0;
+
+  return (
+    <div style={wrapStyle}>
+      {/* 상단 바 */}
+      <header style={headerStyle}>
+        <button
+          onClick={() => router.back()}
+          aria-label="뒤로 가기"
+          style={backBtnStyle}
+        >
+          ←
+        </button>
+        <span style={pageTitleStyle}>액션 아이템 선택</span>
+        <span style={{ width: '36px' }} />
+      </header>
+
+      {/* 상단 goal pill (스펙 3.2) */}
+      <div style={topGoalRowStyle}>
+        <span style={goalPillStyle}>🎯 {goal.goal_title}</span>
+        <span style={{
+          ...countBadgeStyle,
+          background: selectedCount ? 'var(--accent)' : 'var(--border)',
+          color: selectedCount ? '#fff' : 'var(--text-secondary)',
+        }}
+          aria-live="polite"
+        >
+          {selectedCount}
+        </span>
+      </div>
+
+      {/* 본문 */}
+      <main style={mainStyle}>
+        {/* 안내 패널 (스펙 3.3) */}
+        <div style={infoPanelStyle}>
+          <div style={infoTitleStyle}>
+            {seedEmoji} {goal.goal_title}
+          </div>
+          <div style={infoDescStyle}>
+            AI가 추천하는 액션 아이템이에요.
+            <br />
+            지금 시작할 수 있는 것{' '}
+            <strong style={{ color: 'var(--accent)' }}>1개</strong>를 골라주세요.
+          </div>
+        </div>
+
+        {/* 추천 액션 5개 (스펙 3.4) */}
+        {seeds.length === 0 ? (
+          <EmptySeeds />
+        ) : (
+          <div
+            role="radiogroup"
+            aria-label="추천 액션 5개"
+            style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
+          >
+            {seeds.map((seed) => (
+              <ActionCard
+                key={seed.id}
+                seed={seed}
+                selected={selectedId === seed.id}
+                onClick={() => handleSelectSeed(seed.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 커스텀 액션 영역 (스펙 3.5) */}
+        <div style={customWrapStyle}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
+            나만의 액션 만들기
+          </div>
+
+          {/* 추가된 커스텀 항목 (있을 때만 표시) */}
+          {/* HTML 스펙상 <button> 안에 <button>을 둘 수 없어 외부는 div + radio 패턴 */}
+          {customAdded && (
+            <div
+              role="radio"
+              aria-checked={selectedId === CUSTOM_SELECTED_ID}
+              aria-label={`${customAdded}, 직접 입력`}
+              tabIndex={0}
+              onClick={handleSelectCustom}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleSelectCustom();
+                }
+              }}
+              style={{
+                ...cardStyle,
+                textAlign: 'left',
+                cursor: 'pointer',
+                marginBottom: '10px',
+                background:
+                  selectedId === CUSTOM_SELECTED_ID
+                    ? 'var(--accent-light)'
+                    : 'var(--surface)',
+                borderColor:
+                  selectedId === CUSTOM_SELECTED_ID
+                    ? 'var(--accent)'
+                    : 'var(--border)',
+                position: 'relative',
+                fontFamily: 'inherit',
+                paddingRight: '40px',
+                outline: 'none',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={customBadgeStyle}>직접 입력</span>
+                {selectedId === CUSTOM_SELECTED_ID && <SelectedDot />}
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.45 }}>
+                {customAdded}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveCustom();
+                }}
+                aria-label="커스텀 액션 삭제"
+                style={removeBtnStyle}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* 입력 영역 (이미 추가된 항목이 있어도 다시 추가 가능 — 단, 동시에 1개만 가능하게 막거나 덮어쓰기) */}
+          {!customAdded && (
+            <>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={customText}
+                  onChange={(e) => {
+                    setCustomText(e.target.value);
+                    if (customError) setCustomError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustom();
+                    }
+                  }}
+                  placeholder={`나만의 액션 (${CUSTOM_MIN}~${CUSTOM_MAX}자)`}
+                  maxLength={CUSTOM_MAX}
+                  aria-label="나만의 액션 아이템 추가"
+                  style={customInputStyle}
+                />
+                <span style={customCountStyle}>
+                  {customText.length}/{CUSTOM_MAX}
+                </span>
+              </div>
+
+              {/* 입력 가이드 (항상 표시) */}
+              <div
+                style={{
+                  marginTop: '6px',
+                  fontSize: '11.5px',
+                  color:
+                    customText.trim().length >= CUSTOM_MIN
+                      ? 'var(--accent)'
+                      : 'var(--text-muted)',
+                  textAlign: 'right',
+                  minHeight: '14px',
+                }}
+                aria-live="polite"
+              >
+                {customText.trim().length === 0
+                  ? `${CUSTOM_MIN}자 이상 입력하면 [추가] 버튼이 활성화돼요`
+                  : customText.trim().length < CUSTOM_MIN
+                  ? `${CUSTOM_MIN - customText.trim().length}자 더 입력해주세요 (현재 ${customText.trim().length}/${CUSTOM_MIN})`
+                  : '✓ 추가 가능 — 아래 버튼 또는 Enter'}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddCustom}
+                disabled={customText.trim().length < CUSTOM_MIN}
+                style={{
+                  ...customAddBtnStyle,
+                  opacity: customText.trim().length >= CUSTOM_MIN ? 1 : 0.5,
+                  cursor: customText.trim().length >= CUSTOM_MIN ? 'pointer' : 'not-allowed',
+                }}
+              >
+                추가
+              </button>
+              {customError && (
+                <div role="alert" style={{ marginTop: '6px', fontSize: '12px', color: 'var(--danger)' }}>
+                  {customError}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* 하단 summary (스펙 3.6) */}
+        <div style={summaryWrapStyle}>
+          <span style={goalPillStyle}>🎯 {goal.goal_title}</span>
+          <span
+            style={{
+              ...countBadgeStyle,
+              background: selectedCount ? 'var(--accent)' : 'var(--border)',
+              color: selectedCount ? '#fff' : 'var(--text-primary)',
+            }}
+            aria-live="polite"
+          >
+            {selectedCount}
+          </span>
+        </div>
+
+        <div style={{ height: '4px' }} />
+      </main>
+
+      {/* 하단 CTA (스펙 3.7) */}
+      <footer style={footerStyle}>
+        {error && (
+          <div role="alert" style={errorAlertStyle}>
+            {error}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={!selectedId || saving}
+          aria-disabled={!selectedId || saving}
+          style={{
+            ...primaryBtnStyle,
+            background: selectedId && !saving ? 'var(--accent)' : 'var(--border)',
+            color: selectedId && !saving ? '#fff' : 'var(--text-muted)',
+            cursor: selectedId && !saving ? 'pointer' : 'not-allowed',
+            boxShadow:
+              selectedId && !saving ? '0 4px 16px rgba(45,91,255,.3)' : 'none',
+          }}
+        >
+          {saving ? '저장 중...' : '시작하기 🚀'}
+        </button>
+      </footer>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 서브 컴포넌트
+// ────────────────────────────────────────────────────────────
+
+function LoadingScreen({ text }: { text: string }) {
+  return (
+    <div style={wrapStyle}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
+      </div>
+    </div>
+  );
+}
+
+function EmptySeeds() {
+  return (
+    <div style={{ padding: '20px', background: 'var(--bg)', borderRadius: '12px', textAlign: 'center' }}>
+      <div style={{ fontSize: '24px', marginBottom: '8px' }}>📭</div>
+      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        이 역량의 추천 액션이 아직 준비되지 않았어요.
+        <br />
+        아래에서 직접 입력해주세요.
+      </div>
+    </div>
+  );
+}
+
+function ActionCard({
+  seed,
+  selected,
+  onClick,
+}: {
+  seed: DisplaySeed;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      role="radio"
+      aria-checked={selected}
+      aria-label={seed.title}
+      onClick={onClick}
+      style={{
+        ...cardStyle,
+        textAlign: 'left',
+        cursor: 'pointer',
+        borderColor: selected ? 'var(--accent)' : 'var(--border)',
+        background: selected ? 'var(--accent-light)' : 'var(--surface)',
+        position: 'relative',
+        fontFamily: 'inherit',
+        transition: 'background .15s, border-color .15s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+        {/* 체크박스 */}
+        <div
+          aria-hidden="true"
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '6px',
+            border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border-strong)'}`,
+            background: selected ? 'var(--accent)' : 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            marginTop: '2px',
+          }}
+        >
+          {selected && (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M2 6l3 3 5-5"
+                stroke="#fff"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              color: 'var(--text-primary)',
+              lineHeight: 1.45,
+              marginBottom: '4px',
+              letterSpacing: '-.01em',
+            }}
+          >
+            {seed.title}
+          </div>
+          <p
+            style={{
+              margin: '0 0 8px',
+              fontSize: '12.5px',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
+            {seed.description}
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+            {seed.tags.map((tag) => (
+              <span key={tag} style={tagStyle}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function SelectedDot() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: '8px',
+        height: '8px',
+        borderRadius: '50%',
+        background: 'var(--accent)',
+        display: 'inline-block',
+      }}
+    />
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 스타일
+// ────────────────────────────────────────────────────────────
+
+const wrapStyle: React.CSSProperties = {
+  width: '390px',
+  minHeight: '100dvh',
+  background: 'var(--surface)',
+  display: 'flex',
+  flexDirection: 'column',
+  margin: '0 auto',
+  boxShadow: '0 0 40px rgba(0,0,0,.18)',
+  overflowX: 'hidden',
+  position: 'relative',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  padding: '16px 20px',
+  gap: '12px',
+  position: 'sticky',
+  top: 0,
+  background: 'var(--surface)',
+  zIndex: 10,
+  borderBottom: '1px solid var(--border)',
+  flexShrink: 0,
+};
+
+const backBtnStyle: React.CSSProperties = {
+  width: '36px',
+  height: '36px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  border: 'none',
+  background: 'none',
+  cursor: 'pointer',
+  borderRadius: '8px',
+  color: 'var(--text-primary)',
+  fontSize: '20px',
+  fontFamily: 'inherit',
+};
+
+const pageTitleStyle: React.CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: 'var(--text-primary)',
+  flex: 1,
+  textAlign: 'center',
+};
+
+const topGoalRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '12px 20px',
+  background: 'var(--surface)',
+  borderBottom: '1px solid var(--border)',
+  flexShrink: 0,
+};
+
+const goalPillStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '6px 12px',
+  borderRadius: '999px',
+  background: 'var(--accent)',
+  color: '#fff',
+  fontSize: '13px',
+  fontWeight: 700,
+  flex: 1,
+  justifyContent: 'center',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+const countBadgeStyle: React.CSSProperties = {
+  minWidth: '28px',
+  height: '24px',
+  padding: '0 8px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '999px',
+  fontSize: '12px',
+  fontWeight: 800,
+  transition: 'background .15s, color .15s',
+};
+
+const mainStyle: React.CSSProperties = {
+  flex: 1,
+  overflowY: 'auto',
+  padding: '20px',
+};
+
+const infoPanelStyle: React.CSSProperties = {
+  padding: '14px 16px',
+  marginBottom: '16px',
+  background: 'var(--accent-light)',
+  borderRadius: '12px',
+};
+
+const infoTitleStyle: React.CSSProperties = {
+  fontSize: '14px',
+  fontWeight: 800,
+  color: 'var(--accent)',
+  marginBottom: '4px',
+  letterSpacing: '-.01em',
+};
+
+const infoDescStyle: React.CSSProperties = {
+  fontSize: '13px',
+  color: 'var(--text-primary)',
+  lineHeight: 1.6,
+};
+
+const cardStyle: React.CSSProperties = {
+  border: '1.5px solid var(--border)',
+  borderRadius: '14px',
+  padding: '14px',
+  background: 'var(--surface)',
+  width: '100%',
+};
+
+const tagStyle: React.CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 600,
+  color: 'var(--text-secondary)',
+  background: 'var(--bg)',
+  border: '1px solid var(--border)',
+  padding: '3px 8px',
+  borderRadius: '999px',
+};
+
+const customWrapStyle: React.CSSProperties = {
+  marginTop: '20px',
+  padding: '16px',
+  background: 'var(--bg)',
+  borderRadius: '14px',
+};
+
+const customInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '12px 56px 12px 14px',
+  border: '1.5px solid var(--border)',
+  borderRadius: '10px',
+  fontSize: '14px',
+  fontFamily: 'inherit',
+  color: 'var(--text-primary)',
+  background: 'var(--surface)',
+  outline: 'none',
+};
+
+const customCountStyle: React.CSSProperties = {
+  position: 'absolute',
+  right: '12px',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  fontSize: '11px',
+  color: 'var(--text-muted)',
+};
+
+const customAddBtnStyle: React.CSSProperties = {
+  marginTop: '8px',
+  width: '100%',
+  padding: '10px',
+  borderRadius: '10px',
+  background: 'var(--accent-light)',
+  color: 'var(--accent)',
+  border: 'none',
+  fontSize: '13px',
+  fontWeight: 700,
+  fontFamily: 'inherit',
+  transition: 'opacity .15s',
+};
+
+const customBadgeStyle: React.CSSProperties = {
+  fontSize: '10.5px',
+  fontWeight: 700,
+  padding: '2px 8px',
+  borderRadius: '999px',
+  background: 'var(--accent-light)',
+  color: 'var(--accent)',
+  letterSpacing: '.02em',
+};
+
+const removeBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '10px',
+  right: '10px',
+  width: '24px',
+  height: '24px',
+  borderRadius: '50%',
+  border: 'none',
+  background: 'var(--bg)',
+  color: 'var(--text-secondary)',
+  fontSize: '16px',
+  lineHeight: '1',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const summaryWrapStyle: React.CSSProperties = {
+  marginTop: '20px',
+  padding: '12px 14px',
+  background: 'var(--bg)',
+  borderRadius: '12px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+};
+
+const footerStyle: React.CSSProperties = {
+  padding: '14px 20px',
+  paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+  borderTop: '1px solid var(--border)',
+  background: 'var(--surface)',
+  flexShrink: 0,
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '15px',
+  borderRadius: '12px',
+  border: 'none',
+  fontSize: '15px',
+  fontWeight: 700,
+  fontFamily: 'inherit',
+  transition: 'background .15s, transform .1s',
+};
+
+const errorAlertStyle: React.CSSProperties = {
+  padding: '10px 14px',
+  marginBottom: '10px',
+  background: '#FEF2F2',
+  border: '1.5px solid #FECACA',
+  borderRadius: '10px',
+  fontSize: '13px',
+  color: 'var(--danger)',
+};
