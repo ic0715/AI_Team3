@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-const STRENGTHS = ['강점 1', '강점 2', '강점 3', '강점 4', '강점 5'];
+import { supabase } from '@/lib/supabase/client';
 
 const INTERVIEW_CARDS = [
   {
@@ -30,6 +30,28 @@ const INTERVIEW_CARDS = [
 
 export default function CareerIntroPage() {
   const router = useRouter();
+  const [strengths, setStrengths] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchStrengths = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('strength_analyses')
+        .select('strengths')
+        .eq('user_id', user.id)
+        .eq('is_latest', true)
+        .single();
+
+      if (data?.strengths) {
+        const names = (data.strengths as { name_ko: string }[]).map((s) => s.name_ko);
+        setStrengths(names);
+      }
+    };
+
+    fetchStrengths();
+  }, []);
 
   return (
     <div className="min-h-screen flex justify-center items-start bg-[#e8eaee]">
@@ -92,14 +114,18 @@ export default function CareerIntroPage() {
               ⭐ 내 강점 Top 5
             </div>
             <div className="flex flex-wrap gap-[6px] mb-[10px]">
-              {STRENGTHS.map((strength) => (
-                <span
-                  key={strength}
-                  className="text-xs font-bold px-[10px] py-1 bg-[var(--accent-light)] text-[var(--accent)] rounded-[var(--radius-full)]"
-                >
-                  {strength}
-                </span>
-              ))}
+              {strengths.length > 0 ? (
+                strengths.map((strength) => (
+                  <span
+                    key={strength}
+                    className="text-xs font-bold px-[10px] py-1 bg-[var(--accent-light)] text-[var(--accent)] rounded-[var(--radius-full)]"
+                  >
+                    {strength}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-[var(--text-muted)]">강점 데이터를 불러오는 중...</span>
+              )}
             </div>
             <div className="text-xs text-[var(--text-secondary)] leading-[1.5]">
               이 강점들을 컨텍스트로 인터뷰가 진행돼요.
