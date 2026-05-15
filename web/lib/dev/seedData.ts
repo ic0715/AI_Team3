@@ -78,6 +78,7 @@ export async function resetTestData(): Promise<{ ok: boolean; message: string }>
   await Promise.all([
     supabase.from("career_interview_results").delete().eq("user_id", user.id),
     supabase.from("strength_analyses").delete().eq("user_id", user.id),
+    supabase.from("goals").delete().eq("user_id", user.id),
     supabase
       .from("profiles")
       .update({ profile_completed: false })
