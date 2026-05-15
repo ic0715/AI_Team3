@@ -69,87 +69,60 @@ const CORE_QUESTIONS = [
   '시간/돈 제약이 없다면, 1년 동안 무엇을 시도해 보고 싶나요?',
 ];
 
-// ── 🤖 AI 연동 함수 (Mock) ──────────────────────────────────
-// AI 개발자: 아래 함수 교체
+// ── 🤖 AI 연동 함수 (Claude API) ────────────────────────────
 async function sendMessageToAI(params: AIChatParams): Promise<AIResponse> {
-  const { coreQuestionIndex, context, isExtraMode } = params;
-
-  // 인터뷰 더하기 모드: 짧은 ack 응답
-  if (isExtraMode) {
-    await new Promise((r) => setTimeout(r, 800));
-    return {
-      content: '좋은 이야기 더 들었어요 ✨ 더 나누고 싶은 게 있으면 편하게 적어주세요.',
-      nextCoreQuestionIndex: 6,
-      isInterviewComplete: false,
-    };
-  }
-
-  // 코어 질문 완료 (6개 모두 진행됨)
-  if (coreQuestionIndex >= 6) {
-    await new Promise((r) => setTimeout(r, 800));
-    return {
-      content: '인터뷰에 성심껏 답해주셔서 감사해요. 충분히 좋은 이야기를 나눴어요 😊',
-      nextCoreQuestionIndex: 6,
-      isInterviewComplete: true,
-    };
-  }
-
-  // 코어 질문 순서대로 진행 (Mock)
-  await new Promise((r) => setTimeout(r, 1000 + Math.random() * 500));
-
-  const nextIndex = coreQuestionIndex + 1;
-  let nextQuestion = CORE_QUESTIONS[nextIndex] ?? '';
-
-  // Q5: 강점 이름 삽입
-  if (nextIndex === 4 && context.strengths.length > 0) {
-    nextQuestion = `강점 중 "${context.strengths[0].name_ko}"에 가장 공감되시나요? 그 강점을 어디서 느꼈나요?`;
-  }
-
-  const isComplete = nextIndex >= 6;
-
-  return {
-    content: isComplete
-      ? '이야기 잘 들었어요. 답변해 주신 내용을 바탕으로 커리어 방향을 분석할게요 😊'
-      : nextQuestion,
-    nextCoreQuestionIndex: nextIndex,
-    isInterviewComplete: isComplete,
+  // 서버 라우트로 전달 (API 키는 서버에만 존재)
+  const payload = {
+    messages: params.messages.map((m) => ({ role: m.role, content: m.content })),
+    context: params.context,
+    coreQuestionIndex: params.coreQuestionIndex,
+    isExtraMode: params.isExtraMode,
   };
+
+  const res = await fetch('/api/career-interview/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? 'AI chat failed');
+  }
+  return res.json();
 }
 
-// ── 🤖 인터뷰 완료 후 DB 저장 (Mock) ────────────────────────
-// AI 개발자: 아래 함수 교체
-// 실제 구현 시: messages + context → Claude API → key_insights + ai_summary 추출
+// ── 🤖 인터뷰 완료 후 분석 + DB 저장 (Claude API) ───────────
 async function finalizeInterview(
-  _messages: Message[],
-  _context: UserContext,
+  messages: Message[],
+  context: UserContext,
   userId: string
 ): Promise<{ key_insights: object; ai_summary: string }> {
-  // TODO: Claude API 호출로 교체
-  // 현재는 빈 데이터로 DB INSERT (09 화면 테스트용)
-  await new Promise((r) => setTimeout(r, 2000)); // 분석 로딩 시뮬레이션
+  // 1) 서버 라우트에서 Claude로 인사이트 추출
+  const res = await fetch('/api/career-interview/finalize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      context: { nickname: context.nickname, strengths: context.strengths },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? 'AI finalize failed');
+  }
+  const result = (await res.json()) as { key_insights: object; ai_summary: string };
 
-  const mockResult = {
-    key_insights: {
-      satisfaction: '(AI 분석 필요)',
-      dissatisfaction: '(AI 분석 필요)',
-      future_vision: '(AI 분석 필요)',
-      values: '(AI 분석 필요)',
-      work_style: '(AI 분석 필요)',
-      mentioned_competencies: [],
-    },
-    ai_summary: '(AI 분석 필요)',
-  };
-
+  // 2) 클라이언트(인증된 supabase)로 DB INSERT — RLS 통과
   const { error } = await supabase
     .from('career_interview_results')
     .insert({
       user_id: userId,
-      key_insights: mockResult.key_insights,
-      ai_summary: mockResult.ai_summary,
+      key_insights: result.key_insights,
+      ai_summary: result.ai_summary,
     });
 
   if (error) throw error;
-  return mockResult;
+  return result;
 }
 // ─────────────────────────────────────────────────────────────
 

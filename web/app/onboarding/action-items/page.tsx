@@ -12,12 +12,20 @@ const CUSTOM_MAX = 50;
 const CUSTOM_SELECTED_ID = '__custom__';
 
 // DB는 competency_code를 T-1 등 스펙 형식으로 저장. 시드 lookup은 슬러그(constants) 기준이라 역매핑 필요.
+// 12역량 모두 매핑. seeds.ts에 시드 데이터가 없는 역량은 빈 배열 → AI가 fallback으로 처리.
 const CODE_TO_SLUG: Record<string, string> = {
   'T-1': 'critical-thinking',
   'T-2': 'data-analysis',
+  'T-3': 'planning',
   'I-1': 'communication',
   'I-2': 'leadership',
+  'I-3': 'persuasion',
+  'R-1': 'collaboration',
+  'R-2': 'mentoring',
+  'R-3': 'empathy-comm',
   'E-1': 'execution',
+  'E-2': 'problem-solving',
+  'E-3': 'self-management',
 };
 
 // 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
@@ -52,14 +60,28 @@ export default function ActionItemsPage() {
   );
 }
 
+interface UserContextForAI {
+  nickname: string;
+  jobField: string;
+  careerLevel: string;
+  mainConcern: string;
+  strengths: Array<{ id: string; name_ko: string; name_en: string; domain: string }>;
+  interviewInsights: unknown;
+}
+
 function ActionItemsContent() {
   const router = useRouter();
   const { ready } = useOnboardingGuard('action-items');
 
   const [goal, setGoal] = useState<ActiveGoal | null>(null);
   const [careerLevel, setCareerLevel] = useState<string>('junior');
+  const [aiContext, setAiContext] = useState<UserContextForAI | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // AI 개인화 액션 (시드 → 사용자 맞춤 변형)
+  const [aiActions, setAiActions] = useState<DisplaySeed[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(true);
 
   // 단일 선택 상태 (시드 id 또는 CUSTOM_SELECTED_ID)
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,7 +104,7 @@ function ActionItemsContent() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const [goalRes, profileRes] = await Promise.all([
+        const [goalRes, profileRes, strengthRes, interviewRes] = await Promise.all([
           supabase
             .from('goals')
             .select('id, goal_title, competency_code, domain')
@@ -92,8 +114,22 @@ function ActionItemsContent() {
             .maybeSingle(),
           supabase
             .from('profiles')
-            .select('career_level')
+            .select('nickname, job_field, career_level, main_concern')
             .eq('id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('strength_analyses')
+            .select('strengths')
+            .eq('user_id', user.id)
+            .eq('is_latest', true)
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('career_interview_results')
+            .select('key_insights')
+            .eq('user_id', user.id)
+            .order('interviewed_at', { ascending: false })
+            .limit(1)
             .maybeSingle(),
         ]);
 
@@ -107,6 +143,14 @@ function ActionItemsContent() {
         }
         setGoal(goalRes.data);
         setCareerLevel(profileRes.data?.career_level ?? 'junior');
+        setAiContext({
+          nickname: profileRes.data?.nickname ?? '친구',
+          jobField: profileRes.data?.job_field ?? '',
+          careerLevel: profileRes.data?.career_level ?? 'junior',
+          mainConcern: profileRes.data?.main_concern ?? '',
+          strengths: (strengthRes.data?.strengths as UserContextForAI['strengths']) ?? [],
+          interviewInsights: interviewRes.data?.key_insights ?? null,
+        });
         setLoadingData(false);
       } catch (e) {
         console.error(e);
@@ -128,16 +172,93 @@ function ActionItemsContent() {
     [goal],
   );
 
-  const seeds: DisplaySeed[] = useMemo(() => {
+  // 베이스 시드 (constants에서 lookup) — AI 실패 시 fallback으로 사용
+  // 시드 없는 역량(예: R-1, R-2)은 빈 placeholder 5개로 채워서 AI가 처음부터 생성하게 함.
+  const baseSeeds: DisplaySeed[] = useMemo(() => {
     if (!goal || !seedSlug) return [];
     const seedSet = ACTION_SEEDS_BY_COMPETENCY[seedSlug];
-    const items = seedSet?.items ?? [];
-    return items.map((item, idx) => ({
-      ...item,
-      // source_seed_id 형식은 스펙 코드 그대로 유지 (예: "T-1-junior-1")
+    const items = seedSet?.items;
+    if (items && items.length > 0) {
+      return items.map((item, idx) => ({
+        ...item,
+        // source_seed_id 형식은 스펙 코드 그대로 유지 (예: "T-1-junior-1")
+        sourceSeedId: `${goal.competency_code}-${careerLevel}-${idx + 1}`,
+      }));
+    }
+    // 시드 데이터 없는 역량 — AI가 처음부터 생성하도록 빈 placeholder 5개
+    return Array.from({ length: 5 }, (_, idx) => ({
+      id: `${seedSlug}-placeholder-${idx + 1}`,
+      title: '',
+      description: '',
+      tags: [],
       sourceSeedId: `${goal.competency_code}-${careerLevel}-${idx + 1}`,
     }));
   }, [goal, seedSlug, careerLevel]);
+
+  // ── AI 개인화 호출 ─────────────────────────────────────────
+  useEffect(() => {
+    if (!goal || !aiContext || baseSeeds.length === 0) return;
+    let cancelled = false;
+    setAiLoading(true);
+
+    const run = async () => {
+      try {
+        const res = await fetch('/api/career-actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userProfile: {
+              nickname: aiContext.nickname,
+              jobField: aiContext.jobField,
+              careerLevel: aiContext.careerLevel,
+              mainConcern: aiContext.mainConcern,
+            },
+            userStrengths: aiContext.strengths,
+            interviewInsights: aiContext.interviewInsights,
+            selectedGoal: {
+              goal_title: goal.goal_title,
+              competency_code: goal.competency_code,
+            },
+            seeds: baseSeeds.map((s) => ({
+              sourceSeedId: s.sourceSeedId,
+              title: s.title,
+              description: s.description,
+              tags: s.tags,
+            })),
+          }),
+        });
+        if (!res.ok) throw new Error('AI action generation failed');
+        const data = (await res.json()) as {
+          actions: Array<{ sourceSeedId: string; title: string; description: string; tags: string[]; isAiModified: boolean }>;
+        };
+        if (cancelled) return;
+        // baseSeeds 형식에 맞춰 id 보존
+        const merged: DisplaySeed[] = baseSeeds.map((seed) => {
+          const aiItem = data.actions.find((a) => a.sourceSeedId === seed.sourceSeedId);
+          if (!aiItem) return seed;
+          return {
+            ...seed,
+            title: aiItem.title,
+            description: aiItem.description,
+            tags: aiItem.tags,
+          };
+        });
+        setAiActions(merged);
+      } catch (e) {
+        console.error('[10 AI personalize] failed, falling back to seeds:', e);
+        // 폴백: 시드 그대로 사용 (사용자에게는 AI 실패가 안 보임)
+        if (!cancelled) setAiActions(baseSeeds);
+      } finally {
+        if (!cancelled) setAiLoading(false);
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [goal, aiContext, baseSeeds]);
+
+  // 실제 화면에 표시될 시드 (AI 결과 또는 fallback)
+  const seeds: DisplaySeed[] = aiActions ?? baseSeeds;
 
   const seedEmoji = useMemo(() => {
     if (!seedSlug) return '🎯';
@@ -255,6 +376,7 @@ function ActionItemsContent() {
 
   if (!ready || loadingData) return <LoadingScreen text="액션 아이템을 준비 중이에요..." />;
   if (!goal) return <LoadingScreen text={error ?? '목표를 찾을 수 없어요.'} />;
+  if (aiLoading) return <LoadingScreen text="AI가 당신에게 맞는 액션을 만들고 있어요..." />;
 
   const selectedCount = selectedId ? 1 : 0;
 
