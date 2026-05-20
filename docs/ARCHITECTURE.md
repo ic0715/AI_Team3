@@ -1,7 +1,7 @@
 # CareerPT 아키텍처 문서
 
-> 최종 업데이트: 2026-05-13
-> 기준: `main` 최신 (908b956 커밋 완료)
+> 최종 업데이트: 2026-05-20
+> 기준: `main` 최신 (908b956) + post-MVP v2 스펙 반영
 
 ---
 
@@ -35,52 +35,38 @@ AI_Team3/
 
 - **구현 코드는 `web/` 하나에만** 존재합니다.
 - `docs/`에는 `.ts`, `.tsx`, `.js` 파일을 두지 않습니다.
-- 루트(`AI_Team3/`)에는 `.env.example`, `.gitignore`, `config.example.js`만 존재합니다.
+- 루트(`AI_Team3/`)에는 `.env.example`, `.gitignore`만 존재합니다.
+
+> 현재 구현 상태(진행률, 폴더 트리, 체크리스트)는 [`STRUCTURE.md`](STRUCTURE.md)를 참조하세요.
 
 ---
 
-## 4. web/ 내부 구조
+## 4. 라우트 구조
 
-```
-web/
-├── app/                  Next.js App Router 라우트
-├── components/
-│   └── ui/               공통 UI 컴포넌트 (버튼, 칩, 카드 등)
-├── lib/
-│   ├── supabase/
-│   │   └── client.ts     브라우저용 Supabase 클라이언트 (단일 인스턴스)
-│   ├── constants/        앱 전역 정적 데이터
-│   ├── types/            TypeScript 타입 정의
-│   └── hooks/            커스텀 React 훅
-└── styles/
-    ├── globals.css        CSS 변수 + Tailwind import + 전역 리셋
-    └── tokens.css         (미사용, 정리 예정)
-```
+### 4.1 전체 라우트 맵
 
----
-
-## 5. 라우트 구조 및 화면 흐름
-
-### 5.1 라우트 맵
-
-| URL 경로 | 파일 | 스펙 | 상태 |
+| URL 경로 | 파일 | 스펙 | 구분 |
 |----------|------|------|------|
-| `/` | `app/page.tsx` | 01_landing | ✅ |
-| `/login` | `app/login/page.tsx` | 02_login | ✅ |
-| `/auth/callback` | `app/auth/callback/route.ts` | OAuth 콜백 | ✅ |
-| `/verify-email` | `app/verify-email/` | NEW01 | ⬜ |
-| `/onboarding/profile` | `app/onboarding/profile/page.tsx` | 03_basic_info | ✅ |
-| `/onboarding/strengths` | `app/onboarding/strengths/` | 04_strength_choice | ⬜ |
-| `/onboarding/career-intro` | `app/onboarding/career-intro/` | 07_career_intro | ⬜ |
-| `/onboarding/career-interview` | `app/onboarding/career-interview/` | 08_career_interview | ⬜ |
-| `/onboarding/career-result` | `app/onboarding/career-result/` | 09_career_result | ⬜ |
-| `/onboarding/action-items` | `app/onboarding/action-items/` | 10_action_items | ⬜ |
-| `/onboarding/complete` | `app/onboarding/complete/` | NEW02 | ⬜ |
-| `/error/network` | `app/error/network/page.tsx` | NEW05 | ✅ |
-| (런타임 오류) | `app/error.tsx` | NEW06 | ✅ |
-| (404) | `app/not-found.tsx` | NEW06 | ✅ |
+| `/` | `app/page.tsx` | 01_landing | MVP |
+| `/login` | `app/login/page.tsx` | 02_login | MVP |
+| `/auth/callback` | `app/auth/callback/route.ts` | OAuth 콜백 | MVP |
+| `/verify-email` | `app/verify-email/` | NEW01 | MVP |
+| `/onboarding/profile` | `app/onboarding/profile/page.tsx` | 03_basic_info | MVP |
+| `/onboarding/strengths` | `app/onboarding/strengths/` | 04_strength_choice | MVP |
+| `/onboarding/career-intro` | `app/onboarding/career-intro/` | 07_career_intro | MVP |
+| `/onboarding/career-interview` | `app/onboarding/career-interview/` | 08_career_interview | MVP |
+| `/onboarding/career-result` | `app/onboarding/career-result/` | 09_career_result | MVP |
+| `/onboarding/action-items` | `app/onboarding/action-items/` | 10_action_items | MVP |
+| `/onboarding/complete` | `app/onboarding/complete/` | NEW02 | MVP |
+| `/home` | `app/home/` | 11_home | post-MVP v2 |
+| `/reflect` | `app/reflect/` | 12_reflect | post-MVP v2 |
+| `/reflect/ai-coach` | `app/reflect/ai-coach/` | 13_reflect_ai_coach | post-MVP v2 |
+| `/profile` | `app/profile/` | 15_profile | post-MVP v2 |
+| `/error/network` | `app/error/network/page.tsx` | NEW05 | MVP |
+| (런타임 오류) | `app/error.tsx` | NEW06 | MVP |
+| (404) | `app/not-found.tsx` | NEW06 | MVP |
 
-### 5.2 사용자 상태별 진입 화면
+### 4.2 사용자 상태별 진입 화면
 
 랜딩(`/`)은 로그인 상태에 따라 다음 화면으로 자동 라우팅합니다.
 
@@ -98,11 +84,11 @@ web/
         ├─ 커리어 인터뷰 미완료       → /onboarding/career-intro
         ├─ 역량 미선택                → /onboarding/career-result
         ├─ 액션 미선택                → /onboarding/action-items
-        ├─ goal active / paused      → /home            (post-MVP)
-        └─ goal completed            → /cycle-complete  (post-MVP)
+        ├─ goal active / paused      → /home
+        └─ goal completed            → /home (사이클 완료 배너 표시)
 ```
 
-### 5.3 온보딩 플로우
+### 4.3 온보딩 플로우 (MVP)
 
 ```
 /login
@@ -128,13 +114,40 @@ web/
        │                      → action_items 테이블 저장
        ▼
 /onboarding/complete       ← 12주 사이클 시작 안내
+       │
+       ▼
+/home                      ← post-MVP 진입
+```
+
+### 4.4 post-MVP 화면 흐름 (v2 기준)
+
+> 스펙 원본: `docs/functional_spec/_post_mvp_v2/`
+
+```
+/home                      ← 12주 코칭 대시보드
+  │                           커리어 방향 카드 + 오늘의 액션 + 주차별 타임라인
+  │
+  ├─ 회고 버튼
+  │     ▼
+  │   /reflect              ← 날짜 기반 자동 모드 분기
+  │     │                      평일: 메모 모드 / 주말: 회고 모드
+  │     │
+  │     └─ 주말 회고 저장 후 AI 코칭 CTA
+  │           ▼
+  │         /reflect/ai-coach  ← 회고 AI 코칭
+  │                               p08 커리어 인터뷰와 동일 디자인 시스템
+  │                               → AI 프롬프트: docs/ai_prompt/06_reflect_coaching.md
+  │
+  └─ 프로필 버튼
+        ▼
+      /profile               ← 기본 정보 인라인 편집 + 설정
 ```
 
 ---
 
-## 6. 데이터 레이어
+## 5. 데이터 레이어
 
-### 6.1 Supabase 클라이언트 사용 규칙
+### 5.1 Supabase 클라이언트 사용 규칙
 
 ```ts
 // ✅ 모든 페이지 / 컴포넌트에서 이렇게 import
@@ -143,44 +156,36 @@ import { supabase } from '@/lib/supabase/client'
 // ❌ 페이지 안에서 직접 createClient() 호출 금지
 ```
 
-**예외**: `app/auth/callback/route.ts`는 서버에서 실행되는 Route Handler이므로
-브라우저 클라이언트를 쓸 수 없어 직접 `createClient()`를 사용합니다.
-추후 서버 컴포넌트가 늘어나면 `lib/supabase/server.ts`를 별도 추가합니다.
+**예외**: `app/auth/callback/route.ts`는 서버 Route Handler이므로 직접 `createClient()`를 사용합니다.
+서버 컴포넌트가 늘어나면 `lib/supabase/server.ts`를 별도 추가합니다.
 
-### 6.2 주요 테이블 (스펙 기준)
+### 5.2 주요 테이블
 
 | 테이블 | 역할 | 연결 화면 |
 |--------|------|----------|
-| `profiles` | 사용자 기본 정보 | p03 |
+| `profiles` | 사용자 기본 정보 | p03, p15 |
 | `strength_analyses` | 강점 선택 결과 (`is_latest` 플래그) | p04 |
 | `career_interview_results` | AI 인터뷰 결과 + 추천 역량 | p08~p09 |
-| `goals` | 12주 목표 + 상태(`active/paused/completed`) | p09 |
-| `action_items` | 선택한 액션 아이템 | p10 |
+| `goals` | 12주 목표 + 상태(`active/paused/completed`) | p09, p11 |
+| `action_items` | 선택한 액션 아이템 | p10, p11 |
 
 > 전체 스키마: [`docs/schema/spec-schema.md`](schema/spec-schema.md)
 
-### 6.3 상수 데이터 (lib/constants/)
-
-하드코딩을 방지하기 위해 반복 사용되는 데이터를 상수 파일로 분리합니다.
+### 5.3 상수 데이터 (lib/constants/)
 
 | 파일 | 내용 | 사용 화면 |
 |------|------|----------|
-| `strengths.ts` | 갤럽 34개 테마 + 4개 도메인 색상 | p04 강점 선택 |
-| `competencies.ts` | 5개 역량 카드 (제목·설명·태그) | p09 역량 선택 |
-| `seeds.ts` | 역량별 액션 아이템 25개 | p10 액션 선택 |
+| `strengths.ts` | 갤럽 34개 테마 + 4개 도메인 색상 | p04 |
+| `competencies.ts` | 5개 역량 카드 (제목·설명·태그) | p09 |
+| `seeds.ts` | 역량별 액션 아이템 25개 | p10 |
 
-```ts
-// 사용 예시
-import { STRENGTHS_BY_DOMAIN } from '@/lib/constants/strengths'
-import { COMPETENCIES } from '@/lib/constants/competencies'
-import { ACTION_SEEDS_BY_COMPETENCY } from '@/lib/constants/seeds'
-```
+페이지 파일 안에 강점·역량·액션 데이터를 직접 작성하지 않습니다.
 
 ---
 
-## 7. 스타일 시스템
+## 6. 스타일 시스템
 
-### 7.1 CSS 변수 (globals.css)
+### 6.1 CSS 변수 (globals.css)
 
 모든 색상·간격·폰트는 `styles/globals.css`의 `:root` 블록에 정의된 CSS 변수를 사용합니다.
 
@@ -189,6 +194,8 @@ import { ACTION_SEEDS_BY_COMPETENCY } from '@/lib/constants/seeds'
 --accent:         #2D5BFF;
 --accent-light:   #EEF2FF;
 --accent-deep:    #1A3ACC;
+--accent-soft:    #dbeafe;    /* post-MVP v2 추가 */
+--accent-tint:    #eff6ff;    /* post-MVP v2 추가 */
 
 /* 배경 / 서피스 */
 --bg:             #F8F9FC;
@@ -198,28 +205,34 @@ import { ACTION_SEEDS_BY_COMPETENCY } from '@/lib/constants/seeds'
 --text-primary:   #111827;
 --text-secondary: #6B7280;
 --text-muted:     #9CA3AF;
+--ink:            #111418;    /* post-MVP v2 추가 */
+--ink-soft:       #3f4651;    /* post-MVP v2 추가 */
+--ink-mute:       #8b93a0;    /* post-MVP v2 추가 */
 
 /* 보더 */
 --border:         #E5E7EB;
+--line:           #e8eaee;    /* post-MVP v2 추가 */
+--line-strong:    #d3d7de;    /* post-MVP v2 추가 */
 
 /* 상태 */
 --danger:         #EF4444;
 --success:        #10B981;
 
 /* 강점 도메인 색상 */
---d-executing:    #7C3AED;   /* 실행력 */
---d-influencing:  #EA580C;   /* 영향력 */
---d-relationship: #2563EB;   /* 대인관계 구축 */
---d-strategic:    #059669;   /* 전략적 사고 */
+--d-executing:    #7C3AED;
+--d-influencing:  #EA580C;
+--d-relationship: #2563EB;
+--d-strategic:    #059669;
 
 /* 레이아웃 */
 --radius-sm: 6px;  --radius-md: 10px;
 --radius-lg: 16px; --radius-full: 999px;
 ```
 
-### 7.2 적용 방식
+> `--ink-soft`, `--line`, `--line-strong`, `--accent-soft`, `--accent-tint` 5개는
+> post-MVP v2 화면 구현 전 `fix/css-variables-sync` PR이 머지돼야 사용 가능합니다.
 
-현재 구현된 페이지들은 CSS 변수를 인라인 스타일로 참조합니다.
+### 6.2 적용 방식
 
 ```tsx
 // 현재 방식 (인라인 스타일 + CSS 변수)
@@ -229,7 +242,7 @@ import { ACTION_SEEDS_BY_COMPETENCY } from '@/lib/constants/seeds'
 <body className="min-h-full flex flex-col">
 ```
 
-### 7.3 모바일 우선 레이아웃
+### 6.3 모바일 우선 레이아웃
 
 모든 페이지는 `width: 390px`로 고정된 모바일 카드 형태로 화면 중앙에 표시됩니다.
 
@@ -239,7 +252,7 @@ import { ACTION_SEEDS_BY_COMPETENCY } from '@/lib/constants/seeds'
 
 ---
 
-## 8. 인증 흐름
+## 7. 인증 흐름
 
 ```
 이메일 회원가입
@@ -258,7 +271,7 @@ Google OAuth
 
 ---
 
-## 9. 경로 alias
+## 8. 경로 alias
 
 `tsconfig.json`의 `paths` 설정에 따라 `@/`는 `web/` 디렉토리를 가리킵니다.
 
@@ -270,7 +283,7 @@ Google OAuth
 
 ---
 
-## 10. 로컬 개발 시작
+## 9. 로컬 개발 시작
 
 ```bash
 # 1. 환경변수 설정
@@ -288,7 +301,7 @@ npm run dev
 
 ---
 
-## 11. 브랜치 전략
+## 10. 브랜치 전략
 
 | 브랜치 | 용도 |
 |--------|------|
@@ -296,14 +309,3 @@ npm run dev
 | `feature/<화면ID>` | 화면 단위 구현 (예: `feature/04_strength_choice`) |
 | `fix/<내용>` | 버그 수정 |
 | `docs/<내용>` | 문서 작업 |
-
----
-
-## 12. 향후 추가 예정 (post-MVP)
-
-- `lib/supabase/server.ts` — 서버 컴포넌트용 Supabase 클라이언트
-- `lib/hooks/useAuth.ts` — 인증 상태 훅 (미구현)
-- `lib/types/database.ts` — Supabase CLI로 자동 생성한 DB 타입 (DB 스키마 확정 후)
-- `components/ui/` — TopBar, ProgressBar, StrengthChip, ActionItemCard 등 공통 컴포넌트
-
-> `lib/hooks/useOnboardingGuard.ts` — ✅ 구현 완료 (908b956)
