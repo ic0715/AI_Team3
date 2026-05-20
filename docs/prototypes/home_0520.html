@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>CareerPT — 홈</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --accent:#2D5BFF;--accent-light:#EEF2FF;--accent-dark:#1A3FCC;
+  --bg:#F7F7F5;--surface:#FFFFFF;
+  --text-primary:#111111;--text-secondary:#6B7280;--text-muted:#9CA3AF;
+  --border:#E5E7EB;--border-strong:#D1D5DB;
+  --success:#10B981;--warning:#F59E0B;--danger:#EF4444;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:20px;--radius-full:999px;
+  --ink:#111418;--ink-soft:#3f4651;--ink-mute:#8b93a0;
+  --line:#e8eaee;--line-strong:#d3d7de;
+  --accent-deep:#1e3a8a;--accent-soft:#dbeafe;--accent-tint:#eff6ff;
+}
+html,body{height:100%;}
+body{
+  font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:#e8eaee;color:var(--text-primary);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  display:flex;justify-content:center;align-items:flex-start;min-height:100vh;
+}
+::-webkit-scrollbar{width:0;}
+#app{width:390px;min-height:100dvh;background:var(--surface);display:flex;flex-direction:column;position:relative;overflow-x:hidden;box-shadow:0 0 40px rgba(0,0,0,.18);}
+.page{display:none;flex-direction:column;flex:1;min-height:100dvh;}
+.page.active{display:flex;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 20px;border:none;border-radius:var(--radius-md);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;}
+.btn-full{width:100%;}
+.card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:18px;}
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.form-input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:15px;font-family:inherit;color:var(--text-primary);background:var(--surface);transition:border-color .15s;outline:none;}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,91,255,.12);}
+.form-input::placeholder{color:var(--text-muted);}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+/* Tab bar */
+.tab-bar{position:sticky;bottom:0;z-index:40;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr 1fr;padding-bottom:env(safe-area-inset-bottom,0);box-shadow:0 -2px 12px -8px rgba(17,20,24,.08);flex-shrink:0;}
+.tab-item{background:none;border:none;padding:10px 0 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:inherit;color:var(--ink-mute);transition:color .2s;}
+.tab-item .tab-ic{font-size:20px;line-height:1;height:22px;display:flex;align-items:center;justify-content:center;filter:grayscale(.6) opacity(.55);transition:filter .2s;}
+.tab-item .tab-label{font-size:10.5px;font-weight:500;letter-spacing:.02em;}
+.tab-item.active{color:var(--accent);}
+.tab-item.active .tab-ic{filter:none;}
+.tab-item.active .tab-label{font-weight:700;}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;background:var(--bg);backdrop-filter:blur(6px);flex-shrink:0;}
+.topbar .brand{font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink);}
+.topbar .step-pill{font-size:12px;color:var(--accent);padding:5px 12px;border:none;border-radius:999px;background:var(--accent-tint);font-weight:700;}
+.screen{padding:8px 22px 16px;flex:1;overflow-y:auto;}
+/* PAGE 11 */
+.home-greeting{padding:8px 0 22px;}
+.home-greeting .hi{font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:1.25;color:var(--ink);}
+.home-greeting .hi em{font-style:normal;color:var(--accent);font-weight:800;}
+.home-greeting .sub{font-size:13px;color:var(--ink-mute);margin-top:6px;font-weight:500;}
+.theme-card{background:linear-gradient(135deg,#2a3f8f 0%,#3a4fa0 40%,#4a5fc0 100%);color:#fff;border-radius:20px;padding:22px 22px 20px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 6px 24px -8px rgba(29,78,216,.45);}
+.theme-card::after{content:"";position:absolute;top:-20px;right:-20px;width:130px;height:130px;background:rgba(255,255,255,.07);border-radius:50%;}
+.theme-card::before{content:"";position:absolute;bottom:-40px;right:40px;width:80px;height:80px;background:rgba(255,255,255,.04);border-radius:50%;}
+.theme-card .label{font-size:11px;letter-spacing:.12em;opacity:.65;margin-bottom:10px;font-weight:600;text-transform:uppercase;}
+.theme-card h3{font-weight:800;font-size:22px;margin:0 0 18px;letter-spacing:-.03em;line-height:1.3;}
+.theme-card .meta{display:flex;align-items:center;gap:10px;font-size:12px;opacity:.85;}
+/* 새 진행률 바 */
+.tc-prog-row{display:flex;align-items:center;gap:10px;margin-top:14px;}
+.tc-prog-badge{background:rgba(255,255,255,.18);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.tc-prog-bar{flex:1;height:5px;background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden;}
+.tc-prog-fill{height:100%;border-radius:3px;background:rgba(255,255,255,.85);transition:width .5s ease;}
+.tc-prog-pct{font-size:12px;opacity:.7;flex-shrink:0;}
+.tc-desc{margin-top:12px;font-size:10px;line-height:1.65;opacity:.5;letter-spacing:-.005em;}
+.weeks-track{display:flex;gap:4px;margin-top:12px;}
+.week-dot{flex:1;height:4px;background:rgba(255,255,255,.18);border-radius:2px;}
+.week-dot.done{background:rgba(255,255,255,.85);}
+.week-dot.current{background:#fbbf24;box-shadow:0 0 0 2px rgba(251,191,36,.3);}
+.today-card{background:var(--accent-tint);border:2px solid var(--accent);border-radius:18px;padding:18px 18px 16px;margin-bottom:14px;}
+.notif{background:#fef9e7;border:1px solid #fde68a;border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start;cursor:pointer;}
+.timeline{position:relative;}
+.tl-item{position:relative;display:grid;grid-template-columns:56px 1fr;gap:14px;padding-bottom:14px;}
+.tl-item:not(:last-child)::before{content:"";position:absolute;left:22px;top:30px;bottom:0;width:1px;background:var(--line-strong);}
+.tl-week{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;}
+.tl-dot{width:32px;height:32px;border-radius:50%;background:var(--bg-soft,#f5f7fa);border:1px solid var(--line-strong);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--ink-mute);}
+.tl-item.done .tl-dot{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep);}
+.tl-item.current .tl-dot{background:var(--accent);border-color:var(--accent);color:#fff;width:38px;height:38px;font-size:14px;box-shadow:0 0 0 4px var(--accent-tint);margin-top:-3px;}
+.tl-item.future .tl-dot{background:#fff;border-style:dashed;color:var(--line-strong);}
+.tl-week-label{font-size:9px;letter-spacing:.1em;color:var(--ink-mute);margin-top:4px;text-transform:uppercase;}
+.tl-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;}
+.tl-item.done .tl-card{background:var(--bg-soft,#f5f7fa);}
+.tl-item.current .tl-card{background:var(--accent-tint);border-color:var(--accent);border-width:1.5px;padding:16px;box-shadow:0 4px 16px -8px rgba(29,78,216,.18);}
+.tl-item.future .tl-card{background:transparent;border-style:dashed;border-color:var(--line-strong);color:var(--ink-mute);}
+.tl-action{font-weight:500;font-size:14px;margin-bottom:4px;line-height:1.4;}
+.tl-item.current .tl-action{font-size:16px;margin-bottom:6px;}
+.tl-meta{font-size:11px;color:var(--ink-mute);display:flex;gap:8px;align-items:center;}
+.tl-meta .strength-mini{color:var(--accent-deep);background:var(--accent-soft);padding:2px 7px;border-radius:999px;font-size:10px;}
+.tl-status{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);font-weight:500;}
+.tl-item.done .tl-status{color:var(--accent-deep);}
+.tl-item.current .tl-status{color:var(--accent);font-weight:600;}
+.tc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.tc-eyebrow{font-size:12px;color:var(--accent);font-weight:700;}
+.tc-progress{font-size:13px;color:var(--ink-mute);}
+.tc-action{font-weight:500;font-size:17px;line-height:1.4;margin-bottom:12px;}
+.tc-toggle{display:flex;align-items:center;gap:12px;background:var(--bg-soft,#f5f7fa);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .25s;user-select:none;}
+.tc-toggle.done{background:var(--accent-soft);border-color:var(--accent);}
+.tc-checkbox{width:26px;height:26px;border-radius:50%;border:2px solid var(--line-strong);background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:transparent;transition:all .25s;}
+.tc-toggle.done .tc-checkbox{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff;}
+.tc-toggle-label{flex:1;font-size:14px;font-weight:500;color:var(--ink);}
+.tc-toggle.done .tc-toggle-label{color:var(--accent-deep);}
+.tc-toggle-sub{font-size:11px;color:var(--ink-mute);margin-top:2px;}
+.tc-week-row{display:flex;gap:5px;margin-top:12px;}
+.tc-day{flex:1;height:36px;background:var(--bg-soft,#f5f7fa);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;color:var(--ink-mute);cursor:pointer;letter-spacing:.08em;transition:all .2s;font-weight:500;}
+.tc-day .day-letter{font-weight:600;}
+.tc-day .day-mark{font-size:13px;margin-top:1px;height:14px;line-height:1;}
+.tc-day.done{background:var(--accent-soft);color:var(--accent-deep);border-color:var(--accent);}
+.tc-day.today{border-color:var(--accent);border-width:1.5px;background:#fff;}
+.tc-day.future{opacity:.4;cursor:default;}
+.tl-day{flex:1;height:24px;border-radius:6px;background:var(--bg-soft,#f5f7fa);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--ink-mute);}
+.tl-day.done{background:var(--accent-soft);color:var(--accent-deep);border-color:var(--accent);}
+.tl-day.today{border-color:var(--accent);border-width:1.5px;color:var(--accent);}
+/* PAGE 12 */
+.demo-toggle{display:flex;gap:6px;padding:0 22px 14px;align-items:center;flex-shrink:0;}
+.demo-toggle button{flex:1;background:#fff;border:1px solid var(--line-strong);padding:8px 14px;border-radius:999px;font-family:inherit;font-size:13px;cursor:pointer;color:var(--ink-mute);transition:all .2s;font-weight:600;}
+.demo-toggle button.active{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff;}
+.memo-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:flex-start;}
+.memo-day{text-align:center;color:var(--accent-deep);}
+.memo-day .day-letter{font-size:13px;font-weight:600;}
+.memo-day .day-date{font-size:9px;color:var(--ink-mute);margin-top:2px;}
+.memo-text{font-size:13px;line-height:1.55;color:var(--ink);white-space:pre-wrap;word-break:break-word;}
+.urgent-coach-card{margin-top:32px;display:grid;grid-template-columns:44px 1fr 18px;gap:14px;align-items:center;padding:18px;background:var(--accent-tint);border:1px solid var(--line-strong);border-radius:14px;cursor:pointer;transition:all .25s;}
+.ucc-icon{width:44px;height:44px;border-radius:50%;background:var(--accent-tint);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.ucc-title{font-weight:700;font-size:15px;margin-bottom:4px;}
+.ucc-sub{font-size:11.5px;line-height:1.55;color:var(--ink-soft);}
+.ucc-sub strong{color:var(--accent);font-weight:700;}
+.ucc-arrow{color:var(--accent);font-size:18px;font-weight:700;}
+/* PAGE 13 */
+#p13{overflow:hidden;}
+.coach-topbar{flex-shrink:0;display:grid;grid-template-columns:40px 1fr 40px;align-items:center;padding:14px 18px;background:var(--bg);border-bottom:1px solid var(--line);}
+.coach-topbar .back{background:none;border:none;font-size:22px;color:var(--ink);cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;font-weight:500;}
+.coach-topbar .title{text-align:center;font-weight:800;font-size:16px;color:var(--ink);}
+.progress-row{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:12px 20px;background:var(--bg-soft,#f5f7fa);border-bottom:1px solid var(--line);}
+.progress-row .qcount{flex-shrink:0;font-size:12px;color:var(--ink-soft);font-weight:500;}
+.progress-row .qcount strong{color:var(--ink);font-weight:800;}
+.progress-track{flex:1;height:6px;background:#e1e5eb;border-radius:999px;overflow:hidden;}
+.progress-fill-13{height:100%;background:var(--accent);border-radius:999px;transition:width .4s ease;}
+.progress-row .pct{flex-shrink:0;color:var(--ink-mute);font-weight:600;font-size:12px;}
+.chat-scroll-13{flex:1;overflow-y:auto;padding:24px 20px 20px;background:#fff;}
+.chat-13{display:flex;flex-direction:column;gap:20px;}
+.msg-coach-row{align-self:flex-start;animation:msgIn .35s ease;max-width:88%;}
+.msg-avatar-13{display:none;}
+.msg-coach-13{background:#fff;border:1px solid var(--line);border-radius:18px;border-bottom-left-radius:4px;padding:16px 18px;font-size:15px;line-height:1.7;color:var(--ink);}
+.msg-coach-13 strong{color:var(--accent);font-weight:700;}
+.msg-user-13{background:var(--accent);color:#fff;border-radius:18px;border-bottom-right-radius:4px;padding:13px 16px;font-size:14px;line-height:1.55;align-self:flex-end;max-width:78%;word-break:break-word;white-space:pre-wrap;animation:msgIn .35s ease;}
+.msg-time-13{font-size:11px;color:var(--ink-mute);margin-top:4px;padding-left:4px;}
+.input-area-13{flex-shrink:0;background:#fff;padding:10px 16px 20px;}
+.input-row-13{display:flex;align-items:center;gap:10px;}
+.input-row-13 input{flex:1;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:15px;color:var(--ink);padding:14px 18px;background:#fff;outline:none;}
+.input-row-13 input:focus{border-color:var(--accent);}
+.input-row-13 input::placeholder{color:var(--ink-mute);}
+.send-btn-13{width:52px;height:52px;border-radius:14px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.advance-btn-13{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:14px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;}
+.summary-section{display:none;padding:18px;overflow-y:auto;flex:1;}
+.summary-section.show{display:block;}
+.insight-card{background:var(--accent-tint);border:1.5px solid var(--accent);border-radius:18px;padding:22px;}
+.insight-section{margin-bottom:18px;}
+.insight-section:last-child{margin-bottom:0;}
+.insight-section .label-s{font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;}
+.insight-section .body-s{font-size:14px;line-height:1.65;color:var(--ink);}
+.insight-section .action-item-s{background:#fff;border:1px solid var(--accent-soft);border-radius:12px;padding:12px 14px;margin-top:6px;font-weight:700;font-size:15px;color:var(--ink);}
+.strength-link-s{display:inline-block;font-size:11px;color:var(--accent);background:var(--accent-soft);padding:3px 10px;border-radius:999px;margin-top:6px;font-weight:600;}
+.summary-notice{margin-top:14px;padding:14px 16px;background:#fef9e7;border:1px solid #fde68a;border-radius:14px;font-size:13px;line-height:1.55;color:var(--ink-soft);}
+.summary-actions{display:flex;gap:10px;margin-top:14px;}
+.summary-actions button{flex:1;padding:14px;border-radius:14px;border:none;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;}
+.btn-sec-13{background:var(--bg-soft,#f5f7fa);color:var(--ink);border:1px solid var(--line-strong)!important;}
+.btn-pri-13{background:var(--accent);color:#fff;}
+/* PAGE 14 */
+.archive-card{background:var(--bg-soft,#f5f7fa);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:12px;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.archive-card:hover{transform:translateY(-1px);box-shadow:0 4px 14px -8px rgba(29,78,216,.16);}
+.archive-week{display:inline-block;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:3px 10px;border-radius:999px;margin-bottom:10px;}
+.archive-topic{font-weight:800;font-size:16px;margin-bottom:12px;line-height:1.4;}
+.archive-row{display:grid;grid-template-columns:44px 1fr;gap:10px;font-size:12.5px;line-height:1.55;padding:4px 0;}
+.archive-row+.archive-row{border-top:1px dashed var(--line);padding-top:8px;margin-top:4px;}
+.archive-label{color:var(--ink-mute);font-size:11px;padding-top:3px;font-weight:700;}
+.archive-body{color:var(--ink-soft);}
+.archive-strength{color:var(--accent);font-weight:700;}
+/* PAGE 15 */
+.profile-hero{background:var(--accent);border-radius:22px;padding:26px 22px 24px;text-align:center;color:#fff;margin-bottom:18px;box-shadow:0 8px 22px -10px rgba(29,78,216,.4);}
+.profile-avatar{width:76px;height:76px;border-radius:50%;background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 12px;}
+.profile-name{font-size:22px;font-weight:800;margin-bottom:4px;}
+.profile-email{font-size:12.5px;opacity:.85;font-weight:500;}
+.profile-badges{display:flex;justify-content:center;gap:6px;margin-top:14px;flex-wrap:wrap;}
+.profile-badge{background:rgba(255,255,255,.22);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;}
+.section-card-15{background:var(--bg-soft,#f5f7fa);border:1px solid var(--line);border-radius:18px;margin-bottom:14px;overflow:hidden;}
+.section-title-15{font-size:13px;font-weight:700;color:var(--ink);padding:16px 16px 10px;display:flex;align-items:center;gap:6px;}
+.s-tag-15{padding:6px 12px;background:#fff;color:var(--accent);font-size:12.5px;font-weight:700;border-radius:999px;border:1px solid var(--accent-soft);}
+.menu-item-15{display:flex;align-items:center;gap:12px;padding:14px 16px;border-top:1px solid var(--line);cursor:pointer;transition:background .12s;background:#fff;}
+.menu-item-15:hover{background:var(--accent-tint);}
+.menu-icon-15{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--accent-tint);flex-shrink:0;}
+.menu-text-15{flex:1;}
+.menu-title-15{font-size:14px;font-weight:700;color:var(--ink);}
+.menu-sub-15{font-size:11.5px;color:var(--ink-mute);margin-top:2px;}
+.info-row-15{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:#fff;border-top:1px solid var(--line);}
+.info-key-15{font-size:13px;color:var(--ink-mute);font-weight:500;}
+.info-val-15{font-size:13.5px;font-weight:700;color:var(--ink);}
+.danger-btn-15{display:flex;align-items:center;gap:10px;padding:14px 16px;color:#dc2626;font-size:14px;font-weight:700;cursor:pointer;width:100%;background:#fff;border:none;font-family:inherit;text-align:left;border-top:1px solid var(--line);transition:background .12s;}
+.danger-btn-15:hover{background:#fee2e2;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- PAGE 11 — HOME -->
+<div class="page active" id="p11">
+  <div class="topbar">
+    <div class="brand">CareerPT<sup style="font-size:10px;color:var(--accent)">·</sup></div>
+    <div class="step-pill">🏠 홈</div>
+  </div>
+  <section class="screen" id="home-screen">
+    <div class="home-greeting">
+      <div class="hi">안녕하세요, <em>지현님</em> 👋</div>
+      <div class="sub">화요일 · 4월 23일 · <strong style="color:var(--accent)">3주차</strong> 진행 중 ✨</div>
+    </div>
+    <div class="theme-card">
+      <div class="label">나의 커리어 방향</div>
+      <h3 id="themeTitle">"비판적 사고 기르기"</h3>
+      <div class="tc-prog-row">
+        <span class="tc-prog-badge" id="tcWeekBadge">3주차 / 12주</span>
+        <div class="tc-prog-bar"><div class="tc-prog-fill" id="tcProgFill" style="width:25%"></div></div>
+        <span class="tc-prog-pct" id="tcProgPct">25%</span>
+      </div>
+      <div class="tc-desc" id="tcDesc">하나의 역량은 단기간에 만들어지지 않아요. 강점을 기반으로 작은 행동을 반복하고 회고하며, 나만의 방식으로 체화하는 과정이 필요해요. 하나의 역량 목표는 12주 동안 집중해보는 것을 권장합니다.</div>
+      <div class="weeks-track" id="weeksTrack"></div>
+    </div>
+    <div class="today-card" id="todayCard"></div>
+    <div class="notif" style="flex-direction:column;gap:10px;" onclick="nav('p12')">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="font-size:22px;flex-shrink:0;line-height:1.2;">💌</div>
+        <div style="flex:1;font-size:13px;color:var(--ink);"><strong style="display:block;margin-bottom:2px;font-weight:600;">오늘의 메모, 짧게라도 남겨볼까요? ✏️</strong>주말에 코치와 마감 회고를 할 때 컨텍스트가 돼요.</div>
+      </div>
+      <button onclick="event.stopPropagation();nav('p12')" style="width:100%;padding:10px;background:var(--ink);color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">회고하기 →</button>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;margin-top:24px;">🗺️ 12주의 여정</div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+  <nav class="tab-bar">
+    <button class="tab-item active" onclick="nav('p11')"><span class="tab-ic">🏠</span><span class="tab-label">홈</span></button>
+    <button class="tab-item" onclick="nav('p12')"><span class="tab-ic">📝</span><span class="tab-label">회고</span></button>
+    <button class="tab-item" onclick="nav('p15')"><span class="tab-ic">👤</span><span class="tab-label">프로필</span></button>
+  </nav>
+</div>
+
+<!-- PAGE 12 — REFLECT -->
+<div class="page" id="p12">
+  <div class="topbar">
+    <div class="brand">CareerPT<sup style="font-size:10px;color:var(--accent)">·</sup></div>
+    <div class="step-pill">회고</div>
+  </div>
+  <div class="demo-toggle">
+    <button id="btnWeekday" class="active" onclick="setDemoDay(1)">데일리 회고</button>
+    <button id="btnWeekend" onclick="setDemoDay(6)">위클리 회고</button>
+  </div>
+  <section class="screen">
+    <div id="reflectWeekday">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;">매일의 메모 · <span id="rwTodayLabel">화요일</span></div>
+      <h1 style="font-size:28px;font-weight:800;letter-spacing:-.035em;line-height:1.25;margin:0 0 14px;">오늘은 <em style="font-style:normal;color:var(--accent);">어땠어요?</em> 🌱</h1>
+      <!-- 평일 안내 문구 -->
+      <div style="background:var(--accent-tint);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;">💡 오늘 기록이 주말 회고의 재료가 돼요</div>
+        <div style="font-size:12px;color:var(--ink-soft);line-height:1.6;">오늘 액션을 실행하면서 어떤 느낌이었는지 짧게 기록해두세요. 잘 됐든 안 됐든, 솔직한 한 줄이면 충분해요.</div>
+      </div>
+      <div style="background:var(--bg-soft,#f5f7fa);border:1px dashed var(--line-strong);border-radius:18px;padding:20px;margin-bottom:18px;">
+        <div style="font-size:11px;letter-spacing:.1em;color:var(--ink-mute);text-transform:uppercase;margin-bottom:6px;">이번 주 액션</div>
+        <div style="font-size:16px;font-weight:500;line-height:1.4;" id="p12-action-text">책 한 챕터 읽고, 블로그 1편 써보기</div>
+      </div>
+      <div class="form-group">
+        <label style="display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:6px;font-weight:500;">오늘의 메모</label>
+        <textarea id="memoText" placeholder="예: 오늘은 30분 읽고 3줄 메모 남김." rows="4" class="form-input" style="resize:vertical;min-height:100px;"></textarea>
+      </div>
+      <button class="btn btn-full" style="background:var(--ink);color:#fff;border-radius:12px;" onclick="saveMemo()">메모 저장</button>
+      <div id="memoListWrap" style="margin-top:28px;display:none;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;">이번 주 메모 · <span id="memoCount">0</span>개</div>
+        <div id="memoList"></div>
+      </div>
+    </div>
+    <div id="reflectWeekend" style="display:none;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;">Week 3 위클리 회고 · <span id="rwEndDayLabel">일요일</span></div>
+      <h1 style="font-size:28px;font-weight:800;letter-spacing:-.035em;line-height:1.25;margin:0 0 14px;">한 주를 <em style="font-style:normal;color:var(--accent);">마감해요</em> 🌙</h1>
+      <!-- 위클리 회고 안내 멘트 -->
+      <div style="background:var(--accent-tint);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;">💡 이번 주를 돌아보고, 다음 주 액션도 함께 정해요</div>
+        <div style="font-size:12px;color:var(--ink-soft);line-height:1.6;">잘 됐든 안 됐든, 그 이유를 들여다보는 것이 다음 주를 바꿔요. 평일 메모를 참고해서 한 주를 솔직하게 돌아보고, 다음 주에 이어갈 액션까지 정해보세요.</div>
+      </div>
+      <!-- 이번 주 평일 메모 요약 -->
+      <div style="background:var(--bg-soft,#f5f7fa);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">✏️ 이번 주 메모</div>
+        <div id="weekendMemoSummary">
+          <div style="font-size:12px;color:var(--ink-mute);">평일 메모가 없어요. 데일리 회고 탭에서 기록해보세요.</div>
+        </div>
+      </div>
+      <div class="card" style="background:var(--bg-soft,#f5f7fa);border-color:var(--line);">
+        <div style="font-size:11px;letter-spacing:.1em;color:var(--ink-mute);text-transform:uppercase;margin-bottom:6px;">이번 주 액션</div>
+        <div style="font-size:17px;font-weight:500;line-height:1.4;" id="p12-action-text-wknd">책 한 챕터 읽고, 블로그 1편 써보기</div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <span style="padding:6px 12px;background:var(--bg);border-radius:999px;font-size:11px;color:var(--ink-soft);font-weight:500;">목표 7회</span>
+          <span style="padding:6px 12px;background:var(--accent-tint);border-radius:999px;font-size:11px;color:var(--accent);font-weight:500;">실제 1회</span>
+        </div>
+      </div>
+      <div style="height:18px;"></div>
+      <div class="form-group">
+        <label style="display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:6px;font-weight:500;">한 주를 한 줄로 표현하면</label>
+        <textarea id="retroText" placeholder="예: 야근이 많아서 1번밖에 못했어요." rows="3" class="form-input" style="resize:vertical;"></textarea>
+      </div>
+      <button class="btn btn-full" style="background:var(--accent);color:#fff;border-radius:12px;" onclick="saveRetro()">회고 저장하기</button>
+      <p style="margin-top:10px;font-size:12px;color:var(--ink-mute);text-align:center;line-height:1.5;">위클리 회고를 저장하면, 다음 주 액션을 AI 코치와 함께 정해볼 수 있어요.</p>
+
+      <!-- 다음 주 액션 아이템 CTA — 회고 저장 후 표시 -->
+      <div id="nextWeekCta" style="display:none;margin-top:20px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <div style="flex:1;height:1px;background:var(--line);"></div>
+          <span style="font-size:11px;color:var(--ink-mute);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;">다음 주 준비</span>
+          <div style="flex:1;height:1px;background:var(--line);"></div>
+        </div>
+        <!-- CTA 카드 -->
+        <div style="background:#fff;border:1.5px solid var(--line-strong);border-radius:18px;padding:20px;cursor:pointer;transition:all .2s;" onclick="nav('p13','weekly_retro')" onmouseenter="this.style.borderColor='var(--accent)';this.style.boxShadow='0 4px 16px -8px rgba(29,78,216,.22)';" onmouseleave="this.style.borderColor='var(--line-strong)';this.style.boxShadow='none';">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:46px;height:46px;border-radius:14px;background:var(--accent-tint);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🤖</div>
+            <div style="flex:1;">
+              <div style="font-weight:800;font-size:15px;color:var(--ink);margin-bottom:4px;">AI 코치와 다음 주 액션 정하기</div>
+              <div style="font-size:12px;color:var(--ink-soft);line-height:1.6;">이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요.</div>
+            </div>
+            <div style="color:var(--accent);font-size:18px;font-weight:700;flex-shrink:0;">›</div>
+          </div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line-strong);display:flex;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;background:var(--accent-tint);color:var(--accent);padding:4px 10px;border-radius:999px;font-weight:600;">✦ 강점 기반 추천</span>
+            <span style="font-size:11px;background:var(--bg-soft,#f5f7fa);color:var(--ink-soft);padding:4px 10px;border-radius:999px;font-weight:500;">약 3–5분 소요</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <nav class="tab-bar">
+    <button class="tab-item" onclick="nav('p11')"><span class="tab-ic">🏠</span><span class="tab-label">홈</span></button>
+    <button class="tab-item active" onclick="nav('p12')"><span class="tab-ic">📝</span><span class="tab-label">회고</span></button>
+    <button class="tab-item" onclick="nav('p15')"><span class="tab-ic">👤</span><span class="tab-label">프로필</span></button>
+  </nav>
+</div>
+
+<!-- PAGE 13 — AI COACHING (위클리 회고 후 액션 선정) -->
+<div class="page" id="p13">
+  <!-- p08 스타일 상단바: 뒤로가기 | 타이틀(center) | Q진행 -->
+  <div style="position:sticky;top:0;z-index:50;display:grid;grid-template-columns:40px 1fr 64px;align-items:center;padding:14px 18px;background:var(--bg);border-bottom:1px solid var(--line);flex-shrink:0;">
+    <button onclick="navBack()" style="background:none;border:none;font-size:22px;color:var(--ink);cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;font-weight:500;">←</button>
+    <div style="text-align:center;font-weight:800;font-size:16px;color:var(--ink);" id="p13Title">다음 주 액션 정하기</div>
+    <div style="text-align:right;font-size:13px;font-weight:700;color:var(--ink-mute);" id="p13QLabel">Q1 / 4</div>
+  </div>
+  <!-- p08 스타일 진행률 바 (전체 너비, 상단 배치) -->
+  <div id="p13ProgressRow" style="flex-shrink:0;">
+    <div style="height:3px;background:var(--line);"><div id="p13ProgressFill" style="height:100%;background:var(--accent);transition:width .4s ease;width:25%;"></div></div>
+  </div>
+  <!-- 채팅 영역 -->
+  <div class="chat-scroll-13" id="p13ChatScroll">
+    <div class="chat-13" id="p13Chat"></div>
+  </div>
+  <!-- 요약 결과 영역 (코칭 완료 후) -->
+  <div class="summary-section" id="p13Summary">
+    <div class="insight-card">
+      <div class="insight-section">
+        <div class="label-s">📌 이번 주 패턴</div>
+        <div class="body-s" id="p13PatternText"></div>
+      </div>
+      <div class="insight-section">
+        <div class="label-s">🎯 다음 주 액션 아이템</div>
+        <div class="action-item-s" id="p13ActionText"></div>
+        <div class="strength-link-s" id="p13StrengthLink"></div>
+      </div>
+    </div>
+    <div class="summary-notice" id="p13Notice"></div>
+    <div class="summary-actions">
+      <button id="p13BtnSecondary" style="flex:1;padding:14px;border-radius:14px;border:1px solid var(--line-strong);background:var(--bg-soft,#f5f7fa);color:var(--ink);font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;"></button>
+      <button id="p13BtnPrimary" style="flex:2;padding:14px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;"></button>
+    </div>
+  </div>
+  <!-- 입력창 (p08 스타일) -->
+  <div class="input-area-13" id="p13InputArea">
+    <div class="input-row-13">
+      <input id="p13Input" type="text" placeholder="메시지를 입력하세요…" onkeydown="if(event.key==='Enter')sendCoachMsg()">
+      <button class="send-btn-13" onclick="sendCoachMsg()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 14 — HISTORY -->
+<div class="page" id="p14">
+  <div class="topbar">
+    <div class="brand">CareerPT<sup style="font-size:10px;color:var(--accent)">·</sup></div>
+    <div class="step-pill">히스토리</div>
+  </div>
+  <section class="screen">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;">Archive</div>
+    <h1 style="font-size:28px;font-weight:800;letter-spacing:-.035em;line-height:1.25;margin:0 0 14px;">인사이트 <em style="font-style:normal;color:var(--accent);">보관함</em> 📚</h1>
+    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:28px;">지난 코칭에서 발견한 핵심만 정리되어 쌓여요.</p>
+    <div id="archiveList"></div>
+  </section>
+  <nav class="tab-bar">
+    <button class="tab-item" onclick="nav('p11')"><span class="tab-ic">🏠</span><span class="tab-label">홈</span></button>
+    <button class="tab-item" onclick="nav('p12')"><span class="tab-ic">📝</span><span class="tab-label">회고</span></button>
+    <button class="tab-item" onclick="nav('p15')"><span class="tab-ic">👤</span><span class="tab-label">프로필</span></button>
+  </nav>
+</div>
+
+<!-- PAGE 15 — PROFILE -->
+<div class="page" id="p15">
+  <div class="topbar">
+    <div class="brand">CareerPT<sup style="font-size:10px;color:var(--accent)">·</sup></div>
+    <div class="step-pill">👤 프로필</div>
+  </div>
+  <section class="screen">
+    <div class="profile-hero">
+      <div class="profile-avatar">👩</div>
+      <div class="profile-name">김지현</div>
+      <div class="profile-email">jihyun.kim@email.com</div>
+      <div class="profile-badges">
+        <span class="profile-badge">🔥 7일 연속</span>
+        <span class="profile-badge">마케팅/영업 · 5년차</span>
+      </div>
+    </div>
+    <div class="section-card-15">
+      <div class="section-title-15"><span>⭐</span> 내 강점 Top 5</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 14px;">
+        <span class="s-tag-15">⚡ 전략</span><span class="s-tag-15">🔬 분석</span><span class="s-tag-15">🏆 성취</span><span class="s-tag-15">📚 배움</span><span class="s-tag-15">🤝 책임</span>
+      </div>
+    </div>
+    <div class="section-card-15">
+      <div class="section-title-15"><span>🎯</span> 커리어 방향</div>
+      <div style="padding:0 16px 14px;font-size:13px;color:var(--ink-soft);line-height:1.6;">
+        <div style="font-weight:800;font-size:17px;color:var(--accent);margin-bottom:4px;">비판적 사고</div>
+        역량 목표 <strong style="color:var(--accent)">3주차</strong> 진행 중이에요. ✨
+      </div>
+      <div class="menu-item-15"><div class="menu-icon-15">🔄</div><div class="menu-text-15"><div class="menu-title-15">커리어 방향 재설정</div><div class="menu-sub-15">언제든 다시 인터뷰할 수 있어요</div></div><div style="color:var(--ink-mute);font-size:18px;">›</div></div>
+    </div>
+    <div class="section-card-15">
+      <div class="section-title-15" style="justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:6px;"><span>📝</span> 기본 정보</span>
+        <button id="profileEditBtn" onclick="toggleProfileEdit()" style="background:none;border:1px solid var(--line-strong);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:600;color:var(--ink-mute);cursor:pointer;font-family:inherit;">수정</button>
+      </div>
+      <!-- 보기 모드 -->
+      <div id="profileView">
+        <div class="info-row-15"><span class="info-key-15">닉네임</span><span class="info-val-15" id="viewNickname">김지현</span></div>
+        <div class="info-row-15"><span class="info-key-15">직업/분야</span><span class="info-val-15" id="viewJobField">마케팅/영업</span></div>
+        <div class="info-row-15"><span class="info-key-15">경력</span><span class="info-val-15" id="viewCareerLevel">5년차 (4~7년)</span></div>
+      </div>
+      <!-- 편집 모드 -->
+      <div id="profileEdit" style="display:none;padding:14px 16px;border-top:1px solid var(--line);">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;">닉네임</label>
+          <input id="editNickname" class="form-input" type="text" value="김지현" style="padding:10px 12px;font-size:14px;">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;">직업/분야</label>
+          <input id="editJobField" class="form-input" type="text" value="마케팅/영업" style="padding:10px 12px;font-size:14px;">
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;display:block;">경력</label>
+          <select id="editCareerLevel" class="form-input" style="padding:10px 12px;font-size:14px;appearance:auto;">
+            <option>1~3년차</option>
+            <option selected>5년차 (4~7년)</option>
+            <option>8년차 이상</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="cancelProfileEdit()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--line-strong);background:var(--bg-soft,#f5f7fa);color:var(--ink);font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;">취소</button>
+          <button onclick="saveProfileEdit()" style="flex:2;padding:11px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;">저장하기</button>
+        </div>
+      </div>
+    </div>
+    <div class="section-card-15">
+      <div class="section-title-15"><span>⚙️</span> 설정</div>
+      <div class="menu-item-15" onclick="nav('pNEW07')" style="cursor:pointer;"><div class="menu-icon-15">🔒</div><div class="menu-text-15"><div class="menu-title-15">비밀번호 변경</div></div><div style="color:var(--ink-mute);font-size:18px;">›</div></div>
+    </div>
+    <div class="section-card-15">
+      <button class="danger-btn-15" onclick="if(confirm('로그아웃 하시겠어요?'))alert('로그아웃 되었습니다.')"><span>🚪</span> 로그아웃</button>
+      <button class="danger-btn-15" style="opacity:.65;" onclick="if(confirm('정말 탈퇴하시겠어요?'))alert('탈퇴 처리되었습니다.')"><span>⚠️</span> 회원 탈퇴</button>
+    </div>
+    <div style="text-align:center;font-size:11px;color:var(--ink-mute);padding:8px 0 16px;">CareerPT v0.1.0 — Prototype</div>
+  </section>
+  <nav class="tab-bar">
+    <button class="tab-item" onclick="nav('p11')"><span class="tab-ic">🏠</span><span class="tab-label">홈</span></button>
+    <button class="tab-item" onclick="nav('p12')"><span class="tab-ic">📝</span><span class="tab-label">회고</span></button>
+    <button class="tab-item active" onclick="nav('p15')"><span class="tab-ic">👤</span><span class="tab-label">프로필</span></button>
+  </nav>
+</div>
+
+
+<!-- PAGE NEW07 — 비밀번호 변경 -->
+<div class="page" id="pNEW07">
+  <div style="position:sticky;top:0;z-index:50;display:grid;grid-template-columns:40px 1fr 40px;align-items:center;padding:14px 18px;background:var(--bg);border-bottom:1px solid var(--line);flex-shrink:0;">
+    <button onclick="navBack()" style="background:none;border:none;font-size:22px;color:var(--ink);cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;font-weight:500;">←</button>
+    <div style="text-align:center;font-weight:800;font-size:16px;color:var(--ink);">비밀번호 변경</div>
+    <div></div>
+  </div>
+  <section class="screen">
+    <!-- 안내 카드 -->
+    <div style="background:var(--accent-tint);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:24px;">
+      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px;">안전한 비밀번호로 변경해주세요</div>
+      <div style="font-size:12px;color:var(--ink-soft);line-height:1.6;">변경 후 다른 디바이스에서는 자동으로 로그아웃돼요.</div>
+    </div>
+    <!-- 현재 비밀번호 -->
+    <div class="form-group">
+      <label style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block;">현재 비밀번호</label>
+      <div style="position:relative;">
+        <input id="pw-current" class="form-input" type="password" placeholder="현재 비밀번호 입력" autocomplete="current-password" style="padding-right:44px;">
+        <button onclick="togglePwVis('pw-current','eye-cur')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--ink-mute);font-size:18px;" id="eye-cur">👁</button>
+      </div>
+      <div id="err-current" style="font-size:12px;color:var(--danger);margin-top:4px;display:none;"></div>
+    </div>
+    <!-- 새 비밀번호 -->
+    <div class="form-group">
+      <label style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block;">새 비밀번호</label>
+      <div style="position:relative;">
+        <input id="pw-new" class="form-input" type="password" placeholder="8자 이상, 영문+숫자 혼합 권장" autocomplete="new-password" oninput="checkPwStrength()" style="padding-right:44px;">
+        <button onclick="togglePwVis('pw-new','eye-new')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--ink-mute);font-size:18px;" id="eye-new">👁</button>
+      </div>
+      <!-- 강도 표시 -->
+      <div id="pw-strength-row" style="display:none;margin-top:6px;display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;height:4px;background:var(--line);border-radius:2px;overflow:hidden;"><div id="pw-strength-bar" style="height:100%;border-radius:2px;width:0%;transition:width .3s,background .3s;"></div></div>
+        <span id="pw-strength-label" style="font-size:11px;font-weight:700;color:var(--ink-mute);">-</span>
+      </div>
+      <div id="err-new" style="font-size:12px;color:var(--danger);margin-top:4px;display:none;"></div>
+    </div>
+    <!-- 새 비밀번호 확인 -->
+    <div class="form-group">
+      <label style="font-size:11px;font-weight:700;color:var(--ink-mute);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:block;">새 비밀번호 확인</label>
+      <div style="position:relative;">
+        <input id="pw-confirm" class="form-input" type="password" placeholder="새 비밀번호 재입력" autocomplete="new-password" oninput="checkPwMatch()" style="padding-right:44px;">
+        <button onclick="togglePwVis('pw-confirm','eye-con')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--ink-mute);font-size:18px;" id="eye-con">👁</button>
+      </div>
+      <div id="err-confirm" style="font-size:12px;color:var(--danger);margin-top:4px;display:none;"></div>
+    </div>
+    <!-- CTA 버튼 -->
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button onclick="navBack()" style="flex:1;padding:14px;border-radius:12px;border:1px solid var(--line-strong);background:var(--bg-soft,#f5f7fa);color:var(--ink);font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;">취소</button>
+      <button id="pw-submit-btn" onclick="submitPwChange()" style="flex:2;padding:14px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;">비밀번호 변경</button>
+    </div>
+  </section>
+</div>
+
+</div><!-- /#app -->
+
+<script>
+/* Navigation */
+const pageHistory = ['p11'];
+function nav(id, mode) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('active');
+  el.scrollTop = 0;
+  pageHistory.push(id);
+  if (id === 'p11') initHome();
+  if (id === 'p13') initCoach(mode || 'onboarding');
+  if (id === 'p14') initArchive();
+}
+function navBack() {
+  pageHistory.pop();
+  const prev = pageHistory[pageHistory.length - 1] || 'p11';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(prev).classList.add('active');
+}
+
+/* Home (p11) */
+const CURRENT_WEEK = 3;
+const weekPlan = [
+  {week:1,action:'하루 1번, 동료에게 의견 한 문장 말하기',strength:['체계'],status:'done',completed:'7/7회',badge:'🔥',comment:'완벽한 한 주!'},
+  {week:2,action:'회의록 위에 내 해석 3줄 덧붙이기',strength:['체계','분석'],status:'done',completed:'5/7회',badge:'👍',comment:'꾸준함이 쌓이고 있어요'},
+  {week:3,status:'current',target:'주 1회'},
+  {week:4,status:'future'},{week:5,status:'future'},
+  {week:6,status:'future',milestone:'🎯 중간 회고',milestoneMsg:'절반을 지나왔어요 🎉 지금까지의 행동 패턴을 한 번 돌아보는 회고를 권장해요. 작은 발견들이 쌓여 강점이 선명해져요.'},
+  {week:7,status:'future'},{week:8,status:'future'},
+  {week:9,status:'future'},{week:10,status:'future'},{week:11,status:'future'},
+  {week:12,status:'future',milestone:'🏆 12주 통합 회고',milestoneMsg:'12주가 끝났어요. 강점이 어떻게 달라졌는지, 어떤 순간에 에너지가 올랐는지 돌아보는 통합 회고를 권장해요. 다음 사이클이 더 선명해질 거예요.'}
+];
+const todayIdxH = 1;
+let dailyDone = [false,false,false,false,false,false,false];
+const dayLabelsH = ['월','화','수','목','금','토','일'];
+function toggleDay(i){ if(i>todayIdxH)return; dailyDone[i]=!dailyDone[i]; renderHome(); }
+function toggleToday(){ dailyDone[todayIdxH]=!dailyDone[todayIdxH]; renderHome(); }
+function initHome() {
+  const action = localStorage.getItem('selectedAction') || '책 한 챕터 읽고, 블로그 1편 써보기 📖';
+  const goal   = localStorage.getItem('selectedGoal')   || '비판적 사고 기르기';
+  weekPlan[2].action   = action;
+  weekPlan[2].strength = goal;
+  const tt = document.getElementById('themeTitle');
+  if(tt) tt.textContent = `"${goal}"`;
+  // 진행바 동기화
+  const pct = Math.round((CURRENT_WEEK / 12) * 100);
+  const badge = document.getElementById('tcWeekBadge');
+  const fill  = document.getElementById('tcProgFill');
+  const pctEl = document.getElementById('tcProgPct');
+  if(badge) badge.textContent = `${CURRENT_WEEK}주차 / 12주`;
+  if(fill)  fill.style.width  = pct + '%';
+  if(pctEl) pctEl.textContent = pct + '%';
+  // p12 액션 텍스트 동기화
+  const pa = document.getElementById('p12-action-text');
+  const pb = document.getElementById('p12-action-text-wknd');
+  if(pa) pa.textContent = action;
+  if(pb) pb.textContent = action;
+  renderHome();
+}
+function renderHome() {
+  const track = document.getElementById('weeksTrack');
+  if(track){
+    track.innerHTML='';
+    for(let i=1;i<=12;i++){
+      const d=document.createElement('div');
+      d.className='week-dot'+(i<CURRENT_WEEK?' done':i===CURRENT_WEEK?' current':'');
+      track.appendChild(d);
+    }
+  }
+  renderTodayCard();
+  renderTimeline();
+}
+function renderTodayCard(){
+  const el=document.getElementById('todayCard'); if(!el)return;
+  const current=weekPlan.find(w=>w.status==='current'); if(!current){el.style.display='none';return;}
+  el.style.display='block';
+  const isDone=dailyDone[todayIdxH];
+  const doneCount=dailyDone.filter(Boolean).length;
+  const daysHtml=dayLabelsH.map((d,i)=>{
+    let cls=''; const mark=dailyDone[i]?'✓':(i<=todayIdxH?'·':'');
+    if(i>todayIdxH)cls='future'; else if(i===todayIdxH)cls='today'+(dailyDone[i]?' done':''); else if(dailyDone[i])cls='done';
+    const onclick=i>todayIdxH?'':` onclick="toggleDay(${i})"`;
+    return `<div class="tc-day ${cls}"${onclick}><div class="day-letter">${d}</div><div class="day-mark">${mark}</div></div>`;
+  }).join('');
+  el.innerHTML=`
+    <div class="tc-head"><span class="tc-eyebrow">⭐ 오늘의 액션 · ${dayLabelsH[todayIdxH]}요일</span><span class="tc-progress">이번 주 <strong>${doneCount}/7</strong></span></div>
+    <div class="tc-action">${current.action}</div>
+    <div class="tc-toggle${isDone?' done':''}" onclick="toggleToday()">
+      <div class="tc-checkbox">✓</div>
+      <div><div class="tc-toggle-label">${isDone?'🎉 오늘 완료했어요!':'오늘 했나요? 탭해서 체크 👆'}</div><div class="tc-toggle-sub">${isDone?'잘했어요! 한 번의 체크가 다음 주를 만들어요 💪':'강점 「'+(current.strength||'체계')+'」을 발휘하는 시간 ✨'}</div></div>
+    </div>
+    <div class="tc-week-row">${daysHtml}</div>`;
+}
+function renderTimeline(){
+  const tl=document.getElementById('timeline'); if(!tl)return;
+  tl.innerHTML='';
+  weekPlan.forEach(w=>{
+    const item=document.createElement('div');
+    item.className='tl-item '+w.status;
+    const weekCol=document.createElement('div');
+    weekCol.className='tl-week';
+    weekCol.innerHTML=`<div class="tl-dot">${w.week}</div><div class="tl-week-label">W${w.week}</div>`;
+    const card=document.createElement('div');
+    card.className='tl-card';
+    if(w.status==='done'){
+      const badgeHtml = w.badge ? ` ${w.badge}` : '';
+      const commentHtml = w.comment ? `<span style="font-size:11px;color:var(--accent-deep);font-weight:600;">&nbsp;${w.comment}</span>` : '';
+      const strengthArr = Array.isArray(w.strength) ? w.strength : w.strength.split(/\s*[+·,]\s*/);
+      const strengthChips = strengthArr.map(s=>`<span class="strength-mini">${s.trim()}</span>`).join('');
+      card.innerHTML=`<div style="font-size:11px;font-weight:600;color:var(--accent-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px;">완료 · ${w.completed}${badgeHtml}${commentHtml}</div><div style="font-weight:700;font-size:16px;line-height:1.4;color:var(--ink);margin-bottom:10px;letter-spacing:-.015em;">${w.action}</div><div class="tl-meta" style="gap:5px;">${strengthChips}</div>`;
+    } else if(w.status==='current'){
+      const doneCount=dailyDone.filter(Boolean).length;
+      const checksHtml=dayLabelsH.map((d,i)=>{
+        const cls=dailyDone[i]?'done':(i===todayIdxH?'today':'');
+        return `<div class="tl-day ${cls}">${d}</div>`;
+      }).join('');
+      card.innerHTML=`<div class=\"tl-status\">이번 주 · 진행 중 (${doneCount}/7)</div><div class=\"tl-action\">${w.action}</div><div class=\"tl-meta\"><span class=\"strength-mini\">${w.strength}</span><span>· 목표 ${w.target}</span></div><div style=\"display:flex;gap:4px;margin-top:10px;\">${checksHtml}</div>`;
+    } else {
+      const milestoneMsg = w.milestoneMsg ? `<div style="margin-top:7px;font-size:11px;color:var(--ink-soft);line-height:1.65;">${w.milestoneMsg}</div>` : '';
+      card.innerHTML=`<div style="font-size:13px">${w.milestone?`<span style="color:var(--accent);font-weight:600;">${w.milestone}</span>${milestoneMsg}`:'🌱 코치와 함께 정해요'}</div>`;
+    }
+    item.appendChild(weekCol);
+    item.appendChild(card);
+    tl.appendChild(item);
+  });
+}
+
+/* Reflect (p12) */
+let reflectTodayIdx = 1;
+const weekdayMemos = {0:'월요일은 의지가 강했음. 30분 읽고 3줄 메모 남김.',2:'수요일은 회의 4개. 아예 시간을 못 냈음.'};
+const weekdayDates = {0:'4/22',1:'4/23',2:'4/24',3:'4/25',4:'4/26',5:'4/27',6:'4/28'};
+function setDemoDay(idx){
+  reflectTodayIdx=idx;
+  document.getElementById('btnWeekday').classList.toggle('active',idx<=4);
+  document.getElementById('btnWeekend').classList.toggle('active',idx>=5);
+  const isWeekend=idx>=5;
+  document.getElementById('reflectWeekday').style.display=isWeekend?'none':'block';
+  document.getElementById('reflectWeekend').style.display=isWeekend?'block':'none';
+  if(!isWeekend){
+    const labels=['월','화','수','목','금','토','일'];
+    document.getElementById('rwTodayLabel').textContent=labels[idx]+'요일';
+    renderWeekdayMemos();
+  } else {
+    document.getElementById('rwEndDayLabel').textContent=(reflectTodayIdx===5?'토':'일')+'요일';
+    renderWeekendMemoSummary();
+  }
+}
+function saveMemo(){
+  const ta=document.getElementById('memoText');
+  const text=ta.value.trim(); if(!text){ta.focus();return;}
+  weekdayMemos[reflectTodayIdx]=text;
+  ta.value='';
+  renderWeekdayMemos();
+  renderWeekendMemoSummary();
+  renderTimeline(); // 홈 타임라인 메모 요약 갱신
+}
+function renderWeekdayMemos(){
+  const list=document.getElementById('memoList');
+  const wrap=document.getElementById('memoListWrap');
+  const count=document.getElementById('memoCount');
+  if(!list)return;
+  const items=[];
+  for(let i=0;i<=4;i++){if(weekdayMemos[i])items.push({idx:i,text:weekdayMemos[i]});}
+  count.textContent=items.length;
+  if(items.length===0){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const labels=['월','화','수','목','금','토','일'];
+  list.innerHTML=items.map(it=>`<div class="memo-card"><div class="memo-day"><div class="day-letter">${labels[it.idx]}</div><div class="day-date">${weekdayDates[it.idx]||''}</div></div><div class="memo-text">${it.text}</div></div>`).join('');
+}
+function renderWeekendMemoSummary(){
+  const el=document.getElementById('weekendMemoSummary'); if(!el)return;
+  const labels=['월','화','수','목','금','토','일'];
+  const items=[];
+  for(let i=0;i<=4;i++){if(weekdayMemos[i])items.push({idx:i,text:weekdayMemos[i]});}
+  if(items.length===0){
+    el.innerHTML=`<div style="font-size:12px;color:var(--ink-mute);">평일 메모가 없어요. 평일 탭에서 기록해보세요.</div>`;
+    return;
+  }
+  el.innerHTML=items.map(it=>`
+    <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line);">
+      <span style="font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-light);padding:2px 7px;border-radius:999px;flex-shrink:0;white-space:nowrap;">${labels[it.idx]}</span>
+      <span style="font-size:12px;color:var(--ink-soft);line-height:1.6;">${it.text}</span>
+    </div>`).join('') + `<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">총 ${items.length}개의 메모</div>`;
+}
+
+/* ─── PAGE 13: AI 코칭 (공용) ─── */
+// coachMode: 'onboarding' | 'weekly_retro'
+let coachMode = 'onboarding';
+
+// 모드별 시나리오 정의
+const coachScenarios = {
+  onboarding: {
+    title: 'AI 코치',
+    totalQ: 6,
+    steps: [
+      { q: '안녕하세요 😊 오늘 코칭을 시작할게요.\n먼저 요즘 일하면서 가장 에너지를 얻는 순간이 언제인지 들려주실 수 있나요?', key:'satisfaction' },
+      { q: '그렇군요. 반대로, 요즘 일하면서 가장 답답하거나 막막한 순간은 언제인가요?', key:'frustration' },
+      { q: '3~5년 뒤, 어떤 모습으로 일하고 있으면 좋겠어요?', key:'vision' },
+      { q: '어떤 환경이나 방식으로 일할 때 가장 "나답다"는 느낌이 드나요?', key:'workstyle' },
+      { q: '일에서 절대 양보하기 어려운 가치 한 가지를 꼽는다면요?', key:'values' },
+      { q: '지금 가장 풀고 싶은 커리어 고민은 무엇인가요?', key:'concern' },
+    ],
+    summary: (answers) => ({
+      pattern: `"${answers.workstyle||'아직 탐색 중'}"이라고 하셨는데, ${answers.satisfaction||'말씀해주신 내용'}에서 강점이 발휘되는 결이 보여요.`,
+      action: '하루 1번, 동료에게 내 의견을 한 문장으로 말해보기',
+      strength: '「체계」 + 「분석」',
+      notice: '✅ 코칭 결과가 저장됐어요. 홈에서 이번 주 액션을 확인해보세요.',
+      primaryLabel: '홈으로 이동',
+      secondaryLabel: '다시 보기',
+      primaryAction: () => nav('p11'),
+      secondaryAction: () => { document.getElementById('p13Summary').classList.remove('show'); document.getElementById('p13Chat').scrollTop = 9999; },
+    }),
+  },
+  weekly_retro: {
+    title: '다음 주 액션 정하기',
+    totalQ: 4,
+    steps: [
+      { q: '이번 주 회고를 바탕으로 다음 주 액션을 함께 정해볼게요 🗓️\n이번 주에서 가장 인상적이었던 순간은 언제였나요?', key:'highlight' },
+      { q: '반대로, 이번 주 액션을 실행하면서 가장 어려웠던 점이 있었다면요?', key:'difficulty' },
+      { q: '그 어려움을 돌아보면, 다음 주에 하나만 다르게 해본다면 무엇을 바꿔보고 싶으세요?', key:'change' },
+      { q: '다음 주에 이어갈 액션, 지금 떠오르는 게 있으신가요? 없어도 괜찮아요 — 함께 정해드릴게요.', key:'nextAction' },
+    ],
+    summary: (answers) => ({
+      pattern: `이번 주 "${answers.difficulty||'어려움'}" 패턴이 보였어요. "${answers.change||'변화'}"를 시도해보는 게 다음 주 핵심이에요.`,
+      action: answers.nextAction && answers.nextAction.length > 4 ? answers.nextAction : '책 한 챕터 읽고, 핵심 문장 3개 밑줄 긋기',
+      strength: '「체계」 + 「학습」',
+      notice: '✅ 다음 주 액션이 저장됐어요. 홈에서 새 액션을 확인해보세요.',
+      primaryLabel: '홈에서 확인하기',
+      secondaryLabel: '추가로 더 이야기하기',
+      primaryAction: () => nav('p11'),
+      secondaryAction: () => resumeCoach(),
+    }),
+  },
+};
+
+let p13Step = 0;
+let p13Answers = {};
+let p13Typing = false;
+
+function initCoach(mode) {
+  coachMode = mode || 'onboarding';
+  p13Step = 0;
+  p13Answers = {};
+  p13Typing = false;
+
+  const sc = coachScenarios[coachMode];
+
+  // 타이틀
+  document.getElementById('p13Title').textContent = sc.title;
+
+  // 진행률 초기화 (p08 스타일: Q레이블 + 바)
+  const qLabel = document.getElementById('p13QLabel');
+  if(qLabel) qLabel.textContent = 'Q1 / ' + sc.totalQ;
+  const fill = document.getElementById('p13ProgressFill');
+  if(fill) fill.style.width = Math.round(100 / sc.totalQ) + '%';
+  const prow = document.getElementById('p13ProgressRow');
+  if(prow) prow.style.display = 'block';
+
+  // 채팅 초기화
+  const chat = document.getElementById('p13Chat');
+  chat.innerHTML = '';
+  document.getElementById('p13Summary').classList.remove('show');
+  document.getElementById('p13InputArea').style.display = 'block';
+  document.getElementById('p13Input').value = '';
+
+  // 첫 메시지
+  setTimeout(() => appendCoachMsg(sc.steps[0].q), 400);
+}
+
+function appendCoachMsg(text) {
+  const chat = document.getElementById('p13Chat');
+  const row = document.createElement('div');
+  row.className = 'msg-coach-row';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-coach-13';
+  bubble.innerHTML = text.replace(/\n/g, '<br>');
+  row.appendChild(bubble);
+  chat.appendChild(row);
+  scrollCoachChat();
+}
+function appendUserMsg(text) {
+  const chat = document.getElementById('p13Chat');
+  const div = document.createElement('div');
+  div.className = 'msg-user-13';
+  div.textContent = text;
+  chat.appendChild(div);
+  scrollCoachChat();
+}
+
+function appendTyping() {
+  const chat = document.getElementById('p13Chat');
+  const row = document.createElement('div');
+  row.className = 'msg-coach-row';
+  row.id = 'p13Typing';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-coach-13';
+  bubble.style.color = 'var(--ink-mute)';
+  bubble.style.fontSize = '13px';
+  bubble.textContent = '입력 중…';
+  row.appendChild(bubble);
+  chat.appendChild(row);
+  scrollCoachChat();
+}
+function removeTyping() {
+  const el = document.getElementById('p13Typing');
+  if (el) el.remove();
+}
+
+function scrollCoachChat() {
+  const scroll = document.getElementById('p13ChatScroll');
+  if (scroll) setTimeout(() => { scroll.scrollTop = scroll.scrollHeight; }, 50);
+}
+
+function updateP13Progress(step, total) {
+  const pct = Math.round(((step + 1) / total) * 100);
+  const qLabel = document.getElementById('p13QLabel');
+  if(qLabel) qLabel.textContent = 'Q' + Math.min(step + 1, total) + ' / ' + total;
+  const fill = document.getElementById('p13ProgressFill');
+  if(fill) fill.style.width = pct + '%';
+}
+
+function resumeCoach() {
+  // 요약 숨기고 채팅으로 복귀
+  document.getElementById('p13Summary').classList.remove('show');
+  const prow = document.getElementById('p13ProgressRow');
+  if(prow) prow.style.display = 'block';
+  document.getElementById('p13InputArea').style.display = 'block';
+  // sentinel 먼저 설정 후 코치 메시지
+  p13Step = -1;
+  p13Typing = false;
+  setTimeout(() => {
+    appendCoachMsg('액션이 마음에 들지 않으셨나요? 어떻게 바꿔드리면 좋을지 말씀해주세요. 함께 다시 정해볼게요 😊');
+    scrollCoachChat();
+  }, 200);
+}
+
+function sendCoachMsg() {
+  if (p13Typing) return;
+  const input = document.getElementById('p13Input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  appendUserMsg(text);
+
+  // 자유 대화 모드 (추가로 더 이야기하기 후)
+  if (p13Step === -1) {
+    const confirmWords = ['확정', '좋아요', '좋아', '네', '응', '맞아', 'ok', 'OK', '괜찮', '이걸로'];
+    const isConfirm = confirmWords.some(w => text.includes(w));
+    p13Typing = true;
+    appendTyping();
+    setTimeout(() => {
+      removeTyping();
+      p13Typing = false;
+      if (isConfirm) {
+        // 확정 → 요약 화면으로 전환
+        appendCoachMsg('좋아요! 확정됐어요. 다음 주도 잘 해내실 거예요 💪');
+        setTimeout(() => showP13Summary(), 800);
+      } else {
+        // 새 액션 제안으로 처리
+        const sc = coachScenarios[coachMode];
+        const result = sc.summary(Object.assign({}, p13Answers, { nextAction: text }));
+        document.getElementById('p13ActionText').textContent = result.action;
+        appendCoachMsg('알겠어요! 이렇게 바꿔볼게요 👇\n\n「' + result.action + '」\n\n이 액션으로 확정할까요?');
+      }
+    }, 900);
+    return;
+  }
+
+  const sc = coachScenarios[coachMode];
+  const currentStep = sc.steps[p13Step];
+
+  // 사용자 답변 저장
+  p13Answers[currentStep.key] = text;
+  p13Step++;
+
+  if (p13Step < sc.steps.length) {
+    p13Typing = true;
+    appendTyping();
+    updateP13Progress(p13Step, sc.totalQ);
+    setTimeout(() => {
+      removeTyping();
+      p13Typing = false;
+      appendCoachMsg(sc.steps[p13Step].q);
+    }, 900);
+  } else {
+    p13Typing = true;
+    appendTyping();
+    setTimeout(() => {
+      removeTyping();
+      p13Typing = false;
+      showP13Summary();
+    }, 1200);
+  }
+}
+
+function showP13Summary() {
+  const sc = coachScenarios[coachMode];
+  const result = sc.summary(p13Answers);
+
+  document.getElementById('p13PatternText').textContent = result.pattern;
+  document.getElementById('p13ActionText').textContent = result.action;
+  document.getElementById('p13StrengthLink').textContent = result.strength;
+  document.getElementById('p13Notice').textContent = result.notice;
+
+  // 버튼 설정
+  const btnPri = document.getElementById('p13BtnPrimary');
+  const btnSec = document.getElementById('p13BtnSecondary');
+  btnPri.textContent = result.primaryLabel;
+  btnSec.textContent = result.secondaryLabel;
+  btnPri.onclick = result.primaryAction;
+  btnSec.onclick = result.secondaryAction;
+
+  // 입력창 숨기고 요약 표시
+  document.getElementById('p13InputArea').style.display = 'none';
+  const prow2 = document.getElementById('p13ProgressRow');
+  if(prow2) prow2.style.display = 'none';
+  const summary = document.getElementById('p13Summary');
+  summary.classList.add('show');
+  summary.scrollTop = 0;
+
+  // action 저장 (위클리 회고 모드일 때 홈에 반영)
+  if (coachMode === 'weekly_retro') {
+    localStorage.setItem('selectedAction', result.action);
+    initHome();
+  }
+}
+
+/* Profile edit (p15) */
+function toggleProfileEdit(){
+  const view=document.getElementById('profileView');
+  const edit=document.getElementById('profileEdit');
+  const btn=document.getElementById('profileEditBtn');
+  const isEditing=edit.style.display!=='none';
+  view.style.display=isEditing?'block':'none';
+  edit.style.display=isEditing?'none':'block';
+  btn.textContent=isEditing?'수정':'닫기';
+}
+function cancelProfileEdit(){
+  document.getElementById('editNickname').value=document.getElementById('viewNickname').textContent;
+  document.getElementById('editJobField').value=document.getElementById('viewJobField').textContent;
+  toggleProfileEdit();
+}
+function saveProfileEdit(){
+  const nickname=document.getElementById('editNickname').value.trim();
+  const jobField=document.getElementById('editJobField').value.trim();
+  const career=document.getElementById('editCareerLevel').value;
+  if(!nickname){document.getElementById('editNickname').focus();return;}
+  document.getElementById('viewNickname').textContent=nickname;
+  document.getElementById('viewJobField').textContent=jobField;
+  document.getElementById('viewCareerLevel').textContent=career;
+  const pname=document.querySelector('.profile-name');
+  if(pname) pname.textContent=nickname;
+  const hiEl=document.querySelector('.home-greeting .hi em');
+  if(hiEl) hiEl.textContent=nickname+'님';
+  toggleProfileEdit();
+  const btn=document.getElementById('profileEditBtn');
+  btn.textContent='✓ 저장됨';
+  btn.style.color='var(--success)';
+  btn.style.borderColor='var(--success)';
+  setTimeout(()=>{btn.textContent='수정';btn.style.color='';btn.style.borderColor='';},1800);
+}
+
+
+function saveRetro(){
+  const ta=document.getElementById('retroText');
+  if(!ta||!ta.value.trim()){ta&&ta.focus();return;}
+  const btn=document.querySelector('#reflectWeekend .btn-full');
+  if(btn){
+    btn.textContent='✓ 저장 완료';
+    btn.style.background='var(--success)';
+    btn.disabled=true;
+    setTimeout(()=>{btn.textContent='회고 저장하기';btn.style.background='var(--accent)';btn.disabled=false;},2000);
+  }
+  // 다음 주 액션 CTA 표시
+  const cta=document.getElementById('nextWeekCta');
+  if(cta){cta.style.display='block';cta.scrollIntoView({behavior:'smooth',block:'nearest'});}
+}
+
+/* Archive (p14) */
+const insightHistory = [
+  {week:1,date:'4/9 일',topic:'12주 테마 정하기',pattern:'입력은 풍부하지만 출력 비율이 낮음 — 「학습」+「수집」의 그림자',action:'하루 1번, 동료에게 의견 한 문장 말하기',strengthLink:'「체계」'},
+  {week:2,date:'4/16 일',topic:'에너지가 새는 회의 줄이기',pattern:'「개별화」 강점이 다대다 회의에서 소진됨',action:'회의록 위에 내 해석 3줄 덧붙이기',strengthLink:'「체계」 + 「분석」'},
+  {week:3,date:'4/23 화',topic:'팀에서 의견을 분명하게 말하기',pattern:'"정리되기 전엔 말하지 않는다" — 「체계」 강점의 그림자',action:'책 한 챕터 읽고, 블로그 1편 써보기',strengthLink:'「체계」 + 「학습」'},
+];
+function initArchive(){
+  const list=document.getElementById('archiveList'); if(!list)return;
+  const sorted=[...insightHistory].sort((a,b)=>b.week-a.week);
+  list.innerHTML=sorted.map(it=>`
+    <div class="archive-card">
+      <div class="archive-week">W${it.week} · ${it.date}</div>
+      <div class="archive-topic">${it.topic}</div>
+      <div class="archive-row"><span class="archive-label">패턴</span><span class="archive-body">${it.pattern}</span></div>
+      <div class="archive-row"><span class="archive-label">액션</span><span class="archive-body">${it.action}</span></div>
+      <div class="archive-row"><span class="archive-label">강점</span><span class="archive-strength">${it.strengthLink}</span></div>
+    </div>`).join('');
+}
+
+/* NEW07 — 비밀번호 변경 */
+function togglePwVis(inputId, btnId) {
+  const inp = document.getElementById(inputId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+function checkPwStrength() {
+  const val = document.getElementById('pw-new').value;
+  const bar = document.getElementById('pw-strength-bar');
+  const label = document.getElementById('pw-strength-label');
+  const row = document.getElementById('pw-strength-row');
+  if(!val){row.style.display='none';return;}
+  row.style.display='flex';
+  let score=0;
+  if(val.length>=8)score++;
+  if(/[a-zA-Z]/.test(val)&&/[0-9]/.test(val))score++;
+  if(val.length>=12)score++;
+  const levels=[{w:'33%',bg:'var(--danger)',t:'약함'},{w:'66%',bg:'var(--warning)',t:'보통'},{w:'100%',bg:'var(--success)',t:'강함'}];
+  const lv=levels[Math.min(score,2)];
+  bar.style.width=lv.w; bar.style.background=lv.bg; label.textContent=lv.t;
+  label.style.color=lv.bg;
+}
+function checkPwMatch() {
+  const nv=document.getElementById('pw-new').value;
+  const cv=document.getElementById('pw-confirm').value;
+  const err=document.getElementById('err-confirm');
+  if(cv&&nv!==cv){err.textContent='비밀번호가 일치하지 않아요';err.style.display='block';}
+  else{err.style.display='none';}
+}
+function submitPwChange() {
+  const cur=document.getElementById('pw-current').value.trim();
+  const nv=document.getElementById('pw-new').value.trim();
+  const cv=document.getElementById('pw-confirm').value.trim();
+  const errC=document.getElementById('err-current');
+  const errN=document.getElementById('err-new');
+  const errCon=document.getElementById('err-confirm');
+  [errC,errN,errCon].forEach(e=>e.style.display='none');
+  if(!cur){errC.textContent='현재 비밀번호를 입력해주세요';errC.style.display='block';document.getElementById('pw-current').focus();return;}
+  if(nv.length<8){errN.textContent='비밀번호는 최소 8자 이상이어야 해요';errN.style.display='block';document.getElementById('pw-new').focus();return;}
+  if(nv!==cv){errCon.textContent='비밀번호가 일치하지 않아요';errCon.style.display='block';document.getElementById('pw-confirm').focus();return;}
+  const btn=document.getElementById('pw-submit-btn');
+  btn.disabled=true; btn.textContent='변경 중…';
+  setTimeout(()=>{
+    btn.disabled=false; btn.textContent='비밀번호 변경';
+    // 성공 처리
+    ['pw-current','pw-new','pw-confirm'].forEach(id=>{document.getElementById(id).value='';});
+    document.getElementById('pw-strength-row').style.display='none';
+    alert('비밀번호가 변경되었어요 ✅');
+    nav('p11');
+  },1200);
+}
+
+/* Init */
+document.addEventListener('DOMContentLoaded', () => {
+  initHome();
+  initArchive();
+});
+</script>
+</body>
+</html>
