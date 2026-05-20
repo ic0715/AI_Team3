@@ -14,12 +14,19 @@
   --text-primary:  #111827;
   --text-secondary:#6B7280;
   --text-muted:    #9CA3AF;
-  --ink:           #111827;
-  --ink-mute:      #9CA3AF;
+  --ink:           #111418;
+  --ink-soft:      #3f4651;
+  --ink-mute:      #8b93a0;
 
   /* 보더 */
   --border:        #E5E7EB;
   --border-strong: #D1D5DB;
+  --line:          #e8eaee;
+  --line-strong:   #d3d7de;
+
+  /* 액센트 확장 */
+  --accent-soft:   #dbeafe;
+  --accent-tint:   #eff6ff;
 
   /* 상태 */
   --danger:        #EF4444;
