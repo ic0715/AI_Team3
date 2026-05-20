@@ -1,11 +1,13 @@
 # 레포지토리 구조 현황 및 팀 체크리스트
 
-> 최종 업데이트: 2026-05-13
-> 기준: `main` 최신 (908b956 커밋 완료)
+> 최종 업데이트: 2026-05-20
+> 기준: `main` 최신 (908b956) + post-MVP v2 스펙 반영
+
+> 설계 원칙·라우트 흐름·데이터 레이어는 [`ARCHITECTURE.md`](ARCHITECTURE.md)를 참조하세요.
 
 ---
 
-## 1. 전체 폴더 구조 (GitHub main 현재 상태)
+## 1. 전체 폴더 구조
 
 ```
 AI_Team3/                                   ← 레포 루트
@@ -13,12 +15,19 @@ AI_Team3/                                   ← 레포 루트
 ├── .gitignore                              ✅
 │
 ├── docs/                                   ← 문서 전용 (코드 없음)
-│   ├── STRUCTURE.md                        ✅ 이 파일
+│   ├── ARCHITECTURE.md                     ✅ 설계·라우트·데이터 레이어
+│   ├── STRUCTURE.md                        ✅ 이 파일 (현황·체크리스트)
 │   ├── README.md / MANIFESTO.md 외         ✅
 │   ├── functional_spec/
-│   │   ├── _mvp/                           ✅ 현재 구현 대상 스펙 14개
-│   │   └── _post_mvp/                      ✅ MVP 이후 보존 10개
-│   ├── ai_prompt/                          ✅ AI 프롬프트 문서
+│   │   ├── _mvp/                           ✅ MVP 스펙 (구현 기준)
+│   │   ├── _post_mvp_v1/                   ✅ pivot 이전 설계안 (보존용)
+│   │   └── _post_mvp_v2/                   ✅ home_0520.html 기반 (구현 기준)
+│   │       ├── 11_home.md
+│   │       ├── 12_reflect.md
+│   │       ├── 13_reflect_ai_coach.md
+│   │       └── 15_profile.md
+│   ├── ai_prompt/
+│   │   └── 06_reflect_coaching.md          ✅ 회고 AI 코칭 명세 v1.2
 │   ├── schema/                             ✅ DB/API 스키마 문서
 │   └── prototypes/                         ✅ HTML 프로토타입 아카이브
 │
@@ -29,22 +38,38 @@ AI_Team3/                                   ← 레포 루트
     │
     ├── app/
     │   ├── layout.tsx                      ✅ 루트 레이아웃 (Pretendard, metadata)
-    │   ├── page.tsx                        ✅ p01 랜딩
+    │   ├── page.tsx                        ✅ 01_landing
     │   ├── error.tsx                       ✅ NEW06 런타임 Error Boundary
     │   ├── not-found.tsx                   ✅ NEW06 404
     │   ├── login/
-    │   │   └── page.tsx                    ✅ p02 로그인/회원가입
+    │   │   └── page.tsx                    ✅ 02_login
     │   ├── auth/
     │   │   └── callback/route.ts           ✅ Google OAuth 콜백
-    │   ├── verify-email/                   ⬜ NEW01 미구현 (.gitkeep)
+    │   ├── verify-email/
+    │   │   └── page.tsx                    ⬜ NEW01 미구현
     │   ├── onboarding/
-    │   │   ├── profile/page.tsx            ✅ p03 기본 정보
-    │   │   ├── strengths/                  ⬜ p04 미구현
-    │   │   ├── career-intro/               ⬜ p07 미구현
-    │   │   ├── career-interview/           ⬜ p08 미구현
-    │   │   ├── career-result/              ⬜ p09 미구현
-    │   │   ├── action-items/               ⬜ p10 미구현
-    │   │   └── complete/                   ⬜ NEW02 미구현
+    │   │   ├── profile/
+    │   │   │   └── page.tsx                ✅ 03_basic_info
+    │   │   ├── strengths/
+    │   │   │   └── page.tsx                ⬜ 04_strength_choice 미구현
+    │   │   ├── career-intro/
+    │   │   │   └── page.tsx                ⬜ 07_career_intro 미구현
+    │   │   ├── career-interview/
+    │   │   │   └── page.tsx                ⬜ 08_career_interview 미구현
+    │   │   ├── career-result/
+    │   │   │   └── page.tsx                ⬜ 09_career_result 미구현
+    │   │   ├── action-items/
+    │   │   │   └── page.tsx                ⬜ 10_action_items 미구현
+    │   │   └── complete/
+    │   │       └── page.tsx                ⬜ NEW02 미구현
+    │   ├── home/
+    │   │   └── page.tsx                    ⬜ 11_home 미구현 (post-MVP v2)
+    │   ├── reflect/
+    │   │   ├── page.tsx                    ⬜ 12_reflect 미구현 (post-MVP v2)
+    │   │   └── ai-coach/
+    │   │       └── page.tsx                ⬜ 13_reflect_ai_coach 미구현 (post-MVP v2)
+    │   ├── profile/
+    │   │   └── page.tsx                    ⬜ 15_profile 미구현 (post-MVP v2)
     │   └── error/
     │       └── network/page.tsx            ✅ NEW05 네트워크 오류
     │
@@ -71,90 +96,9 @@ AI_Team3/                                   ← 레포 루트
 
 ---
 
-## 2. 아키텍처 흐름
+## 2. 구현 진행 현황
 
-```
-사용자
-  │
-  ▼
-app/page.tsx  (랜딩, p01)
-  │  로그인 상태 확인 (Supabase)
-  │
-  ├─ 비로그인 → 랜딩 화면 노출
-  │
-  └─ 로그인 → DB 상태에 따라 자동 라우팅
-       ├─ 이메일 미인증          → /login
-       ├─ profile 미완료         → /onboarding/profile
-       ├─ 강점 미선택            → /onboarding/strengths
-       ├─ 커리어 인터뷰 미완료   → /onboarding/career-intro
-       ├─ 역량 미선택            → /onboarding/career-result
-       ├─ 액션 미선택            → /onboarding/action-items
-       ├─ goal active/paused    → /home  (post-MVP)
-       └─ goal completed        → /cycle-complete  (post-MVP)
-
-app/login/page.tsx  (로그인/회원가입, p02)
-  ├─ 이메일 로그인 / 회원가입
-  ├─ Google OAuth → app/auth/callback/route.ts
-  ├─ 비밀번호 재설정 (패널 전환)
-  └─ 이메일 인증 대기 (패널 전환, verify-email 패널 내장)
-
-app/onboarding/
-  ├─ profile/page.tsx    (p03) ✅ 기본 정보 입력 → profiles 테이블
-  ├─ strengths/          (p04) ⬜ 강점 선택 → strength_analyses 테이블
-  ├─ career-intro/       (p07) ⬜ 커리어 인터뷰 안내
-  ├─ career-interview/   (p08) ⬜ AI 인터뷰 → career_interview_results 테이블
-  ├─ career-result/      (p09) ⬜ 역량 선택 → goals 테이블
-  ├─ action-items/       (p10) ⬜ 액션 선택 → action_items 테이블
-  └─ complete/           (NEW02) ⬜ 온보딩 완료
-
-공통 레이어
-  lib/supabase/client.ts   ← 모든 페이지가 사용하는 DB 연결
-  lib/constants/           ← 강점·역량·액션 데이터 (하드코딩 제거)
-  styles/globals.css       ← CSS 변수 + 전역 스타일
-```
-
----
-
-## 3. 핵심 개발 규칙 (팀 공통)
-
-### Supabase 클라이언트
-```ts
-// ✅ 모든 페이지에서 이렇게 import
-import { supabase } from '@/lib/supabase/client'
-
-// ❌ 직접 createClient() 호출 금지 (auth/callback/route.ts 제외)
-```
-
-### 경로 alias
-```ts
-// tsconfig의 "@/*": ["./*"] 설정에 따라
-import { STRENGTHS } from '@/lib/constants/strengths'   // ✅
-import { STRENGTHS } from '../../lib/constants/strengths' // ❌
-```
-
-### 상수 데이터
-```
-lib/constants/strengths.ts    → 강점 칩 (p04에서 사용)
-lib/constants/competencies.ts → 역량 카드 (p09에서 사용)
-lib/constants/seeds.ts        → 액션 아이템 (p10에서 사용)
-```
-페이지 파일 안에 강점·역량·액션 데이터를 직접 작성하지 않는다.
-
-### 스타일
-- CSS 변수는 `styles/globals.css`의 `:root` 블록에 정의되어 있음
-- 페이지는 `style={{ color: 'var(--accent)' }}` 방식으로 CSS 변수를 사용 중
-- Tailwind 클래스는 `layout.tsx`의 구조 수준에서만 사용
-
-### 환경변수 설정
-```bash
-# 로컬 개발 시작 전 필수
-cp .env.example web/.env.local
-# web/.env.local에 실제 Supabase URL/KEY 입력
-```
-
----
-
-## 4. 구현 진행 현황
+### MVP
 
 | 스펙 | 라우트 | 상태 |
 |------|--------|------|
@@ -171,49 +115,77 @@ cp .env.example web/.env.local
 | NEW05_network_error | `app/error/network/page.tsx` | ✅ 완료 |
 | NEW06_general_error | `app/error.tsx` + `app/not-found.tsx` | ✅ 완료 |
 
-**진행률: 5 / 12 완료**
+**MVP 진행률: 5 / 12 완료**
+
+### post-MVP v2
+
+| 스펙 | 라우트 | 상태 |
+|------|--------|------|
+| 11_home | `app/home/page.tsx` | ⬜ 미구현 |
+| 12_reflect | `app/reflect/page.tsx` | ⬜ 미구현 |
+| 13_reflect_ai_coach | `app/reflect/ai-coach/page.tsx` | ⬜ 미구현 |
+| 15_profile | `app/profile/page.tsx` | ⬜ 미구현 |
+
+> post-MVP 구현은 MVP 완료 후 시작 예정 (`feature/home` 브랜치부터)
 
 ---
 
-## 5. 팀 체크리스트
+## 3. 핵심 개발 규칙
 
-### 🟡 결정 필요 (개발 시작 전 합의)
+### Supabase 클라이언트
+```ts
+// ✅ 모든 페이지에서 이렇게 import
+import { supabase } from '@/lib/supabase/client'
 
-**① `app/verify-email/` 라우트 필요 여부**
+// ❌ 직접 createClient() 호출 금지 (auth/callback/route.ts 제외)
+```
 
-현재 `login/page.tsx` 안에 이메일 인증 대기 패널이 내장되어 있음 (`PanelType = 'verify-email'`).
-NEW01 스펙의 이메일 인증 화면을 별도 라우트(`/verify-email`)로 분리할지, 아니면 지금처럼 로그인 페이지 내 패널로 유지할지 결정 필요.
+### 경로 alias
+```ts
+import { STRENGTHS } from '@/lib/constants/strengths'    // ✅
+import { STRENGTHS } from '../../lib/constants/strengths' // ❌
+```
 
-| 선택 | 장점 | 단점 |
-|------|------|------|
-| 별도 라우트 유지 | URL로 직접 접근 가능, 명확한 상태 구분 | 로그인 페이지와 상태 공유 필요 |
-| 로그인 패널로 유지 | 이미 구현됨, 상태 공유 간단 | `/verify-email` 폴더가 사용 안 됨 |
+### 상수 데이터
+페이지 파일 안에 강점·역량·액션 데이터를 직접 작성하지 않습니다.
+```
+lib/constants/strengths.ts    → 강점 칩 (p04)
+lib/constants/competencies.ts → 역량 카드 (p09)
+lib/constants/seeds.ts        → 액션 아이템 (p10)
+```
 
-### ✅ 완료된 정리 작업
+### 스타일
+- CSS 변수는 `styles/globals.css`의 `:root`에 정의
+- 페이지는 `style={{ color: 'var(--accent)' }}` 방식으로 참조
+- Tailwind는 `layout.tsx` 구조 수준에서만 사용
 
-**② `config.example.js` 삭제** — 완료 (908b956)
+---
 
-**③ `styles/tokens.css` 삭제** — 완료 (908b956). `globals.css` 단일 파일로 유지.
+## 4. 팀 체크리스트
 
-**⑦ `lib/hooks/useOnboardingGuard.ts` 구현** — 완료 (908b956). 각 온보딩 페이지에서 `const { ready } = useOnboardingGuard("strengths")` 형태로 사용.
+### 🔵 구현 시 참고
 
-### 🔵 구현 시 참고사항
+**`onboarding/profile/page.tsx` 상수 인라인 정의**
+`JOB_OPTIONS`, `CAREER_OPTIONS`, `GENDER_OPTIONS`가 페이지 파일에 직접 정의되어 있음. 다른 페이지에서 재사용이 필요해지면 `lib/constants/`로 이동.
 
-**④ `onboarding/profile/page.tsx` 상수 인라인 정의**
+**`app/auth/callback/route.ts` Supabase 클라이언트**
+서버 Route Handler이므로 직접 `createClient()` 호출이 정상. 서버 컴포넌트 필요 시 `lib/supabase/server.ts` 별도 생성.
 
-현재 `JOB_OPTIONS`, `CAREER_OPTIONS`, `GENDER_OPTIONS`가 페이지 파일 안에 직접 정의되어 있음.
-다른 페이지에서 재사용이 필요해지면 `lib/constants/`로 이동 검토.
-(현재 profile 페이지에서만 쓰이므로 급하지 않음)
-
-**⑤ `app/auth/callback/route.ts` Supabase 클라이언트**
-
-이 파일은 서버에서 실행되는 Route Handler이므로 브라우저용 `@/lib/supabase/client`를 사용할 수 없어 직접 `createClient()`를 호출. 정상 동작임. 추후 서버 컴포넌트가 필요해지면 `lib/supabase/server.ts`를 별도로 만들어야 함.
-
-**⑥ `lib/types/database.ts` / `api.ts` 작성 시점**
-
-현재 빈 파일. Supabase에서 타입 자동 생성 명령어:
+**`lib/types/database.ts` 작성 시점**
+DB 스키마 확정 후 자동 생성:
 ```bash
 cd web
 npx supabase gen types typescript --project-id <project-id> > lib/types/database.ts
 ```
-DB 스키마가 확정되면 생성 권장.
+
+**`app/verify-email/` 라우트 처리**
+현재 `login/page.tsx` 안에 이메일 인증 대기 패널이 내장되어 있음 (`PanelType = 'verify-email'`).
+별도 라우트로 분리할지 현재 구조 유지할지 결정 필요.
+
+### ✅ 완료된 작업
+
+- `config.example.js` 삭제 (908b956)
+- `styles/tokens.css` 삭제 — `globals.css` 단일 파일로 유지 (908b956)
+- `lib/hooks/useOnboardingGuard.ts` 구현 (908b956)
+- post-MVP v2 스펙 문서 작성 (`_post_mvp_v2/` 4개 파일)
+- `06_reflect_coaching.md` v1.2 작성
