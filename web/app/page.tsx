@@ -230,15 +230,12 @@ export default function LandingPage() {
         </main>
       </div>
 
-      {/* ── 하단 CTA (sticky — 항상 뷰포트 하단 고정) ── */}
+      {/* ── 하단 CTA (자연 문서 흐름 — 스크롤 후 클릭) ── */}
       <footer style={{
-        position: 'sticky',
-        bottom: 0,
-        padding: '14px 22px',
-        paddingBottom: 'max(18px, env(safe-area-inset-bottom))',
+        padding: '16px 22px',
+        paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
         borderTop: '1px solid var(--border)',
         background: 'var(--surface)',
-        zIndex: 20,
       }}>
         <button
           onClick={() => router.push('/login?tab=signup')}
@@ -248,6 +245,7 @@ export default function LandingPage() {
             color: '#fff', border: 'none', fontFamily: 'inherit',
             fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
             cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(45,91,255,.3)',
           }}
         >
           동의하고 시작하기 →
