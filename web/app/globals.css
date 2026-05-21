@@ -34,6 +34,13 @@ body {
 /* iOS Safari: input 포커스 시 자동 확대 방지 (font-size 16px 미만이면 확대됨) */
 input, textarea, select {
   font-size: 16px;
+  line-height: 1.5;
+}
+
+/* iOS Safari: type="date" 기본 높이를 text input과 동일하게 */
+input[type="date"] {
+  min-height: unset;
+  line-height: 1.5;
 }
 
 ::-webkit-scrollbar {

@@ -530,7 +530,8 @@ const sectionDescStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '12px 14px',
   border: '1.5px solid var(--border)', borderRadius: 'var(--radius-md)',
-  fontSize: '15px', fontFamily: 'inherit', color: 'var(--text-primary)',
+  fontSize: '16px', lineHeight: '1.5', // date input 높이를 text input과 동일하게 맞춤
+  fontFamily: 'inherit', color: 'var(--text-primary)',
   background: 'var(--surface)', outline: 'none',
 };
 

@@ -755,6 +755,7 @@ function ConsentRow({
 const inputStyle: React.CSSProperties = {
   width: '100%',
   fontSize: '16px', // iOS Safari: 16px 미만이면 포커스 시 자동 확대됨
+  lineHeight: '1.5', // date input 높이를 text input과 동일하게 맞춤
   padding: '12px 14px',
   borderRadius: 'var(--radius-sm)',
   border: '1.5px solid var(--border)',
