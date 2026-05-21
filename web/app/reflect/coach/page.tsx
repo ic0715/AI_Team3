@@ -1,0 +1,940 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import type { CSSProperties } from 'react';
+import { supabase } from '@/lib/supabase/client';
+
+// ────────────────────────────────────────────────────────────
+// 13 회고 AI 코칭 — 채팅 + 다음 주 액션 정하기 (스펙 v1.1)
+//
+// MVP는 시나리오 기반 정적 플로우 (mock). 추후 Claude API 스트리밍 연동.
+// AI 연동 인터페이스는 generatePersonalizedTexts/Actions와 동일 패턴.
+// 자세한 인계 내용은 docs/HANDOFF_AI.md (Phase 1.7 신설 예정) 참조.
+// ────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────
+// 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
+//
+// 현재: mock 구현 (Q1~Q4 시나리오 순차 응답 + 정적 요약)
+// 교체: sendCoachMessage / finalizeCoaching 함수 본문을 Claude API 호출로 변경
+//
+// 자세한 명세는 docs/HANDOFF_AI.md (Phase 1.7) 참조 — 추가 예정.
+// 본 화면의 AI 동작은 docs/ai_prompt/06_reflect_coaching.md 를 구현 기준으로 따름.
+// ─────────────────────────────────────────────────────────────
+
+interface Message {
+  id: string;
+  role: 'coach' | 'user';
+  content: string;
+}
+
+interface CoachContext {
+  nickname: string;
+  goal: { id: string; goal_title: string; current_week: number; competency_code: string };
+  topStrength: string | null;
+  weeklyRetro: string;
+  doneCountWeek: number;
+}
+
+interface CoachMessageParams {
+  history: Message[];
+  context: CoachContext;
+  questionIndex: number; // 1~4
+  isRenegotiate: boolean;
+}
+
+interface CoachMessageResult {
+  content: string;
+  nextQuestionIndex: number; // 다음 Q index, 4 초과 시 종료
+  isComplete: boolean;
+}
+
+interface CoachingResult {
+  topic: string;
+  patternInsight: string;
+  nextActionTitle: string;
+  strengthLink: string;
+}
+
+// ── 🤖 mock — 코치 메시지 (Q1~Q4 시나리오) ─────────────────────
+async function sendCoachMessage(params: CoachMessageParams): Promise<CoachMessageResult> {
+  const { questionIndex, isRenegotiate, context } = params;
+  await new Promise((r) => setTimeout(r, 900));
+
+  if (isRenegotiate) {
+    return {
+      content: '어떤 액션이 더 잘 맞을 것 같아요? 자유롭게 말씀해주세요.',
+      nextQuestionIndex: questionIndex,
+      isComplete: false,
+    };
+  }
+
+  // Q2: 강점 언급 / Q3: 다음 주 방향 / Q4: 액션 제안 + 확정
+  const strength = context.topStrength ?? '집중';
+  const nextIndex = questionIndex + 1;
+
+  const QUESTIONS: Record<number, string> = {
+    2: `이번 주 회고를 보니 ${context.doneCountWeek}/7로 진행하셨네요. 그 중 가장 인상 깊었던 한 가지는 뭐였어요?`,
+    3: `그 부분에서 강점 「${strength}」이(가) 작동한 것 같아요. 다음 주에는 어떤 방향으로 이어가고 싶으세요?`,
+    4: `좋아요. 그 방향이라면 "${context.goal.goal_title}" 흐름에서 한 단계 더 깊게 가볼 수 있어요. 다음 주에 ${nextIndex - 3}회 정도 실행 가능한 작은 액션 하나를 떠올려볼까요? 이 액션으로 다음 주 시작해볼까요?`,
+  };
+
+  if (questionIndex >= 4) {
+    return {
+      content: '좋아요, 그 액션으로 다음 주 정리할게요. 잠시만 기다려주세요...',
+      nextQuestionIndex: 5,
+      isComplete: true,
+    };
+  }
+
+  return {
+    content: QUESTIONS[nextIndex] ?? '이야기 잘 들었어요.',
+    nextQuestionIndex: nextIndex,
+    isComplete: false,
+  };
+}
+
+// ── 🤖 mock — 종료 시 coaching_insights + action_items INSERT ──
+async function finalizeCoaching(
+  history: Message[],
+  context: CoachContext,
+  userId: string,
+): Promise<CoachingResult> {
+  await new Promise((r) => setTimeout(r, 1500));
+
+  // 사용자가 마지막에 말한 내용을 next_action_title로 활용 (mock 단순화)
+  const lastUserMsg = [...history].reverse().find((m) => m.role === 'user');
+  const nextActionTitle =
+    lastUserMsg?.content?.slice(0, 50) ??
+    `${context.goal.goal_title} — 다음 주 첫 실행`;
+
+  const result: CoachingResult = {
+    topic: context.goal.goal_title,
+    patternInsight:
+      context.doneCountWeek >= 5
+        ? '꾸준함이 쌓이고 있어요. 다음 주는 깊이를 한 단계 더 시도해봐도 좋아요.'
+        : context.doneCountWeek >= 2
+          ? '실행과 회피의 패턴이 보여요. 다음 주는 트리거를 명확히 정해두면 좋겠어요.'
+          : '실행이 어려웠던 한 주였네요. 다음 주는 더 작은 단위로 시작해볼까요?',
+    nextActionTitle,
+    strengthLink: context.topStrength ?? '집중',
+  };
+
+  // coaching_insights INSERT
+  const { error: insightErr } = await supabase.from('coaching_insights').insert({
+    user_id: userId,
+    goal_id: context.goal.id,
+    week_number: context.goal.current_week,
+    topic: result.topic,
+    pattern_insight: result.patternInsight,
+    next_action_title: result.nextActionTitle,
+    strength_link: result.strengthLink,
+  });
+  if (insightErr) {
+    console.error('[13] coaching_insights INSERT:', insightErr);
+  }
+
+  // action_items INSERT (다음 주차)
+  // strength_link는 schema 없을 수 있어 INSERT에서 제외
+  const { error: actionErr } = await supabase.from('action_items').insert({
+    user_id: userId,
+    goal_id: context.goal.id,
+    week_number: context.goal.current_week + 1,
+    title: result.nextActionTitle,
+    description: result.patternInsight,
+    tags: [],
+    is_custom: false,
+    source_seed_id: null,
+  });
+  if (actionErr) {
+    console.error('[13] action_items INSERT:', actionErr);
+  }
+
+  return result;
+}
+// ─────────────────────────────────────────────────────────────
+
+const TOTAL_Q = 4;
+const CONFIRM_WORDS = ['확정', '좋아요', '네', '응', '맞아', 'OK', 'ok', '괜찮', '이걸로'];
+
+function isConfirmation(text: string): boolean {
+  const t = text.trim();
+  return CONFIRM_WORDS.some((w) => t.includes(w));
+}
+
+// ────────────────────────────────────────────────────────────
+// 페이지 export
+// ────────────────────────────────────────────────────────────
+
+export default function CoachPage() {
+  return (
+    <Suspense fallback={<LoadingScreen text="코치를 준비하고 있어요..." />}>
+      <CoachContent />
+    </Suspense>
+  );
+}
+
+function CoachContent() {
+  const router = useRouter();
+
+  const [userId, setUserId] = useState<string | null>(null);
+  const [context, setContext] = useState<CoachContext | null>(null);
+  const [loadingContext, setLoadingContext] = useState(true);
+  const [contextError, setContextError] = useState<string | null>(null);
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [questionIndex, setQuestionIndex] = useState(1); // 1~4
+  const [isComplete, setIsComplete] = useState(false);
+  const [isRenegotiate, setIsRenegotiate] = useState(false);
+
+  const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [summary, setSummary] = useState<CoachingResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ── 컨텍스트 로드 + 첫 코치 메시지 ────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.replace('/login');
+          return;
+        }
+        if (cancelled) return;
+        setUserId(user.id);
+
+        // active goal + this week's weekly_retros 필수
+        const [profileRes, goalRes, strengthRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('nickname')
+            .eq('id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('goals')
+            .select('id, goal_title, current_week, competency_code')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('strength_analyses')
+            .select('strengths')
+            .eq('user_id', user.id)
+            .eq('is_latest', true)
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        if (cancelled) return;
+        if (!goalRes.data) {
+          router.replace('/onboarding/action-items');
+          return;
+        }
+
+        const goal = goalRes.data as CoachContext['goal'];
+
+        // weekly_retros for this week + action_completions 병렬
+        const [retroRes, completionRes] = await Promise.all([
+          supabase
+            .from('weekly_retros')
+            .select('summary_one_line, completion_count, target_count')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .eq('week_number', goal.current_week)
+            .order('retro_date', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('action_completions')
+            .select('completed_date')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .eq('week_number', goal.current_week),
+        ]);
+
+        if (cancelled) return;
+
+        // ⚠️ 테스트용 — production 복구 필요
+        // 원래 동작: weekly_retros 미저장이면 /reflect로 리다이렉트
+        // if (!retroRes.data) {
+        //   router.replace('/reflect');
+        //   return;
+        // }
+
+        const strengths = (strengthRes.data?.strengths as Array<{ name_ko: string }> | undefined) ?? [];
+        const ctx: CoachContext = {
+          nickname: profileRes.data?.nickname ?? '친구',
+          goal,
+          topStrength: strengths[0]?.name_ko ?? null,
+          weeklyRetro: retroRes.data?.summary_one_line ?? '',
+          doneCountWeek:
+            (retroRes.data?.completion_count as number | undefined) ??
+            (completionRes.data?.length ?? 0),
+        };
+        setContext(ctx);
+
+        // 첫 코치 메시지 (위클리 회고 없으면 인용 라인 생략)
+        const retroQuote = ctx.weeklyRetro ? `\n\n"${ctx.weeklyRetro}"` : '';
+        const openingMessage: Message = {
+          id: crypto.randomUUID(),
+          role: 'coach',
+          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${ctx.goal.current_week} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
+        };
+        setMessages([openingMessage]);
+        setLoadingContext(false);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setContextError('컨텍스트를 불러올 수 없어요.');
+          setLoadingContext(false);
+        }
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [router]);
+
+  // 스크롤 자동 따라가기
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isSending]);
+
+  // ── 메시지 전송 ───────────────────────────────────────────
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || isSending || !context || !userId) return;
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: input.trim(),
+    };
+    const inputCopy = input.trim();
+    setInput('');
+    setIsSending(true);
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
+
+    try {
+      // 재협의 모드에서 확정어 감지 → 요약 재표시
+      if (isRenegotiate && isConfirmation(inputCopy)) {
+        await new Promise((r) => setTimeout(r, 900));
+        setIsRenegotiate(false);
+        setIsComplete(true);
+        setIsSending(false);
+        // 요약은 이미 있음 (summary state 유지)
+        return;
+      }
+
+      const response = await sendCoachMessage({
+        history: nextMessages,
+        context,
+        questionIndex,
+        isRenegotiate,
+      });
+
+      const coachMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'coach',
+        content: response.content,
+      };
+      setMessages((prev) => [...prev, coachMessage]);
+      setQuestionIndex(response.nextQuestionIndex);
+
+      if (response.isComplete && !isRenegotiate) {
+        // finalize → coaching_insights + action_items INSERT → 요약 화면 전환
+        setIsFinalizing(true);
+        try {
+          const result = await finalizeCoaching([...nextMessages, coachMessage], context, userId);
+          setSummary(result);
+          setIsComplete(true);
+        } catch (e) {
+          console.error('[13] finalize:', e);
+          setError('저장에 실패했어요. 다시 시도해주세요.');
+        } finally {
+          setIsFinalizing(false);
+        }
+      }
+    } catch (e) {
+      console.error('[13] send:', e);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'coach',
+          content: '잠시 연결이 불안정해요. 다시 시도해주세요.',
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
+  }, [input, isSending, context, userId, messages, questionIndex, isRenegotiate]);
+
+  // ── 재협의 시작 ───────────────────────────────────────────
+  const handleRenegotiate = useCallback(() => {
+    setIsRenegotiate(true);
+    setIsComplete(false);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: 'coach',
+        content:
+          '어떤 액션이 더 잘 맞을 것 같아요? 자유롭게 말씀해주세요. 마음에 드는 액션을 발견하면 "좋아요"나 "이걸로"라고 알려주세요.',
+      },
+    ]);
+  }, []);
+
+  // ── 분기 렌더 ────────────────────────────────────────────
+  if (loadingContext) return <LoadingScreen text="코치를 준비하고 있어요..." />;
+  if (!context) return <LoadingScreen text={contextError ?? '컨텍스트가 없어요.'} />;
+
+  const progressRatio = Math.min(questionIndex / TOTAL_Q, 1);
+  const showSummary = isComplete && !!summary && !isRenegotiate;
+
+  return (
+    <div style={wrapStyle}>
+      {/* 상단 바 — ← + 중앙 타이틀 (08 인터뷰 스타일) */}
+      <header style={topbarStyle}>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="뒤로 가기"
+          style={backBtnStyle}
+        >
+          ←
+        </button>
+        <span style={topbarTitleStyle}>다음 주 액션 정하기</span>
+        <span style={{ width: '40px' }} />
+      </header>
+
+      {/* 진행률 행 — 질문 N/4 + 바 + % (08 스타일) */}
+      {!showSummary && (
+        <div style={progressRowStyle}>
+          <span style={progressLabelStyle}>
+            질문 <strong style={{ color: 'var(--accent)', fontWeight: 700 }}>{Math.min(questionIndex, TOTAL_Q)}</strong> / {TOTAL_Q}
+          </span>
+          <div style={progressBarTrackStyle}>
+            <div
+              style={{
+                ...progressBarFillNewStyle,
+                width: `${progressRatio * 100}%`,
+              }}
+            />
+          </div>
+          <span style={progressPctStyle}>{Math.round(progressRatio * 100)}%</span>
+        </div>
+      )}
+
+      {/* 채팅 영역 또는 요약 화면 */}
+      {showSummary ? (
+        <SummarySection
+          summary={summary!}
+          onRenegotiate={handleRenegotiate}
+          onGoHome={() => router.push('/home')}
+        />
+      ) : (
+        <>
+          <div style={chatScrollStyle}>
+            {messages.map((m) => (
+              <MessageBubble key={m.id} msg={m} />
+            ))}
+
+            {(isSending || isFinalizing) && <TypingIndicator />}
+
+            {error && (
+              <div role="alert" style={errorAlertStyle}>
+                {error}
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* 입력창 */}
+          {!isFinalizing && (
+            <div style={inputAreaStyle}>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="답변을 입력해주세요"
+                rows={1}
+                style={inputTextareaStyle}
+                aria-label="코치에게 답변 입력"
+              />
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!input.trim() || isSending}
+                style={{
+                  ...sendBtnStyle,
+                  opacity: !input.trim() || isSending ? 0.4 : 1,
+                  cursor: !input.trim() || isSending ? 'not-allowed' : 'pointer',
+                }}
+                aria-label="메시지 전송"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 서브 컴포넌트
+// ────────────────────────────────────────────────────────────
+
+function MessageBubble({ msg }: { msg: Message }) {
+  const isUser = msg.role === 'user';
+  if (isUser) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          animation: 'msgIn .35s ease',
+        }}
+      >
+        <div style={userBubbleStyle}>{msg.content}</div>
+      </div>
+    );
+  }
+  // 코치 메시지: 말풍선 + 하단 [아바타 + 방금]
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        animation: 'msgIn .35s ease',
+      }}
+    >
+      <div style={coachBubbleStyle}>{msg.content}</div>
+      <div style={msgFooterStyle}>
+        <CoachAvatar />
+        <span style={msgTimeStyle}>방금</span>
+      </div>
+    </div>
+  );
+}
+
+function CoachAvatar() {
+  return (
+    <span aria-hidden="true" style={avatarStyle}>
+      🤖
+    </span>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+      }}
+    >
+      <div style={{ ...coachBubbleStyle, color: 'var(--text-muted)', fontSize: '13px' }}>
+        입력 중<span style={dotAnim}>...</span>
+      </div>
+      <div style={msgFooterStyle}>
+        <CoachAvatar />
+        <span style={msgTimeStyle}>방금</span>
+      </div>
+    </div>
+  );
+}
+
+function SummarySection({
+  summary,
+  onRenegotiate,
+  onGoHome,
+}: {
+  summary: CoachingResult;
+  onRenegotiate: () => void;
+  onGoHome: () => void;
+}) {
+  return (
+    <div style={summaryWrapStyle}>
+      {/* 인사이트 카드 */}
+      <div style={insightCardStyle}>
+        <div style={insightLabelStyle}>📌 이번 주 패턴</div>
+        <div style={insightContentStyle}>{summary.patternInsight}</div>
+
+        <div style={{ ...insightLabelStyle, marginTop: '14px' }}>🎯 다음 주 액션 아이템</div>
+        <div style={nextActionBoxStyle}>{summary.nextActionTitle}</div>
+
+        <span style={strengthLinkPillStyle}>강점 「{summary.strengthLink}」</span>
+      </div>
+
+      {/* 안내 메시지 */}
+      <div style={summaryNoticeStyle}>
+        ✅ 다음 주 액션이 저장됐어요. 홈에서 새 액션을 확인해보세요.
+      </div>
+
+      {/* 액션 버튼 행 */}
+      <div style={summaryActionsStyle}>
+        <button type="button" onClick={onRenegotiate} style={summaryBtnSecondaryStyle}>
+          추가로 더 이야기하기
+        </button>
+        <button type="button" onClick={onGoHome} style={summaryBtnPrimaryStyle}>
+          홈에서 확인하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LoadingScreen({ text }: { text: string }) {
+  return (
+    <div style={wrapStyle}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 스타일
+// ────────────────────────────────────────────────────────────
+
+const wrapStyle: CSSProperties = {
+  width: '390px',
+  minHeight: '100dvh',
+  background: 'var(--surface)',
+  display: 'flex',
+  flexDirection: 'column',
+  margin: '0 auto',
+  boxShadow: '0 0 40px rgba(0,0,0,.18)',
+  overflowX: 'hidden',
+  position: 'relative',
+};
+
+const topbarStyle: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 50,
+  display: 'grid',
+  gridTemplateColumns: '40px 1fr 40px',
+  alignItems: 'center',
+  padding: '14px 20px',
+  background: 'var(--surface)',
+  borderBottom: '1px solid var(--line)',
+  flexShrink: 0,
+};
+
+const backBtnStyle: CSSProperties = {
+  width: '40px',
+  height: '40px',
+  border: 'none',
+  background: 'none',
+  cursor: 'pointer',
+  fontSize: '22px',
+  color: 'var(--ink)',
+  fontFamily: 'inherit',
+  textAlign: 'left',
+  padding: 0,
+};
+
+const topbarTitleStyle: CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 800,
+  color: 'var(--ink)',
+  textAlign: 'center',
+  letterSpacing: '-.02em',
+};
+
+const topbarQStyle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 700,
+  color: 'var(--ink-mute)',
+  textAlign: 'right',
+};
+
+// 진행률 행 (08 인터뷰 스타일)
+const progressRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  padding: '10px 20px 12px',
+  background: 'var(--surface)',
+  borderBottom: '1px solid var(--line)',
+  flexShrink: 0,
+};
+
+const progressLabelStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: 'var(--text-muted)',
+  whiteSpace: 'nowrap',
+};
+
+const progressBarTrackStyle: CSSProperties = {
+  flex: 1,
+  height: '6px',
+  background: 'var(--line)',
+  borderRadius: '999px',
+  overflow: 'hidden',
+};
+
+const progressBarFillNewStyle: CSSProperties = {
+  height: '100%',
+  background: 'var(--accent)',
+  borderRadius: '999px',
+  transition: 'width .4s ease',
+};
+
+const progressPctStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: 'var(--text-secondary)',
+  minWidth: '32px',
+  textAlign: 'right',
+};
+
+const chatScrollStyle: CSSProperties = {
+  flex: 1,
+  overflowY: 'auto',
+  padding: '20px 20px 12px',
+  background: 'var(--surface)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '18px',
+};
+
+// 코치 말풍선 — 회색 배경, 보더 없음, 통일 둥근 모서리
+const coachBubbleStyle: CSSProperties = {
+  maxWidth: '85%',
+  padding: '14px 18px',
+  fontSize: '15px',
+  lineHeight: 1.6,
+  background: 'var(--bg-soft)',
+  borderRadius: '16px',
+  color: 'var(--text-primary)',
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+};
+
+// 메시지 하단 푸터 (아바타 + 방금)
+const msgFooterStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  marginTop: '6px',
+  marginLeft: '4px',
+};
+
+const avatarStyle: CSSProperties = {
+  width: '28px',
+  height: '28px',
+  borderRadius: '50%',
+  background: 'var(--accent-tint)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '15px',
+  flexShrink: 0,
+};
+
+const msgTimeStyle: CSSProperties = {
+  fontSize: '11px',
+  color: 'var(--text-muted)',
+  fontWeight: 500,
+};
+
+const userBubbleStyle: CSSProperties = {
+  maxWidth: '78%',
+  padding: '14px 18px',
+  fontSize: '15px',
+  lineHeight: 1.6,
+  background: 'var(--accent)',
+  color: '#fff',
+  borderRadius: '16px',
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+};
+
+const dotAnim: CSSProperties = {
+  display: 'inline-block',
+  marginLeft: '2px',
+};
+
+// 입력 영역 — pill 스타일 + 원형 전송 버튼
+const inputAreaStyle: CSSProperties = {
+  padding: '12px 16px',
+  paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+  background: 'var(--surface)',
+  borderTop: '1px solid var(--line)',
+  display: 'flex',
+  gap: '10px',
+  alignItems: 'center',
+  flexShrink: 0,
+};
+
+const inputTextareaStyle: CSSProperties = {
+  flex: 1,
+  resize: 'none',
+  fontSize: '15px',
+  padding: '11px 18px',
+  borderRadius: '999px',
+  border: '1.5px solid var(--line)',
+  background: 'var(--bg-soft)',
+  color: 'var(--text-primary)',
+  fontFamily: 'inherit',
+  outline: 'none',
+  lineHeight: 1.5,
+  minHeight: '44px',
+  maxHeight: '120px',
+};
+
+const sendBtnStyle: CSSProperties = {
+  width: '44px',
+  height: '44px',
+  borderRadius: '50%',
+  background: 'var(--accent)',
+  border: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  transition: 'opacity .2s',
+  boxShadow: '0 2px 8px -2px rgba(45,91,255,.4)',
+};
+
+const errorAlertStyle: CSSProperties = {
+  padding: '10px 14px',
+  background: '#FEF2F2',
+  border: '1.5px solid #FECACA',
+  borderRadius: '10px',
+  fontSize: '13px',
+  color: 'var(--danger)',
+};
+
+// Summary
+const summaryWrapStyle: CSSProperties = {
+  flex: 1,
+  overflowY: 'auto',
+  padding: '18px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '14px',
+};
+
+const insightCardStyle: CSSProperties = {
+  background: 'var(--accent-tint)',
+  border: '1.5px solid var(--accent)',
+  borderRadius: '18px',
+  padding: '18px',
+};
+
+const insightLabelStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 700,
+  color: 'var(--accent)',
+  marginBottom: '8px',
+};
+
+const insightContentStyle: CSSProperties = {
+  fontSize: '14px',
+  color: 'var(--ink)',
+  lineHeight: 1.65,
+};
+
+const nextActionBoxStyle: CSSProperties = {
+  background: '#fff',
+  border: '1.5px solid var(--accent-soft)',
+  borderRadius: '12px',
+  padding: '12px 14px',
+  fontSize: '15px',
+  fontWeight: 700,
+  color: 'var(--ink)',
+  lineHeight: 1.4,
+  marginBottom: '12px',
+};
+
+const strengthLinkPillStyle: CSSProperties = {
+  display: 'inline-block',
+  background: 'var(--accent-soft)',
+  color: 'var(--accent)',
+  fontSize: '11px',
+  fontWeight: 700,
+  padding: '4px 10px',
+  borderRadius: '999px',
+};
+
+const summaryNoticeStyle: CSSProperties = {
+  background: '#fef9e7',
+  border: '1px solid #fde68a',
+  borderRadius: '14px',
+  padding: '12px 16px',
+  fontSize: '13px',
+  color: 'var(--ink)',
+  lineHeight: 1.6,
+};
+
+const summaryActionsStyle: CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  marginTop: '4px',
+  paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+};
+
+const summaryBtnSecondaryStyle: CSSProperties = {
+  flex: 1,
+  padding: '14px 8px',
+  borderRadius: '14px',
+  border: '1px solid var(--line-strong)',
+  background: 'var(--bg-soft)',
+  color: 'var(--ink)',
+  fontFamily: 'inherit',
+  fontWeight: 700,
+  fontSize: '13.5px',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  letterSpacing: '-.02em',
+};
+
+const summaryBtnPrimaryStyle: CSSProperties = {
+  flex: 1,
+  padding: '14px',
+  borderRadius: '14px',
+  border: 'none',
+  background: 'var(--accent)',
+  color: '#fff',
+  fontFamily: 'inherit',
+  fontWeight: 700,
+  fontSize: '14px',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  letterSpacing: '-.02em',
+};

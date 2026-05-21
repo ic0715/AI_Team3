@@ -1,23 +1,101 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import { TabBar } from '@/components/ui/TabBar';
+
+// ────────────────────────────────────────────────────────────
+// 11 홈 — 12주 코칭 대시보드 (스펙 v1.2)
+//
+// 구성 (스펙 3번):
+//   3.1 상단바  3.2 인사  3.3 커리어 방향 카드  3.4 오늘의 액션
+//   3.5 메모 유도 카드  3.6 12주 타임라인  3.7 탭바
+// ────────────────────────────────────────────────────────────
+
+interface ActiveGoal {
+  id: string;
+  goal_title: string;
+  current_week: number;
+  competency_code: string;
+}
+
+interface ActionItem {
+  id: string;
+  title: string;
+  strength_link?: string | null;
+}
+
+interface CoachingInsight {
+  week_number: number;
+  next_action_title: string | null;
+  strength_link: string | null;
+  badge: string | null;
+  comment: string | null;
+}
+
+interface UserStrength {
+  name_ko: string;
+  name_en: string;
+  domain: string;
+  rank?: number;
+}
 
 interface HomeData {
   nickname: string;
-  strengths: Array<{ name_ko: string; name_en: string; domain: string; rank?: number }>;
-  goalTitle: string;
-  startedAt: string; // ISO date
-  actionTitle: string;
+  goal: ActiveGoal;
+  currentAction: ActionItem | null;
+  strengths: UserStrength[];
+  insights: CoachingInsight[];
 }
 
+const TOTAL_WEEKS = 12;
+const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+
+// ────────────────────────────────────────────────────────────
+// 유틸
+// ────────────────────────────────────────────────────────────
+
+function formatLocalISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// 월요일을 한 주의 시작으로 (한국 관례)
+function startOfWeekMonday(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=일, 1=월, ..., 6=토
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function addDays(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 페이지 export
 // ────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<LoadingScreen text="불러오는 중..." />}>
+    <Suspense fallback={<LoadingScreen text="홈을 준비하고 있어요..." />}>
       <HomeContent />
     </Suspense>
   );
@@ -25,14 +103,19 @@ export default function HomePage() {
 
 function HomeContent() {
   const router = useRouter();
-  // 11 홈도 모든 단계 완료 후 진입 가능 → 'complete'와 동일 조건
   const { ready } = useOnboardingGuard('complete');
 
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [restarting, setRestarting] = useState(false);
+  const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
 
+  // 이번 주 월~일 7일
+  const today = new Date();
+  const monday = startOfWeekMonday(today);
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+
+  // ── 데이터 로드 ───────────────────────────────────────────
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
@@ -43,12 +126,19 @@ function HomeContent() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // 1차: profile/strengths/goal 병렬 fetch
-        const [profileRes, strengthRes, goalRes] = await Promise.all([
+        // 1차: profile, goal, strengths 병렬
+        const [profileRes, goalRes, strengthRes] = await Promise.all([
           supabase
             .from('profiles')
             .select('nickname')
             .eq('id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('goals')
+            .select('id, goal_title, current_week, competency_code')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .limit(1)
             .maybeSingle(),
           supabase
             .from('strength_analyses')
@@ -57,53 +147,87 @@ function HomeContent() {
             .eq('is_latest', true)
             .limit(1)
             .maybeSingle(),
-          supabase
-            .from('goals')
-            .select('id, goal_title, started_at')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle(),
         ]);
 
         if (cancelled) return;
 
-        if (profileRes.error) console.error('[11] profiles query error:', profileRes.error);
-        if (strengthRes.error) console.error('[11] strength_analyses query error:', strengthRes.error);
-        if (goalRes.error) console.error('[11] goals query error:', goalRes.error);
+        if (profileRes.error) console.error('[11] profiles:', profileRes.error);
+        if (goalRes.error) console.error('[11] goals:', goalRes.error);
+        if (strengthRes.error) console.error('[11] strength_analyses:', strengthRes.error);
 
         if (!goalRes.data) {
-          // 활성 goal 없음 → 진입 조건 위반 (스펙 6번)
-          // 일반 오류 화면 대체로 첫 단계로 보냄
-          router.replace('/error/network');
+          // active goal 없음 → 액션 아이템 단계로
+          router.replace('/onboarding/action-items');
+          return;
+        }
+        const goal = goalRes.data as ActiveGoal;
+        const currentWeek = goal.current_week ?? 1;
+
+        // 2차: 현재 주차 action_items, 이번 주 completions, 과거 주차 insights 병렬
+        const mondayISO = formatLocalISO(monday);
+        const sundayISO = formatLocalISO(addDays(monday, 6));
+
+        const [actionRes, completionRes, insightRes] = await Promise.all([
+          supabase
+            .from('action_items')
+            // strength_link는 schema에 없을 수 있어 SELECT에서 제외 — strengths[0]로 fallback
+            .select('id, title')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .eq('week_number', currentWeek)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('action_completions')
+            .select('completed_date')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .gte('completed_date', mondayISO)
+            .lte('completed_date', sundayISO),
+          supabase
+            .from('coaching_insights')
+            .select('week_number, next_action_title, strength_link, badge, comment')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .lt('week_number', currentWeek)
+            .order('week_number', { ascending: true }),
+        ]);
+
+        if (cancelled) return;
+
+        const logErr = (label: string, err: { message?: string; details?: string; code?: string; hint?: string } | null) => {
+          if (!err) return;
+          console.error(`[11] ${label}:`, err.message || '(no message)', '| code:', err.code, '| details:', err.details, '| hint:', err.hint);
+        };
+        logErr('action_items', actionRes.error);
+        logErr('action_completions', completionRes.error);
+        logErr('coaching_insights', insightRes.error);
+
+        if (!actionRes.data) {
+          // 현재 주차 action_items 없음 → 진입 조건 위반
+          router.replace('/onboarding/action-items');
           return;
         }
 
-        // 2차: action_items를 활성 goal_id로 필터링 (테스트 계정에 누적된 옛 row 회피)
-        const actionRes = await supabase
-          .from('action_items')
-          .select('title')
-          .eq('user_id', user.id)
-          .eq('goal_id', goalRes.data.id)
-          .eq('week_number', 1)
-          .limit(1)
-          .maybeSingle();
-
-        if (cancelled) return;
-        if (actionRes.error) console.error('[11] action_items query error:', actionRes.error);
-
         setData({
           nickname: profileRes.data?.nickname ?? '',
-          strengths: strengthRes.data?.strengths ?? [],
-          goalTitle: goalRes.data.goal_title ?? '',
-          startedAt: goalRes.data.started_at ?? new Date().toISOString().split('T')[0],
-          actionTitle: actionRes.data?.title ?? '',
+          goal,
+          currentAction: actionRes.data as ActionItem,
+          strengths: (strengthRes.data?.strengths as UserStrength[] | undefined) ?? [],
+          insights: (insightRes.data as CoachingInsight[] | undefined) ?? [],
         });
+
+        const dates = new Set<string>();
+        (completionRes.data ?? []).forEach((c: { completed_date: string }) => {
+          if (c.completed_date) dates.add(c.completed_date);
+        });
+        setCompletedDates(dates);
         setLoading(false);
       } catch (e) {
         console.error(e);
         if (!cancelled) {
-          setError('정보를 불러오지 못했어요.');
+          setError('홈 데이터를 불러올 수 없어요.');
           setLoading(false);
         }
       }
@@ -111,207 +235,550 @@ function HomeContent() {
 
     run();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, router]);
 
-  const handleRestart = useCallback(() => {
-    if (restarting) return; // 중복 클릭 방지 (스펙 6번)
-    setRestarting(true);
-    // ⚠️ 미결 사항 (스펙 9번): 기존 goals/action_items/strength_analyses 처분 정책 미정.
-    // 일단 04로 이동만. 정책 확정되면 여기에 처리 로직 추가.
-    router.push('/onboarding/strengths');
-  }, [router, restarting]);
+  // ── 오늘/특정 날짜 완료 토글 ───────────────────────────────
+  // 미래 날짜만 차단. 오늘·과거 다 체크 가능.
+  // 낙관적 업데이트 후 롤백 안 함 — schema 미비 시에도 UI는 작동, DB 에러는 콘솔에만.
+  const handleToggleDay = useCallback(
+    async (date: Date) => {
+      if (!data) return;
+      // 미래 날짜만 차단 (오늘·과거 모두 허용)
+      const todayOnly = new Date(today);
+      todayOnly.setHours(0, 0, 0, 0);
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0);
+      if (dateOnly.getTime() > todayOnly.getTime()) return;
 
+      const dateISO = formatLocalISO(date);
+      const wasCompleted = completedDates.has(dateISO);
+
+      // 낙관적 업데이트 (즉시 UI 반영, 롤백 없음)
+      setCompletedDates((prev) => {
+        const next = new Set(prev);
+        if (wasCompleted) next.delete(dateISO);
+        else next.add(dateISO);
+        return next;
+      });
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        if (wasCompleted) {
+          const { error: delErr } = await supabase
+            .from('action_completions')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('goal_id', data.goal.id)
+            .eq('completed_date', dateISO);
+          if (delErr) console.error('[11] action_completions DELETE error:', delErr);
+        } else {
+          const { error: insErr } = await supabase.from('action_completions').insert({
+            user_id: user.id,
+            goal_id: data.goal.id,
+            week_number: data.goal.current_week,
+            completed_date: dateISO,
+          });
+          if (insErr) console.error('[11] action_completions INSERT error:', insErr);
+        }
+      } catch (e) {
+        console.error('[11] toggle error:', e);
+      }
+    },
+    [data, completedDates, today],
+  );
+
+  const handleToggleToday = useCallback(() => {
+    handleToggleDay(today);
+  }, [handleToggleDay, today]);
+
+  // ── 렌더 분기 ─────────────────────────────────────────────
   if (!ready || loading) return <LoadingScreen text="홈을 준비하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 
-  const startDate = new Date(data.startedAt);
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + 83);
+  const todayISO = formatLocalISO(today);
+  const todayCompleted = completedDates.has(todayISO);
+  const todayStrength =
+    data.currentAction?.strength_link ?? data.strengths[0]?.name_ko ?? '체계';
+
+  // 이번 주 doneCount (월~일)
+  const doneCountWeek = weekDays.filter((d) =>
+    completedDates.has(formatLocalISO(d)),
+  ).length;
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 (뒤로가기 없음 — 종착점) */}
-      <header style={headerStyle}>
+      {/* 상단 바 */}
+      <header style={topbarStyle}>
         <div style={brandStyle}>
           CareerPT
-          <span style={brandDotStyle}>·</span>
+          <sup style={brandDotStyle}>·</sup>
         </div>
-        <div style={{ flex: 1 }} />
-        <span style={completePillStyle}>✅ 완료</span>
+        <span style={stepPillStyle}>🏠 홈</span>
       </header>
 
-      {/* 본문 */}
-      <main style={mainStyle}>
+      {/* 본문 (스크롤) */}
+      <main style={screenStyle}>
         {/* 인사 영역 */}
-        <section style={{ marginBottom: '20px' }}>
-          <h1
-            style={{
-              margin: '0 0 6px',
-              fontSize: '24px',
-              fontWeight: 800,
-              color: 'var(--text-primary)',
-              letterSpacing: '-.02em',
-              lineHeight: 1.3,
-            }}
-          >
+        <section style={greetingStyle}>
+          <div style={greetingTitleStyle}>
             안녕하세요,{' '}
             {data.nickname ? (
-              <>
-                <span style={{ color: 'var(--accent)' }}>{data.nickname}</span>님
-              </>
+              <em style={greetingNameStyle}>{data.nickname}님</em>
             ) : (
-              ''
+              '친구님'
             )}{' '}
             👋
-          </h1>
-          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>
-            커리어 방향 설정이 완료되었어요!
-          </p>
-        </section>
-
-        {/* 커리어 방향 요약 카드 (그라데이션, 스펙 3.3) */}
-        <section style={directionCardStyle}>
-          {/* 우상단 장식 원 */}
-          <div aria-hidden="true" style={decorCircleStyle} />
-
-          <div style={directionLabelStyle}>🎯 나의 커리어 방향</div>
-          <h2 style={directionTitleStyle}>
-            {`"${data.goalTitle}"`}
-          </h2>
-
-          {data.strengths.length > 0 && (
-            <div
-              role="list"
-              aria-label="강점 Top 5"
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '6px',
-                marginTop: '14px',
-                position: 'relative',
-                zIndex: 1,
-              }}
-            >
-              {data.strengths.slice(0, 5).map((s, i) => (
-                <span key={`${s.name_en}-${i}`} role="listitem" style={strengthChipStyle}>
-                  {s.name_ko}
-                </span>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* 첫 번째 액션 카드 (스펙 3.4) */}
-        <section style={actionCardStyle}>
-          <div style={actionLabelStyle}>✅ 첫 번째 액션</div>
-          <div
-            style={{
-              fontSize: '15px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              lineHeight: 1.5,
-              letterSpacing: '-.01em',
-              marginBottom: '8px',
-            }}
-          >
-            {data.actionTitle || '액션이 설정되지 않았어요'}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            매일 작은 실행이 커리어를 바꿔요 💪
+          <div style={greetingSubStyle}>
+            {WEEKDAY_KO[today.getDay()]}요일 · {today.getMonth() + 1}월 {today.getDate()}일 ·{' '}
+            <strong style={{ color: 'var(--accent)' }}>
+              {data.goal.current_week}주차
+            </strong>{' '}
+            진행 중 ✨
           </div>
         </section>
 
-        {/* 정보 행 (2-column grid, 스펙 3.5) */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '10px',
-            marginBottom: '16px',
-          }}
-        >
-          <InfoCard label="📅 시작일" value={data.startedAt ? formatDate(startDate) : '—'} dateTime={data.startedAt} />
-          <InfoCard label="🏁 종료일" value={formatDate(endDate)} dateTime={endDate.toISOString().split('T')[0]} />
-        </div>
+        {/* 커리어 방향 카드 (3.3) */}
+        <ThemeCard goal={data.goal} />
 
-        {/* 안내 메시지 (스펙 3.6) */}
-        <div style={hintBoxStyle}>
-          💡 강점과 커리어 방향을 바탕으로 액션 아이템이 설계되었어요.
-          꾸준한 실행으로 원하는 커리어를 만들어가세요!
-        </div>
+        {/* 오늘의 액션 카드 (3.4) */}
+        <TodayCard
+          action={data.currentAction}
+          strength={todayStrength}
+          todayCompleted={todayCompleted}
+          doneCountWeek={doneCountWeek}
+          weekDays={weekDays}
+          today={today}
+          completedDates={completedDates}
+          onToggleToday={handleToggleToday}
+          onToggleDay={handleToggleDay}
+        />
 
-        {/* 재시작 CTA (스펙 3.7) */}
-        <button
-          type="button"
-          onClick={handleRestart}
-          disabled={restarting}
-          aria-label="처음부터 다시 분석하기 — 강점 선택 화면으로 돌아갑니다"
-          style={{
-            ...restartBtnStyle,
-            opacity: restarting ? 0.5 : 1,
-            cursor: restarting ? 'not-allowed' : 'pointer',
-          }}
-        >
-          🔄 처음부터 다시 분석하기
-        </button>
+        {/* 메모 유도 카드 (3.5) */}
+        <MemoNotif onGoReflect={() => router.push('/reflect')} />
 
-        <div style={{ height: '20px' }} />
+        {/* 12주 타임라인 (3.6) */}
+        <h2 style={timelineTitleStyle}>🗺️ 12주의 여정</h2>
+        <Timeline
+          goal={data.goal}
+          insights={data.insights}
+          currentAction={data.currentAction}
+          weekDays={weekDays}
+          today={today}
+          completedDates={completedDates}
+          onToggleDay={handleToggleDay}
+        />
+
+        <div style={{ height: '12px' }} />
       </main>
+
+      {/* 탭바 */}
+      <TabBar active="home" />
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────
-// 서브 컴포넌트
+// 서브 컴포넌트 — Theme Card (커리어 방향 그라데이션 카드)
 // ────────────────────────────────────────────────────────────
 
-function InfoCard({
-  label,
-  value,
-  dateTime,
+function ThemeCard({ goal }: { goal: ActiveGoal }) {
+  const progressPct = Math.round((goal.current_week / TOTAL_WEEKS) * 100);
+
+  return (
+    <div style={themeCardStyle}>
+      <div aria-hidden="true" style={themeDecorTopRight} />
+      <div aria-hidden="true" style={themeDecorBottomRight} />
+
+      <div style={themeLabel}>나의 커리어 방향</div>
+      <h3 style={themeTitle}>{`"${goal.goal_title}"`}</h3>
+
+      {/* 진행률 행 */}
+      <div style={themeProgRow}>
+        <span style={themeProgBadge}>
+          {goal.current_week}주차 / {TOTAL_WEEKS}주
+        </span>
+        <div style={themeProgBar}>
+          <div style={{ ...themeProgFill, width: `${progressPct}%` }} />
+        </div>
+        <span style={themeProgPct}>{progressPct}%</span>
+      </div>
+
+      <div style={themeDesc}>
+        하나의 역량은 단기간에 만들어지지 않아요. 강점을 기반으로 작은 행동을 반복하고
+        회고하며, 나만의 방식으로 체화하는 과정이 필요해요. 하나의 역량 목표는 12주
+        동안 집중해보는 것을 권장합니다.
+      </div>
+
+      {/* 주차 도트 트랙 */}
+      <div style={weeksTrack} role="list" aria-label="12주 진행 도트">
+        {Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+          const week = i + 1;
+          const status =
+            week < goal.current_week ? 'done' : week === goal.current_week ? 'current' : 'future';
+          return (
+            <span
+              key={week}
+              role="listitem"
+              aria-label={`${week}주차 ${status === 'done' ? '완료' : status === 'current' ? '진행 중' : '예정'}`}
+              style={{
+                ...weekDot,
+                ...(status === 'done' ? weekDotDone : {}),
+                ...(status === 'current' ? weekDotCurrent : {}),
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 서브 컴포넌트 — Today Card (오늘의 액션 + 7일 그리드)
+// ────────────────────────────────────────────────────────────
+
+function TodayCard({
+  action,
+  strength,
+  todayCompleted,
+  doneCountWeek,
+  weekDays,
+  today,
+  completedDates,
+  onToggleToday,
+  onToggleDay,
 }: {
-  label: string;
-  value: string;
-  dateTime?: string;
+  action: ActionItem | null;
+  strength: string;
+  todayCompleted: boolean;
+  doneCountWeek: number;
+  weekDays: Date[];
+  today: Date;
+  completedDates: Set<string>;
+  onToggleToday: () => void;
+  onToggleDay: (date: Date) => void;
 }) {
   return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1.5px solid var(--border)',
-        borderRadius: '12px',
-        padding: '12px 14px',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '11.5px',
-          fontWeight: 700,
-          color: 'var(--text-secondary)',
-          marginBottom: '4px',
-          letterSpacing: '.01em',
-        }}
-      >
-        {label}
+    <div style={todayCardStyle}>
+      <div style={todayHeaderStyle}>
+        <span style={{ color: 'var(--accent)', fontSize: '12px', fontWeight: 700 }}>
+          ⭐ 오늘의 액션 · {WEEKDAY_KO[today.getDay()]}요일
+        </span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>
+          이번 주 {doneCountWeek}/7
+        </span>
       </div>
-      <div
+
+      <div style={todayActionTextStyle}>{action?.title ?? '액션이 설정되지 않았어요'}</div>
+
+      <button
+        type="button"
+        onClick={onToggleToday}
         style={{
-          fontSize: '14px',
-          fontWeight: 700,
-          color: 'var(--text-primary)',
-          letterSpacing: '-.01em',
+          ...todayToggleStyle,
+          background: todayCompleted ? 'var(--accent-tint)' : 'var(--bg-soft)',
+          borderColor: todayCompleted ? 'var(--accent-soft)' : 'var(--line)',
         }}
+        aria-pressed={todayCompleted}
       >
-        {dateTime ? <time dateTime={dateTime}>{value}</time> : value}
+        <span style={{ fontSize: '20px' }} aria-hidden="true">
+          {todayCompleted ? '✅' : '⭕'}
+        </span>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            {todayCompleted ? '🎉 오늘 완료했어요!' : '오늘 했나요? 탭해서 체크 👆'}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            {todayCompleted
+              ? '잘했어요! 한 번의 체크가 다음 주를 만들어요 💪'
+              : `강점 「${strength}」을 발휘하는 시간 ✨`}
+          </div>
+        </div>
+      </button>
+
+      {/* 7일 그리드 */}
+      <div style={todaysGridStyle}>
+        {weekDays.map((day) => {
+          const dayISO = formatLocalISO(day);
+          const isCompleted = completedDates.has(dayISO);
+          const isToday = isSameDay(day, today);
+          const isFuture = day.getTime() > today.getTime() && !isToday;
+
+          const dayStyle: CSSProperties = {
+            ...tcDayStyle,
+            ...(isCompleted ? tcDayFilledStyle : {}),
+            ...(isToday ? tcDayTodayStyle : {}),
+            ...(isFuture ? tcDayFutureStyle : {}),
+          };
+
+          return (
+            <button
+              key={dayISO}
+              type="button"
+              onClick={() => onToggleDay(day)}
+              disabled={isFuture}
+              style={dayStyle}
+              aria-label={`${WEEKDAY_KO[day.getDay()]}요일 ${day.getDate()}일 ${isCompleted ? '완료' : '미완료'}`}
+            >
+              <span style={{ fontSize: '9px', letterSpacing: '.08em' }}>
+                {WEEKDAY_KO[day.getDay()]}
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>
+                {isCompleted ? '✓' : day.getDate()}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
+
+// ────────────────────────────────────────────────────────────
+// 서브 컴포넌트 — Memo Notif (메모 유도 카드)
+// ────────────────────────────────────────────────────────────
+
+function MemoNotif({ onGoReflect }: { onGoReflect: () => void }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onGoReflect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onGoReflect();
+        }
+      }}
+      style={notifStyle}
+    >
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        <div aria-hidden="true" style={{ fontSize: '22px', flexShrink: 0, lineHeight: 1.2 }}>
+          💌
+        </div>
+        <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)' }}>
+          <strong style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+            오늘의 메모, 짧게라도 남겨볼까요? ✏️
+          </strong>
+          주말에 코치와 마감 회고를 할 때 컨텍스트가 돼요.
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onGoReflect();
+        }}
+        style={notifBtnStyle}
+      >
+        회고하기 →
+      </button>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 서브 컴포넌트 — Timeline (12주 여정)
+// ────────────────────────────────────────────────────────────
+
+function Timeline({
+  goal,
+  insights,
+  currentAction,
+  weekDays,
+  today,
+  completedDates,
+  onToggleDay,
+}: {
+  goal: ActiveGoal;
+  insights: CoachingInsight[];
+  currentAction: ActionItem | null;
+  weekDays: Date[];
+  today: Date;
+  completedDates: Set<string>;
+  onToggleDay: (d: Date) => void;
+}) {
+  const insightByWeek = new Map(insights.map((i) => [i.week_number, i]));
+
+  return (
+    <div style={timelineWrapStyle}>
+      {Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+        const week = i + 1;
+        if (week < goal.current_week) {
+          // done
+          const ins = insightByWeek.get(week);
+          return <TimelineDone key={week} week={week} insight={ins} />;
+        }
+        if (week === goal.current_week) {
+          return (
+            <TimelineCurrent
+              key={week}
+              week={week}
+              action={currentAction}
+              weekDays={weekDays}
+              today={today}
+              completedDates={completedDates}
+              onToggleDay={onToggleDay}
+            />
+          );
+        }
+        return <TimelineFuture key={week} week={week} />;
+      })}
+    </div>
+  );
+}
+
+function TimelineDone({
+  week,
+  insight,
+}: {
+  week: number;
+  insight: CoachingInsight | undefined;
+}) {
+  const hasInsight = !!insight && (!!insight.next_action_title || !!insight.comment);
+  return (
+    <div style={tlItemStyle}>
+      <div style={tlLeftCol}>
+        <div style={{ ...tlDot, ...tlDotDone }}>{week}</div>
+        <div style={tlWeekLabel}>W{week}</div>
+      </div>
+      <div style={{ ...tlCard, ...tlCardDone }}>
+        {hasInsight ? (
+          <>
+            <div style={tlStatusDone}>
+              완료
+              {insight?.badge ? ` · ${insight.badge}` : ''}
+              {insight?.comment ? ` ${insight.comment}` : ''}
+            </div>
+            {insight?.next_action_title && (
+              <div style={tlActionTitleDone}>{insight.next_action_title}</div>
+            )}
+            {insight?.strength_link && (
+              <span style={strengthMiniStyle}>강점 「{insight.strength_link}」</span>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            회고 미완료
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TimelineCurrent({
+  week,
+  action,
+  weekDays,
+  today,
+  completedDates,
+  onToggleDay,
+}: {
+  week: number;
+  action: ActionItem | null;
+  weekDays: Date[];
+  today: Date;
+  completedDates: Set<string>;
+  onToggleDay: (d: Date) => void;
+}) {
+  const doneCount = weekDays.filter((d) => completedDates.has(formatLocalISO(d))).length;
+  return (
+    <div style={tlItemStyle}>
+      <div style={tlLeftCol}>
+        <div style={{ ...tlDot, ...tlDotCurrent }}>{week}</div>
+        <div style={tlWeekLabel}>W{week}</div>
+      </div>
+      <div style={{ ...tlCard, ...tlCardCurrent }}>
+        <div style={tlStatusCurrent}>이번 주 · 진행 중 ({doneCount}/7)</div>
+        <div style={tlActionTitleCurrent}>{action?.title ?? '액션이 없어요'}</div>
+
+        <div style={tlDayRow}>
+          {weekDays.map((day) => {
+            const dayISO = formatLocalISO(day);
+            const isCompleted = completedDates.has(dayISO);
+            const isToday = isSameDay(day, today);
+            const isFuture = day.getTime() > today.getTime() && !isToday;
+            return (
+              <button
+                key={dayISO}
+                type="button"
+                onClick={() => onToggleDay(day)}
+                disabled={isFuture}
+                style={{
+                  ...tlDayStyle,
+                  ...(isCompleted ? tlDayFilledStyle : {}),
+                  ...(isToday ? tlDayTodayStyle : {}),
+                  ...(isFuture ? tlDayFutureStyle : {}),
+                }}
+                aria-label={`${WEEKDAY_KO[day.getDay()]}요일 ${isCompleted ? '완료' : '미완료'}`}
+              >
+                {isCompleted ? '✓' : WEEKDAY_KO[day.getDay()]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimelineFuture({ week }: { week: number }) {
+  // W6, W12 마일스톤
+  const isMidMilestone = week === 6;
+  const isFinalMilestone = week === TOTAL_WEEKS;
+  return (
+    <div style={tlItemStyle}>
+      <div style={tlLeftCol}>
+        <div style={{ ...tlDot, ...tlDotFuture }}>{week}</div>
+        <div style={tlWeekLabel}>W{week}</div>
+      </div>
+      <div style={{ ...tlCard, ...tlCardFuture }}>
+        {isMidMilestone && (
+          <>
+            <div style={tlMilestoneTitle}>🎯 중간 회고</div>
+            <div style={tlMilestoneDesc}>
+              여기까지의 패턴을 돌아보고, 남은 6주를 다시 정해요.
+            </div>
+          </>
+        )}
+        {isFinalMilestone && (
+          <>
+            <div style={tlMilestoneTitle}>🏆 12주 통합 회고</div>
+            <div style={tlMilestoneDesc}>
+              12주를 마치고, 다음 사이클을 그려봐요.
+            </div>
+          </>
+        )}
+        {!isMidMilestone && !isFinalMilestone && (
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            🌱 코치와 함께 정해요
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// LoadingScreen
+// ────────────────────────────────────────────────────────────
 
 function LoadingScreen({ text }: { text: string }) {
   return (
     <div style={wrapStyle}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
       </div>
     </div>
@@ -319,165 +786,506 @@ function LoadingScreen({ text }: { text: string }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// 유틸
-// ────────────────────────────────────────────────────────────
-
-function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}.${m}.${day}`;
-}
-
-// ────────────────────────────────────────────────────────────
 // 스타일
 // ────────────────────────────────────────────────────────────
 
-const wrapStyle: React.CSSProperties = {
+const wrapStyle: CSSProperties = {
   width: '390px',
   minHeight: '100dvh',
-  background: 'var(--bg)',
+  background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
   overflowX: 'hidden',
+  position: 'relative',
 };
 
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  padding: '14px 20px',
-  gap: '12px',
+const topbarStyle: CSSProperties = {
   position: 'sticky',
   top: 0,
-  background: 'rgba(247,247,245,.85)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  zIndex: 10,
+  zIndex: 50,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '18px 22px 14px',
+  background: 'var(--bg)',
+  backdropFilter: 'blur(6px)',
   flexShrink: 0,
 };
 
-const brandStyle: React.CSSProperties = {
-  fontSize: '17px',
+const brandStyle: CSSProperties = {
   fontWeight: 800,
+  fontSize: '18px',
+  letterSpacing: '-.01em',
   color: 'var(--text-primary)',
-  letterSpacing: '-.02em',
-  display: 'inline-flex',
-  alignItems: 'center',
 };
 
-const brandDotStyle: React.CSSProperties = {
+const brandDotStyle: CSSProperties = {
+  fontSize: '10px',
   color: 'var(--accent)',
-  marginLeft: '1px',
-  fontSize: '17px',
 };
 
-const completePillStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  fontSize: '11.5px',
-  fontWeight: 700,
-  padding: '4px 10px',
+const stepPillStyle: CSSProperties = {
+  fontSize: '12px',
+  color: 'var(--accent)',
+  padding: '5px 12px',
+  border: 'none',
   borderRadius: '999px',
-  background: 'var(--accent-light)',
-  color: 'var(--accent)',
-  letterSpacing: '-.005em',
+  background: 'var(--accent-tint)',
+  fontWeight: 700,
 };
 
-const mainStyle: React.CSSProperties = {
+const screenStyle: CSSProperties = {
+  padding: '8px 22px 16px',
   flex: 1,
   overflowY: 'auto',
-  padding: '20px',
 };
 
-const directionCardStyle: React.CSSProperties = {
-  position: 'relative',
-  overflow: 'hidden',
-  background: 'linear-gradient(135deg, #1e3a8a, #2D5BFF)',
+const greetingStyle: CSSProperties = {
+  padding: '8px 0 22px',
+};
+
+const greetingTitleStyle: CSSProperties = {
+  fontSize: '24px',
+  fontWeight: 800,
+  letterSpacing: '-.02em',
+  lineHeight: 1.3,
+  color: 'var(--text-primary)',
+};
+
+const greetingNameStyle: CSSProperties = {
+  fontStyle: 'normal',
+  color: 'var(--accent)',
+  fontWeight: 800,
+};
+
+const greetingSubStyle: CSSProperties = {
+  fontSize: '13px',
+  color: 'var(--text-muted)',
+  marginTop: '6px',
+  fontWeight: 500,
+};
+
+// Theme card (3.3)
+const themeCardStyle: CSSProperties = {
+  // 14 프로필 히어로 카드와 동일한 solid accent 색
+  background: 'var(--accent)',
   color: '#fff',
   borderRadius: '20px',
-  padding: '22px 20px',
-  marginBottom: '14px',
+  padding: '22px 22px 20px',
+  marginBottom: '16px',
+  position: 'relative',
+  overflow: 'hidden',
+  boxShadow: '0 6px 20px -8px rgba(45,91,255,.4)',
 };
 
-const decorCircleStyle: React.CSSProperties = {
+const themeDecorTopRight: CSSProperties = {
   position: 'absolute',
-  top: '-50px',
-  right: '-40px',
-  width: '160px',
-  height: '160px',
+  top: '-20px',
+  right: '-20px',
+  width: '130px',
+  height: '130px',
+  background: 'rgba(255,255,255,.07)',
   borderRadius: '50%',
-  background: 'rgba(255,255,255,.08)',
   pointerEvents: 'none',
 };
 
-const directionLabelStyle: React.CSSProperties = {
+const themeDecorBottomRight: CSSProperties = {
+  position: 'absolute',
+  bottom: '-40px',
+  right: '40px',
+  width: '80px',
+  height: '80px',
+  background: 'rgba(255,255,255,.04)',
+  borderRadius: '50%',
+  pointerEvents: 'none',
+};
+
+const themeLabel: CSSProperties = {
   fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '.08em',
-  opacity: 0.8,
+  letterSpacing: '.12em',
+  opacity: 0.65,
   marginBottom: '10px',
+  fontWeight: 600,
+  textTransform: 'uppercase',
   position: 'relative',
-  zIndex: 1,
 };
 
-const directionTitleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: '19px',
+const themeTitle: CSSProperties = {
   fontWeight: 800,
-  lineHeight: 1.4,
+  fontSize: '20px',
+  margin: '0 0 18px',
   letterSpacing: '-.02em',
+  lineHeight: 1.35,
   position: 'relative',
-  zIndex: 1,
-  wordBreak: 'keep-all',
 };
 
-const strengthChipStyle: React.CSSProperties = {
-  fontSize: '11.5px',
-  fontWeight: 700,
-  padding: '4px 10px',
-  borderRadius: '999px',
+const themeProgRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  marginTop: '14px',
+  position: 'relative',
+};
+
+const themeProgBadge: CSSProperties = {
   background: 'rgba(255,255,255,.18)',
-  color: '#fff',
+  borderRadius: '999px',
+  padding: '4px 12px',
+  fontSize: '12px',
+  fontWeight: 700,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
-const actionCardStyle: React.CSSProperties = {
-  background: 'var(--accent-light)',
-  border: '1.5px solid rgba(45,91,255,.18)',
-  borderRadius: '16px',
-  padding: '16px',
+const themeProgBar: CSSProperties = {
+  flex: 1,
+  height: '5px',
+  background: 'rgba(255,255,255,.2)',
+  borderRadius: '3px',
+  overflow: 'hidden',
+};
+
+const themeProgFill: CSSProperties = {
+  height: '100%',
+  borderRadius: '3px',
+  background: 'rgba(255,255,255,.85)',
+  transition: 'width .5s ease',
+};
+
+const themeProgPct: CSSProperties = {
+  fontSize: '12px',
+  opacity: 0.7,
+  flexShrink: 0,
+};
+
+const themeDesc: CSSProperties = {
+  marginTop: '12px',
+  fontSize: '10px',
+  lineHeight: 1.65,
+  opacity: 0.5,
+  letterSpacing: '-.005em',
+  position: 'relative',
+};
+
+const weeksTrack: CSSProperties = {
+  display: 'flex',
+  gap: '4px',
+  marginTop: '12px',
+  position: 'relative',
+};
+
+const weekDot: CSSProperties = {
+  flex: 1,
+  height: '4px',
+  background: 'rgba(255,255,255,.18)',
+  borderRadius: '2px',
+};
+
+const weekDotDone: CSSProperties = {
+  background: 'rgba(255,255,255,.85)',
+};
+
+const weekDotCurrent: CSSProperties = {
+  background: '#fbbf24',
+  boxShadow: '0 0 0 2px rgba(251,191,36,.3)',
+};
+
+// Today card (3.4)
+const todayCardStyle: CSSProperties = {
+  background: 'var(--accent-tint)',
+  border: '2px solid var(--accent)',
+  borderRadius: '18px',
+  padding: '18px',
   marginBottom: '14px',
 };
 
-const actionLabelStyle: React.CSSProperties = {
+const todayHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  marginBottom: '10px',
+};
+
+const todayActionTextStyle: CSSProperties = {
+  fontSize: '17px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
+  lineHeight: 1.4,
+  marginBottom: '14px',
+  letterSpacing: '-.01em',
+};
+
+const todayToggleStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  background: 'var(--bg-soft)',
+  border: '1px solid var(--line)',
+  borderRadius: '12px',
+  padding: '12px 14px',
+  cursor: 'pointer',
+  transition: 'all .25s',
+  userSelect: 'none',
+  width: '100%',
+  fontFamily: 'inherit',
+};
+
+const todaysGridStyle: CSSProperties = {
+  display: 'flex',
+  gap: '5px',
+  marginTop: '12px',
+};
+
+const tcDayStyle: CSSProperties = {
+  flex: 1,
+  height: '36px',
+  background: 'var(--bg-soft)',
+  border: '1px solid var(--line)',
+  borderRadius: '8px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '9px',
+  color: 'var(--text-muted)',
+  cursor: 'pointer',
+  letterSpacing: '.08em',
+  transition: 'all .2s',
+  fontWeight: 500,
+  fontFamily: 'inherit',
+  padding: 0,
+};
+
+const tcDayFilledStyle: CSSProperties = {
+  background: 'var(--accent-soft)',
+  borderColor: 'var(--accent-soft)',
+  color: 'var(--accent-deep)',
+};
+
+const tcDayTodayStyle: CSSProperties = {
+  background: '#fff',
+  borderColor: 'var(--accent)',
+  color: 'var(--accent)',
+};
+
+const tcDayFutureStyle: CSSProperties = {
+  opacity: 0.4,
+  cursor: 'not-allowed',
+};
+
+// Memo Notif (3.5)
+const notifStyle: CSSProperties = {
+  background: '#fef9e7',
+  border: '1px solid #fde68a',
+  borderRadius: '14px',
+  padding: '14px 16px',
+  marginBottom: '16px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+  cursor: 'pointer',
+};
+
+const notifBtnStyle: CSSProperties = {
+  width: '100%',
+  padding: '10px',
+  background: 'var(--ink)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '10px',
+  fontFamily: 'inherit',
+  fontSize: '13px',
+  fontWeight: 700,
+  cursor: 'pointer',
+};
+
+// Timeline (3.6)
+const timelineTitleStyle: CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 700,
+  color: 'var(--text-primary)',
+  marginBottom: '14px',
+  marginTop: '24px',
+  letterSpacing: '-.01em',
+};
+
+const timelineWrapStyle: CSSProperties = {
+  position: 'relative',
+};
+
+const tlItemStyle: CSSProperties = {
+  position: 'relative',
+  display: 'grid',
+  gridTemplateColumns: '56px 1fr',
+  gap: '14px',
+  paddingBottom: '14px',
+};
+
+const tlLeftCol: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '4px',
+};
+
+const tlDot: CSSProperties = {
+  width: '32px',
+  height: '32px',
+  borderRadius: '50%',
+  background: 'var(--bg-soft)',
+  border: '1px solid var(--line-strong)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '13px',
+  fontWeight: 500,
+  color: 'var(--text-muted)',
+};
+
+const tlDotDone: CSSProperties = {
+  background: 'var(--accent-soft)',
+  borderColor: 'var(--accent)',
+  color: 'var(--accent-deep)',
+  fontWeight: 700,
+};
+
+const tlDotCurrent: CSSProperties = {
+  background: 'var(--accent)',
+  color: '#fff',
+  borderColor: 'var(--accent)',
+  width: '38px',
+  height: '38px',
+  boxShadow: '0 0 0 4px var(--accent-tint)',
+  fontWeight: 700,
+};
+
+const tlDotFuture: CSSProperties = {
+  background: '#fff',
+  borderStyle: 'dashed',
+  color: 'var(--text-muted)',
+};
+
+const tlWeekLabel: CSSProperties = {
+  fontSize: '10px',
+  color: 'var(--text-muted)',
+  fontWeight: 600,
+  letterSpacing: '.04em',
+};
+
+const tlCard: CSSProperties = {
+  background: '#fff',
+  border: '1px solid var(--line)',
+  borderRadius: '14px',
+  padding: '14px',
+};
+
+const tlCardDone: CSSProperties = {
+  background: 'var(--bg-soft)',
+};
+
+const tlCardCurrent: CSSProperties = {
+  background: 'var(--accent-tint)',
+  border: '1.5px solid var(--accent)',
+  boxShadow: '0 4px 14px -6px rgba(45,91,255,.18)',
+};
+
+const tlCardFuture: CSSProperties = {
+  background: 'transparent',
+  border: '1px dashed var(--line-strong)',
+};
+
+const tlStatusDone: CSSProperties = {
+  color: 'var(--accent-deep)',
   fontSize: '11px',
   fontWeight: 700,
+  marginBottom: '6px',
+};
+
+const tlStatusCurrent: CSSProperties = {
   color: 'var(--accent)',
+  fontSize: '10px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
   letterSpacing: '.08em',
   marginBottom: '8px',
 };
 
-const hintBoxStyle: React.CSSProperties = {
-  padding: '14px 16px',
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '12px',
-  fontSize: '13px',
-  color: 'var(--text-secondary)',
-  lineHeight: 1.7,
-  marginBottom: '16px',
+const tlActionTitleDone: CSSProperties = {
+  fontSize: '14px',
+  fontWeight: 700,
+  color: 'var(--text-primary)',
+  marginBottom: '6px',
+  lineHeight: 1.4,
 };
 
-const restartBtnStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '14px',
-  borderRadius: '12px',
-  background: 'var(--surface)',
-  color: 'var(--text-secondary)',
-  border: '1.5px solid var(--border-strong)',
-  fontSize: '14px',
+const tlActionTitleCurrent: CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
+  marginBottom: '10px',
+  lineHeight: 1.4,
+};
+
+const strengthMiniStyle: CSSProperties = {
+  display: 'inline-block',
+  background: 'var(--accent-soft)',
+  color: 'var(--accent-deep)',
+  fontSize: '11px',
   fontWeight: 600,
+  padding: '3px 10px',
+  borderRadius: '999px',
+};
+
+const tlDayRow: CSSProperties = {
+  display: 'flex',
+  gap: '4px',
+  marginTop: '8px',
+};
+
+const tlDayStyle: CSSProperties = {
+  flex: 1,
+  height: '24px',
+  borderRadius: '6px',
+  background: 'var(--bg-soft)',
+  border: '1px solid var(--line)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '10px',
+  fontWeight: 500,
+  color: 'var(--text-muted)',
+  cursor: 'pointer',
   fontFamily: 'inherit',
-  transition: 'background .15s',
+  padding: 0,
+};
+
+const tlDayFilledStyle: CSSProperties = {
+  background: 'var(--accent-soft)',
+  borderColor: 'var(--accent-soft)',
+  color: 'var(--accent-deep)',
+};
+
+const tlDayTodayStyle: CSSProperties = {
+  background: '#fff',
+  borderColor: 'var(--accent)',
+  color: 'var(--accent)',
+};
+
+const tlDayFutureStyle: CSSProperties = {
+  opacity: 0.4,
+  cursor: 'not-allowed',
+};
+
+const tlMilestoneTitle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 700,
+  color: 'var(--text-primary)',
+  marginBottom: '4px',
+};
+
+const tlMilestoneDesc: CSSProperties = {
+  fontSize: '11px',
+  color: 'var(--text-secondary)',
+  lineHeight: 1.55,
 };

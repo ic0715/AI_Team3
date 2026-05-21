@@ -43,7 +43,9 @@
 
 ### 3.3 커리어 방향 카드 (theme-card)
 
-그라데이션 배경 (135deg, `#2a3f8f → #3a4fa0 → #4a5fc0`), 흰색 텍스트, 우상단·우하단 원형 장식.
+배경: **solid `var(--accent)`** (`#2D5BFF`) — 14 프로필 히어로 카드와 동일 톤으로 디자인 통일.
+~~기존: 그라데이션 (135deg, `#2a3f8f → #3a4fa0 → #4a5fc0`) — v1.2에서 변경됨~~
+흰색 텍스트, 우상단·우하단 반투명 흰색 원형 장식, accent 글로우 그림자.
 
 | 요소 | 내용 |
 | --- | --- |
@@ -103,10 +105,9 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 - 내용:
   - 상태 레이블: `"이번 주 · 진행 중 ({doneCount}/7)"` (uppercase, 10px, accent, weight 600)
   - 액션명 (16px, weight 500)
-  - 강점 chip + 목표 빈도 텍스트 (예: `· 목표 주 1회`)
   - 7일 체크 인디케이터 (월~일 한 줄, height 24px, done/today/일반 구분)
-  - 이번 주 메모 요약 (있으면 최대 2개 미리보기. "+N개 더 보기 →" 탭 시 p12 이동. 없으면 안내 문구)
-  - "회고하기" 버튼 → p12로 이동
+  - ~~이번 주 메모 요약~~ **v1.2 제거** — 회고 진입은 3.5 메모 유도 카드의 [회고하기 →] 버튼으로 일원화
+  - ~~"회고하기" 버튼~~ **v1.2 제거** — 동일 사유
 
 **future (미래 주차)**
 - dot: 흰색 배경, 점선 보더, line-strong 글씨
@@ -148,8 +149,9 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 | `goals` (status='active') | `goal_title`, `current_week`, `competency_code` | 커리어 방향 카드, 진행 바, 인사 서브 |
 | `action_items` (week_number=current_week) | `title` | 오늘의 액션 텍스트, 타임라인 current 카드 |
 | `action_completions` (이번 주) | `completed_date` | 7일 그리드, doneCount, 타임라인 current 체크 인디케이터 |
-| `coaching_insights` (goal_id, week_number < current_week) | `week_number`, `next_action_title`, `strength_link`, `completion_count`, `target_count` | 타임라인 done 카드 액션명·강점chip·완료율 |
-| `daily_memos` (이번 주) | `content`, `memo_date` | 타임라인 current 카드 메모 요약 |
+| `coaching_insights` (goal_id, week_number < current_week) | `week_number`, `next_action_title`, `strength_link`, **`badge`**, **`comment`** (schema v0.8) | 타임라인 done 카드 액션명·강점chip·이모지 배지·코멘트 |
+| `action_items` (week_number=current_week) | **`strength_link`** (schema v0.8) | 오늘의 액션 카드 "강점 「○○」을 발휘하는 시간" 표시 |
+| ~~`daily_memos` (이번 주)~~ | ~~`content`, `memo_date`~~ | **v1.2 제거** — 타임라인 current 카드 메모 요약 미노출에 따라 홈 화면에서 읽기 불필요 |
 
 ### 5.2 쓰기
 
@@ -213,3 +215,4 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 | --- | --- | --- |
 | v1.0 | 2026-05-18 | home_0518.html p11 기준으로 최초 작성. post-mvp 스펙과 분리된 구현 기준 문서. |
 | v1.1 | 2026-05-20 | **[HTML 미반영 항목 반영]** **3.4** 메모 유도 카드 내 "회고하기 →" 버튼 존재 및 동작 명시. **3.5(→3.5)** 메모 유도 카드 상세 UI(배경색, 보더, 버튼 스타일) 추가. **3.6** 타임라인 done 카드 badge 형식(이모지 + comment 문구) 상세 정의. 마일스톤 주차(W6·W12) 전체 설명 문구 명시. current 카드 메모 요약 "+N개 더 보기 →" 동작 명시. **5.1** coaching_insights 읽기 항목 추가(completion_count, target_count). **6.** done 카드 badge 로직 테이블 신규 추가. **7.** done 주차 coaching_insights 없는 경우 예외 처리 추가. |
+| v1.2 | 2026-05-21 | **[feature/12 구현 반영 + 디자인 통일 + schema v0.8 정합]** **3.3** 커리어 방향 카드 배경 그라데이션 → **solid `var(--accent)`** 변경 (14 프로필 히어로 카드와 동일 톤, 디자인 일관성 ↑). **3.6** 타임라인 current 카드의 ~~메모 요약~~ + ~~회고하기 버튼~~ 제거 — 회고 진입은 3.5 메모 유도 카드 [회고하기 →]로 일원화. **5.1** 데이터 — `coaching_insights.badge`/`comment`, `action_items.strength_link` 컬럼 명시 (schema v0.8). `daily_memos` 읽기 항목 제거 (current 카드 메모 미노출에 따라 불필요). |

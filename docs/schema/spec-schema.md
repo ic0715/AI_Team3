@@ -1,12 +1,21 @@
-# CareerPT — DB 스키마 설계 (Draft v0.7.2)
+# CareerPT — DB 스키마 설계 (Draft v0.8)
 
-> 기준 프로토타입: `CareerPT_prototype_v3_0505.html`
+> 기준 프로토타입: `home_0520_v2.html`
 > 작성일: 2026-05-04
-> 최종 수정: 2026-05-08
+> 최종 수정: 2026-05-21
 > 상태: 기획 요건 확정 → Supabase 테이블 생성 준비
 > DB: Supabase (PostgreSQL)
 
 ---
+
+### v0.7.2 → v0.8 변경 사항 (2026-05-21) — feature/12 MAINTAIN 페이지 반영
+
+| # | 변경 내용 |
+| --- | --- |
+| 1 | `action_items.strength_link` 컬럼 신규 추가 — 11 홈 "오늘의 액션" 카드의 강점 표시 ("강점 「{strength}」을 발휘하는 시간 ✨") |
+| 2 | `coaching_insights.badge` + `comment` 컬럼 신규 추가 — 11 홈 12주 타임라인의 done 카드에 이모지 배지와 짧은 코멘트 표시 |
+| 3 | `daily_memos`: `UNIQUE(user_id, memo_date)` 제약 **제거** — 같은 날에도 메모 여러 개 누적 저장 가능 (정책 변경: 1일 1메모 → 다중 메모) |
+| 4 | `action_completions` 단순화: MVP에서는 `action_item_id` 대신 `goal_id + week_number + completed_date` 기준으로 INSERT/DELETE 허용 (한 주에 액션 1개만 표시하는 현재 UI 정합) |
 
 ### v0.7.1 → v0.7.2 변경 사항 (2026-05-08)
 
@@ -421,6 +430,7 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 > AI 추천 항목(`is_custom=false`)과 유저 직접 추가(`is_custom=true`) 모두 저장.
 >
 > ⚡ v0.7 변경: `source_seed_id` 컬럼 추가 (시드 액션 추적용)
+> ⚡ v0.8 변경: `strength_link` 컬럼 추가 — 11 홈에서 강점-액션 연결 표시용
 
 | 컬럼명 | 타입 | 제약 | 설명 | 예시 |
 | --- | --- | --- | --- | --- |
@@ -433,6 +443,7 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 | `tags` | `text[]` | nullable | 분류 태그 배열 | `["📹 영상 분석", "⏱ 1~2시간"]` |
 | `is_custom` | `boolean` | default false | 유저 직접 추가 여부 | `false` |
 | `source_seed_id` | `text` | nullable | 시드 액션 식별자 (예: `T-1-junior-2`). 디버깅·품질 분석용 | `T-1-junior-2` |
+| `strength_link` | `text` | nullable | 이 액션과 연결된 강점명 (자유 텍스트). 11 홈 "오늘의 액션" 카드의 "강점 「○○」을 발휘하는 시간" 표시용 | `분석` |
 | `created_at` | `timestamptz` | default now() | 생성 일시 | `2026-04-16 09:35:00+09` |
 
 > **매주 추천 흐름:** 코칭 인사이트 저장 시 다음 주 액션 아이템을 AI가 생성 → `action_items`에 INSERT
@@ -470,10 +481,12 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 | `memo_date` | `date` | NOT NULL | 메모 날짜 | `2026-04-23` |
 | `week_number` | `int` | NOT NULL | 해당 목표의 주차 | `2` |
 | `content` | `text` | NOT NULL | 메모 내용 | `오늘은 30분 읽고 3줄 메모 남김.` |
-| `created_at` | `timestamptz` | default now() | 생성 일시 | `2026-04-23 22:10:00+09` |
+| `created_at` | `timestamptz` | default now() | 생성 일시 (정렬 키) | `2026-04-23 22:10:00+09` |
 | `updated_at` | `timestamptz` | default now() | 수정 일시 | `2026-04-23 22:10:00+09` |
 
-**제약:** `(user_id, memo_date)` UNIQUE — 날짜별 메모 1개
+**제약 (v0.8 정책 변경):**
+- ~~`(user_id, memo_date)` UNIQUE — 날짜별 메모 1개~~ **제거됨**
+- 같은 날에도 메모 여러 개 누적 저장 가능. 정렬은 `(memo_date asc, created_at asc)` 로 처리.
 
 ---
 
@@ -505,7 +518,8 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 > 역할: AI 코칭 세션 종료 후 저장되는 핵심 요약.
 > 히스토리 화면의 "인사이트 보관함"으로 표시되고, 다음 주 코칭 시 AI 컨텍스트로 재사용됨.
 >
-> ⚠️ `strength_link` 컬럼은 자유 텍스트 유지 (v0.8에서 정형화 검토).
+> ⚠️ `strength_link` 컬럼은 자유 텍스트 유지.
+> ⚡ v0.8 변경: `badge` + `comment` 컬럼 추가 — 11 홈 12주 타임라인의 done 카드 표시용
 
 | 컬럼명 | 타입 | 제약 | 설명 | 예시 |
 | --- | --- | --- | --- | --- |
@@ -519,6 +533,8 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 | `next_action_title` | `text` | NOT NULL | 다음 주 AI 추천 액션 제목 | `책 한 챕터 읽고, 블로그 1편 써보기` |
 | `next_action_reason` | `text` | nullable | 추천 이유 | `체계 강점의 최소 단위로 압축한 출력 훈련이에요.` |
 | `strength_link` | `text` | nullable | 연결된 강점 (자유 텍스트) | `체계 + 학습` |
+| `badge` | `text` | nullable | **v0.8 신규** — 11 홈 타임라인 done 카드의 이모지 배지 (예: `🔥`, `👍`) | `🔥` |
+| `comment` | `text` | nullable | **v0.8 신규** — 11 홈 타임라인 done 카드의 짧은 코칭 코멘트 | `완벽한 한 주!` |
 | `created_at` | `timestamptz` | default now() | 인사이트 생성 일시 | `2026-04-27 22:00:00+09` |
 
 **제약:** `(user_id, goal_id, week_number)` UNIQUE — 주차별 인사이트 1개
@@ -1046,7 +1062,60 @@ CREATE POLICY "본인 푸시 구독만 삭제"
 
 ---
 
-## 추가 검토 필요 사항 (v0.8 후보)
+## v0.7.2 → v0.8 마이그레이션 SQL
+
+feature/12 MAINTAIN 페이지 (11/12/13) 작업 정합용. Supabase SQL Editor에서 실행.
+
+```sql
+-- ============================================================
+-- v0.7.2 → v0.8 마이그레이션 (feature/12 MAINTAIN 페이지 반영)
+-- ============================================================
+
+-- 1. action_items.strength_link 컬럼 추가
+--    11 홈 "오늘의 액션" 카드의 강점 표시용
+ALTER TABLE action_items
+  ADD COLUMN IF NOT EXISTS strength_link TEXT;
+
+-- 2. coaching_insights에 badge + comment 컬럼 추가
+--    11 홈 12주 타임라인의 done 카드 표시용
+ALTER TABLE coaching_insights
+  ADD COLUMN IF NOT EXISTS badge TEXT,
+  ADD COLUMN IF NOT EXISTS comment TEXT;
+
+-- 3. daily_memos: 같은 날 메모 여러 개 허용 (정책 변경)
+--    자동 생성된 UNIQUE constraint 이름을 동적으로 찾아서 drop
+DO $$
+DECLARE
+  v_constraint_name text;
+BEGIN
+  FOR v_constraint_name IN
+    SELECT conname FROM pg_constraint
+    WHERE conrelid = 'daily_memos'::regclass
+      AND contype = 'u'
+  LOOP
+    EXECUTE format('ALTER TABLE daily_memos DROP CONSTRAINT %I', v_constraint_name);
+    RAISE NOTICE 'Dropped daily_memos constraint: %', v_constraint_name;
+  END LOOP;
+END $$;
+
+-- 4. action_completions: created_at 기반 정렬 인덱스 (선택)
+CREATE INDEX IF NOT EXISTS idx_action_completions_user_goal_date
+  ON action_completions (user_id, goal_id, completed_date);
+
+-- 5. daily_memos: 주차 + 날짜 + 시간 정렬용 인덱스 (선택)
+CREATE INDEX IF NOT EXISTS idx_daily_memos_user_goal_week
+  ON daily_memos (user_id, goal_id, week_number, memo_date, created_at);
+
+-- 6. coaching_insights: 11 홈 타임라인 done 카드 조회 인덱스 (이미 있으면 스킵)
+--    docs/schema/spec-schema.md §5 인덱스에 있는 idx_coaching_goal_week 활용
+```
+
+> ⚠️ **action_completions 정책 노트:**
+> 기존 스키마는 `(user_id, action_item_id, completed_date)` UNIQUE로 액션별 완료 추적. feature/12에서는 한 주에 액션 1개만 표시하는 단순화된 UI라 `goal_id + week_number + completed_date`로 충분. 액션 1주 1개 정책이 유지되면 기존 UNIQUE는 그대로 두어도 무방.
+
+---
+
+## 추가 검토 필요 사항 (v0.9 후보)
 
 1. `coaching_insights.strength_link`는 자유 텍스트(예: "체계 + 학습")인데, 12개 역량 체계로 가면 이것도 `competency_code` 참조나 강점 페어 코드로 정형화할지 결정 필요. **권장**: v0.7.1에서는 손대지 말고 추후 v0.8에서 다루기. 코칭 인사이트는 사람이 읽는 텍스트라 자유도가 높은 게 더 자연스러움.
 
