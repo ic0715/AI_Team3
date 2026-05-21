@@ -132,15 +132,17 @@ function CompleteContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 (뒤로가기 없음 — 1회성 안내) */}
-      <header style={headerStyle}>
-        <span style={{ width: '36px' }} />
-        <span style={pageTitleStyle}>커리어 방향 설정 완료</span>
-        <span style={{ width: '36px' }} />
-      </header>
+      {/* 스크롤 영역 */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {/* 상단 바 */}
+        <header style={headerStyle}>
+          <span style={{ width: '36px' }} />
+          <span style={pageTitleStyle}>커리어 방향 설정 완료</span>
+          <span style={{ width: '36px' }} />
+        </header>
 
-      {/* 본문 */}
-      <main style={mainStyle}>
+        {/* 본문 */}
+        <main style={mainStyle}>
         {/* Hero (스펙 3.2) */}
         <section style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ fontSize: '56px', lineHeight: 1, marginBottom: '14px' }} aria-hidden="true">
@@ -213,9 +215,10 @@ function CompleteContent() {
         <div style={cheerBoxStyle}>
           💡 매일 작은 실행과 회고를 반복하며 커리어를 바꿔가요.
         </div>
-      </main>
+        </main>
+      </div>{/* end scroll */}
 
-      {/* CTA (스펙 3.5) */}
+      {/* CTA */}
       <footer style={footerStyle}>
         <button type="button" onClick={handleGoHome} style={primaryBtnStyle}>
           홈으로 가기 →
@@ -292,13 +295,13 @@ function formatDate(d: Date): string {
 
 const wrapStyle: React.CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
+  overflow: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
@@ -306,10 +309,7 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   padding: '10px 16px',
   gap: '12px',
-  position: 'sticky',
-  top: 0,
   background: 'var(--surface)',
-  zIndex: 10,
   borderBottom: '1px solid var(--border)',
   flexShrink: 0,
 };
@@ -323,9 +323,7 @@ const pageTitleStyle: React.CSSProperties = {
 };
 
 const mainStyle: React.CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
-  padding: '32px 20px 24px',
+  padding: '28px 20px 16px',
 };
 
 const summaryCardStyle: React.CSSProperties = {

@@ -103,157 +103,154 @@ export default function LandingPage() {
       overflow: 'hidden',
     }}>
 
-      {/* ── 헤더 ── */}
-      <header style={{
-        padding: '20px 22px 18px',
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* 브랜드 마크 (심장 박동 SVG) */}
-          <div
-            aria-hidden="true"
-            style={{
-              width: '52px', height: '52px', borderRadius: '24%',
-              background: 'var(--accent)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, boxShadow: '0 6px 16px -4px rgba(45,91,255,.4)',
-            }}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12 H7 L9.5 6 L12.5 18 L15 12 H21" />
-            </svg>
-          </div>
-          <div>
-            <div style={{
-              fontSize: '22px', fontWeight: 900, lineHeight: 1.1,
-              letterSpacing: '-.04em', color: 'var(--text-primary)',
-            }}>
-              CareerPT
-            </div>
-            <div style={{
-              marginTop: '3px', fontSize: '13px', fontWeight: 500,
-              color: 'var(--text-muted)', letterSpacing: '-.01em',
-            }}>
-              내 강점으로 커리어 방향을 찾는 AI 코치
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* ── 스크롤 영역 (헤더 + 콘텐츠 포함) ── */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
 
-      {/* ── 메인 콘텐츠 ── */}
-      <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 22px 16px' }}>
-
-        {/* 아이브로우 태그 */}
-        <div style={{
-          display: 'inline-block', marginBottom: '14px',
-          padding: '5px 13px', background: 'var(--accent-light)',
-          color: 'var(--accent)', borderRadius: '999px',
-          fontSize: '12px', fontWeight: 700, letterSpacing: '-.005em',
+        {/* ── 헤더 (스크롤과 함께 올라감) ── */}
+        <header style={{
+          padding: '18px 22px 16px',
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
         }}>
-          📋 코칭 합의
-        </div>
-
-        {/* 메인 타이틀 */}
-        <h1 style={{
-          margin: '0 0 14px', color: 'var(--text-primary)',
-          fontSize: '26px', fontWeight: 800,
-          lineHeight: 1.35, letterSpacing: '-.035em',
-        }}>
-          강점 진단 그 다음,<br />
-          <em style={{ fontStyle: 'normal', color: 'var(--accent)', fontWeight: 800 }}>
-            커리어 방향까지
-          </em>{' '}
-          이어드립니다.
-        </h1>
-
-        {/* 설명 */}
-        <p style={{
-          margin: '0 0 28px', color: 'var(--text-secondary)',
-          fontSize: '14px', fontWeight: 500, lineHeight: 1.7,
-          letterSpacing: '-.005em',
-        }}>
-          코칭을 시작하기 전에 이 서비스가 무엇을 하는지 짧게 안내드려요.{' '}
-          방향, 액션, 성공 기준은 모두{' '}
-          <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-            당신이 직접 선택
-          </strong>
-          합니다. 🙌
-        </p>
-
-        {/* 코칭 원칙 카드 3장 */}
-        {principles.map((p) => (
-          <section
-            key={p.title}
-            style={{
-              padding: '18px 20px', marginBottom: '12px',
-              border: '1px solid var(--border)', borderRadius: '20px',
-              background: 'var(--bg)',
-              display: 'grid', gridTemplateColumns: '40px 1fr',
-              gap: '14px', alignItems: 'flex-start',
-            }}
-          >
-            {/* 아이콘 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               aria-hidden="true"
               style={{
-                width: '40px', height: '40px', borderRadius: '50%',
-                background: 'var(--surface)', border: '1px solid var(--accent-light)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '18px', flexShrink: 0,
+                width: '44px', height: '44px', borderRadius: '24%',
+                background: 'var(--accent)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, boxShadow: '0 6px 16px -4px rgba(45,91,255,.4)',
               }}
             >
-              {p.icon}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12 H7 L9.5 6 L12.5 18 L15 12 H21" />
+              </svg>
             </div>
-            {/* 텍스트 */}
-            <div style={{ minWidth: 0 }}>
-              <h2 style={{
-                margin: '0 0 6px', color: 'var(--text-primary)',
-                fontSize: '16px', fontWeight: 800,
-                lineHeight: 1.3, letterSpacing: '-.025em',
+            <div>
+              <div style={{
+                fontSize: '20px', fontWeight: 900, lineHeight: 1.1,
+                letterSpacing: '-.04em', color: 'var(--text-primary)',
               }}>
-                {p.title}
-              </h2>
+                CareerPT
+              </div>
+              <div style={{
+                marginTop: '2px', fontSize: '12px', fontWeight: 500,
+                color: 'var(--text-muted)', letterSpacing: '-.01em',
+              }}>
+                내 강점으로 커리어 방향을 찾는 AI 코치
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* ── 메인 콘텐츠 ── */}
+        <main style={{ padding: '20px 22px 16px' }}>
+
+          {/* 아이브로우 태그 */}
+          <div style={{
+            display: 'inline-block', marginBottom: '12px',
+            padding: '5px 13px', background: 'var(--accent-light)',
+            color: 'var(--accent)', borderRadius: '999px',
+            fontSize: '12px', fontWeight: 700, letterSpacing: '-.005em',
+          }}>
+            📋 코칭 합의
+          </div>
+
+          {/* 메인 타이틀 */}
+          <h1 style={{
+            margin: '0 0 12px', color: 'var(--text-primary)',
+            fontSize: '24px', fontWeight: 800,
+            lineHeight: 1.35, letterSpacing: '-.035em',
+          }}>
+            강점 진단 그 다음,<br />
+            <em style={{ fontStyle: 'normal', color: 'var(--accent)', fontWeight: 800 }}>
+              커리어 방향까지
+            </em>{' '}
+            이어드립니다.
+          </h1>
+
+          {/* 설명 */}
+          <p style={{
+            margin: '0 0 20px', color: 'var(--text-secondary)',
+            fontSize: '14px', fontWeight: 500, lineHeight: 1.7,
+            letterSpacing: '-.005em',
+          }}>
+            코칭을 시작하기 전에 이 서비스가 무엇을 하는지 짧게 안내드려요.{' '}
+            방향, 액션, 성공 기준은 모두{' '}
+            <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+              당신이 직접 선택
+            </strong>
+            합니다. 🙌
+          </p>
+
+          {/* 코칭 원칙 카드 3장 */}
+          {principles.map((p) => (
+            <section
+              key={p.title}
+              style={{
+                padding: '16px 18px', marginBottom: '10px',
+                border: '1px solid var(--border)', borderRadius: '16px',
+                background: 'var(--bg)',
+              }}
+            >
+              {/* 아이콘 + 제목 한 줄 */}
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                gap: '10px', marginBottom: '8px',
+              }}>
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: '34px', height: '34px', borderRadius: '50%',
+                    background: 'var(--surface)', border: '1px solid var(--accent-light)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '16px', flexShrink: 0,
+                  }}
+                >
+                  {p.icon}
+                </div>
+                <h2 style={{
+                  margin: 0, color: 'var(--text-primary)',
+                  fontSize: '15px', fontWeight: 800,
+                  lineHeight: 1.3, letterSpacing: '-.025em',
+                }}>
+                  {p.title}
+                </h2>
+              </div>
+              {/* 설명 텍스트 (전체 너비) */}
               <p style={{
                 color: 'var(--text-secondary)', fontSize: '13px',
-                fontWeight: 500, lineHeight: 1.6,
+                fontWeight: 500, lineHeight: 1.65,
                 letterSpacing: '-.005em', margin: 0,
               }}>
                 {p.text}
               </p>
-            </div>
-          </section>
-        ))}
-      </main>
+            </section>
+          ))}
+        </main>
+      </div>
 
-      {/* ── 하단 CTA (Footer) ── */}
+      {/* ── 하단 CTA (항상 고정) ── */}
       <footer style={{
-        padding: '16px 22px',
-        paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+        padding: '14px 22px',
+        paddingBottom: 'max(18px, env(safe-area-inset-bottom))',
         borderTop: '1px solid var(--border)',
         background: 'var(--surface)',
         flexShrink: 0,
       }}>
-        {/* Primary CTA: 동의하고 시작하기 → 회원가입 탭 */}
         <button
           onClick={() => router.push('/login?tab=signup')}
           style={{
-            width: '100%', minHeight: '54px', padding: '16px 18px',
+            width: '100%', minHeight: '52px', padding: '14px 18px',
             borderRadius: '12px', background: 'var(--accent)',
             color: '#fff', border: 'none', fontFamily: 'inherit',
             fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
-            cursor: 'pointer', transition: 'background .2s, transform .1s',
+            cursor: 'pointer',
           }}
-          onMouseOver={(e) => (e.currentTarget.style.background = 'var(--accent-deep)')}
-          onMouseOut={(e) => (e.currentTarget.style.background = 'var(--accent)')}
-          onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.99)')}
-          onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         >
           동의하고 시작하기 →
         </button>
-
       </footer>
     </div>
   );

@@ -155,29 +155,32 @@ function StrengthsContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* ── 상단 바 ── */}
-      <header style={headerStyle}>
-        <button
-          onClick={() => router.back()}
-          aria-label="뒤로 가기"
-          style={backBtnStyle}
-        >
-          ←
-        </button>
-        <span style={pageTitleStyle}>강점 선택</span>
-        <span style={{ width: '36px' }} />
-      </header>
+      {/* ── 스크롤 영역 (헤더+진행바+본문) ── */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
 
-      {/* ── 프로그레스 바 ── */}
-      <div style={progressWrapStyle}>
-        <div style={progressLabelStyle}>2 / 5 단계</div>
-        <div style={progressBarStyle}>
-          <div style={{ ...progressFillStyle, width: '40%' }} />
+        {/* ── 상단 바 ── */}
+        <header style={headerStyle}>
+          <button
+            onClick={() => router.back()}
+            aria-label="뒤로 가기"
+            style={backBtnStyle}
+          >
+            ←
+          </button>
+          <span style={pageTitleStyle}>강점 선택</span>
+          <span style={{ width: '44px' }} />
+        </header>
+
+        {/* ── 프로그레스 바 ── */}
+        <div style={progressWrapStyle}>
+          <div style={progressLabelStyle}>2 / 5 단계</div>
+          <div style={progressBarStyle}>
+            <div style={{ ...progressFillStyle, width: '40%' }} />
+          </div>
         </div>
-      </div>
 
-      {/* ── 스크롤 본문 ── */}
-      <main style={mainStyle}>
+        {/* ── 본문 ── */}
+        <main style={mainStyle}>
         {/* 인트로 */}
         <div style={{ marginBottom: '28px' }}>
           <div style={eyebrowStyle}>STEP 2</div>
@@ -305,7 +308,8 @@ function StrengthsContent() {
             </section>
           );
         })}
-      </main>
+        </main>
+      </div>{/* end scroll */}
 
       {/* ── 하단 카운터 + CTA ── */}
       <footer style={footerStyle}>
@@ -382,13 +386,13 @@ function scheduleLocalSave(
 // ── 공통 스타일 ───────────────────────────────────────────────
 const wrapStyle: React.CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
+  overflow: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
@@ -396,12 +400,8 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   padding: '10px 16px',
   gap: '12px',
-  position: 'sticky',
-  top: 0,
   background: 'var(--surface)',
-  zIndex: 10,
   borderBottom: '1px solid var(--border)',
-  flexShrink: 0,
 };
 
 const backBtnStyle: React.CSSProperties = {
@@ -455,8 +455,6 @@ const progressFillStyle: React.CSSProperties = {
 };
 
 const mainStyle: React.CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
   padding: '24px 20px',
 };
 

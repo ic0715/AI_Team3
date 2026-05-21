@@ -382,35 +382,37 @@ function ActionItemsContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 */}
-      <header style={headerStyle}>
-        <button
-          onClick={() => router.back()}
-          aria-label="뒤로 가기"
-          style={backBtnStyle}
-        >
-          ←
-        </button>
-        <span style={pageTitleStyle}>액션 아이템 선택</span>
-        <span style={{ width: '36px' }} />
-      </header>
+      {/* 스크롤 영역 */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {/* 상단 바 */}
+        <header style={headerStyle}>
+          <button
+            onClick={() => router.back()}
+            aria-label="뒤로 가기"
+            style={backBtnStyle}
+          >
+            ←
+          </button>
+          <span style={pageTitleStyle}>액션 아이템 선택</span>
+          <span style={{ width: '44px' }} />
+        </header>
 
-      {/* 상단 goal pill (스펙 3.2) */}
-      <div style={topGoalRowStyle}>
-        <span style={goalPillStyle}>🎯 {goal.goal_title}</span>
-        <span style={{
-          ...countBadgeStyle,
-          background: selectedCount ? 'var(--accent)' : 'var(--border)',
-          color: selectedCount ? '#fff' : 'var(--text-secondary)',
-        }}
-          aria-live="polite"
-        >
-          {selectedCount}
-        </span>
-      </div>
+        {/* 상단 goal pill */}
+        <div style={topGoalRowStyle}>
+          <span style={goalPillStyle}>🎯 {goal.goal_title}</span>
+          <span style={{
+            ...countBadgeStyle,
+            background: selectedCount ? 'var(--accent)' : 'var(--border)',
+            color: selectedCount ? '#fff' : 'var(--text-secondary)',
+          }}
+            aria-live="polite"
+          >
+            {selectedCount}
+          </span>
+        </div>
 
-      {/* 본문 */}
-      <main style={mainStyle}>
+        {/* 본문 */}
+        <main style={mainStyle}>
         {/* 안내 패널 (스펙 3.3) */}
         <div style={infoPanelStyle}>
           <div style={infoTitleStyle}>
@@ -608,10 +610,11 @@ function ActionItemsContent() {
           </span>
         </div>
 
-        <div style={{ height: '4px' }} />
-      </main>
+          <div style={{ height: '4px' }} />
+        </main>
+      </div>{/* end scroll */}
 
-      {/* 하단 CTA (스펙 3.7) */}
+      {/* 하단 CTA */}
       <footer style={footerStyle}>
         {error && (
           <div role="alert" style={errorAlertStyle}>
@@ -779,14 +782,13 @@ function SelectedDot() {
 
 const wrapStyle: React.CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
-  position: 'relative',
+  overflow: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
@@ -794,12 +796,8 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   padding: '10px 16px',
   gap: '12px',
-  position: 'sticky',
-  top: 0,
   background: 'var(--surface)',
-  zIndex: 10,
   borderBottom: '1px solid var(--border)',
-  flexShrink: 0,
 };
 
 const backBtnStyle: React.CSSProperties = {
@@ -866,8 +864,6 @@ const countBadgeStyle: React.CSSProperties = {
 };
 
 const mainStyle: React.CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
   padding: '20px',
 };
 

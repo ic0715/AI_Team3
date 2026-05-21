@@ -466,21 +466,23 @@ function CareerResultContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 */}
-      <header style={headerStyle}>
-        <button
-          onClick={() => router.back()}
-          aria-label="뒤로 가기"
-          style={backBtnStyle}
-        >
-          ←
-        </button>
-        <span style={pageTitleStyle}>커리어 방향 결과</span>
-        <span style={{ width: '36px' }} />
-      </header>
+      {/* 스크롤 영역 */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {/* 상단 바 */}
+        <header style={headerStyle}>
+          <button
+            onClick={() => router.back()}
+            aria-label="뒤로 가기"
+            style={backBtnStyle}
+          >
+            ←
+          </button>
+          <span style={pageTitleStyle}>커리어 방향 결과</span>
+          <span style={{ width: '44px' }} />
+        </header>
 
-      {/* 본문 */}
-      <main style={mainStyle}>
+        {/* 본문 */}
+        <main style={mainStyle}>
         {/* 결과 배너 (스펙 3.2) */}
         <div style={bannerStyle}>
           <div style={bannerEyebrowStyle}>🎯 AI 분석 완료</div>
@@ -518,10 +520,11 @@ function CareerResultContent() {
           </div>
         ) : null}
 
-        <div style={{ height: '8px' }} />
-      </main>
+          <div style={{ height: '8px' }} />
+        </main>
+      </div>{/* end scroll */}
 
-      {/* 하단 CTA (스펙 3.5) */}
+      {/* 하단 CTA */}
       <footer style={footerStyle}>
         {error && slots && (
           <div role="alert" style={errorAlertStyle}>
@@ -943,14 +946,13 @@ function badgeStyle(badge: BadgeKey): React.CSSProperties {
 
 const wrapStyle: React.CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
-  position: 'relative',
+  overflow: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
@@ -958,12 +960,8 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   padding: '10px 16px',
   gap: '12px',
-  position: 'sticky',
-  top: 0,
   background: 'var(--surface)',
-  zIndex: 10,
   borderBottom: '1px solid var(--border)',
-  flexShrink: 0,
 };
 
 const backBtnStyle: React.CSSProperties = {
@@ -990,8 +988,6 @@ const pageTitleStyle: React.CSSProperties = {
 };
 
 const mainStyle: React.CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
   padding: '20px',
 };
 
