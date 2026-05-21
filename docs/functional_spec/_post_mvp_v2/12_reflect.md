@@ -65,9 +65,13 @@
 
 **이번 주 메모 리스트** (메모 1개 이상 존재 시 노출)
 - 섹션 타이틀: `"이번 주 메모 · {N}개"` (13px, weight 700, margin-top 28px)
-- 각 메모 카드: 좌측 요일 레이블(day-letter) + 날짜(day-date), 우측 메모 텍스트
-  - 예: `[월 / 4/22]` | `"월요일은 의지가 강했음. 30분 읽고 3줄 메모 남김."`
+- 각 메모 카드: 좌측 요일 레이블(day-letter) + 날짜(day-date) + **시간(HH:MM, v1.2 신규)**, 우측 메모 텍스트
+  - 예: `[월 / 4/22 / 14:32]` | `"월요일은 의지가 강했음. 30분 읽고 3줄 메모 남김."`
+- 정렬: `memo_date` 우선, 동일 날짜 내에서는 `created_at` 오름차순 (시간 순)
 - 메모 없음: 리스트 영역 미노출
+
+> **v1.2 정책 변경: 같은 날에도 메모 여러 개 누적 저장 가능.**
+> 기존 UPSERT(1일 1메모, 덮어쓰기) → INSERT(다중 누적). 시간 표시로 구분.
 
 ---
 
@@ -134,7 +138,7 @@ CTA 카드:
 | 기능 | 동작 |
 | --- | --- |
 | 모드 자동 분기 | 오늘 요일 기준. 월~금=평일, 토~일=주말 |
-| 평일 메모 저장 | textarea 입력 후 "메모 저장" → `daily_memos` INSERT → textarea 초기화 + 메모 리스트 갱신 + 11 홈 타임라인 메모 요약 갱신 |
+| 평일 메모 저장 | textarea 입력 후 "메모 저장" → `daily_memos` **INSERT (누적, v1.2)** → textarea 초기화 + 메모 리스트 append. 11 홈 타임라인 메모 요약은 v1.2에서 제거됨 (renderTimeline 호출 불필요) |
 | 주말 회고 저장 | "회고 저장하기" → `weekly_retros` INSERT → 버튼 2초간 "✓ 저장 완료" 표시 후 복원 → **`nextWeekCta` 영역 표시** |
 | 주말 완료 횟수 집계 | 저장 시 `action_completions` (이번 주) 건수를 프론트에서 집계해 `completion_count`에 저장. `target_count = 7` 고정 |
 | 메모 리스트 | 이번 주 월~금 메모 전체 표시 (저장 순서 아닌 요일 순) |
@@ -158,7 +162,7 @@ CTA 카드:
 
 | 테이블 | 동작 | 시점 |
 | --- | --- | --- |
-| `daily_memos` | INSERT (UPSERT) | 평일 "메모 저장" 클릭 |
+| `daily_memos` | **INSERT (다중 누적, v1.2)** | 평일 "메모 저장" 클릭 — 같은 날에도 새 row 추가 |
 | `weekly_retros` | INSERT | 주말 "회고 저장하기" 클릭 |
 
 **`daily_memos` INSERT 필드:**
@@ -189,7 +193,7 @@ target_count:     7 (고정)
 | 주말 회고 빈 텍스트 저장 시도 | textarea 포커스 유지, 저장 안 함 |
 | 저장 실패 | 토스트 "저장에 실패했어요. 다시 시도해주세요" |
 | active goals 없음 | `/onboarding/action-items`로 리다이렉트 |
-| 같은 날 메모 중복 저장 | UPSERT 처리 (`memo_date` UNIQUE 제약 활용) |
+| 같은 날 메모 중복 저장 | **다중 INSERT 허용 (v1.2)** — `(user_id, memo_date)` UNIQUE 제약 제거됨. 정렬은 `(memo_date, created_at)` 시간순 |
 | `nextWeekCta` 재진입 시 | 이미 `weekly_retros` 레코드가 존재하면 화면 진입 시점에 CTA 노출 상태로 초기화 |
 
 ---
@@ -209,3 +213,4 @@ target_count:     7 (고정)
 | --- | --- | --- |
 | v1.0 | 2026-05-18 | home_0518.html p12 기준으로 최초 작성. 시연용 토글 제거, 날짜 기반 자동 분기로 정의. 13 회고 코칭 진입 Post-MVP로 명시. |
 | v1.1 | 2026-05-20 | **[HTML 미반영 항목 반영]** **1.** 다음 화면에 "13 회고 AI 코칭 (주말 회고 저장 후 CTA 카드)" 추가. **3.4** 위클리 안내 문구를 HTML 기준으로 수정("이번 주를 돌아보고, 다음 주 액션도 함께 정해요"). 회고 저장 후 안내 문구("위클리 회고를 저장하면…") 추가. CTA 영역(`nextWeekCta`) 전체 UI 상세 명시 — 카드 구조·아이콘·태그 chip·동작(p13 weekly_retro 모드 진입). **4.** AI 코칭 진입 CTA 기능 행 추가. **7.** "13 회고 코칭 진입 Post-MVP" 항목 제거 (MVP 구현으로 승격). `nextWeekCta` 재진입 예외 처리 추가. |
+| v1.2 | 2026-05-21 | **[feature/12 구현 반영 — 다중 메모 정책 + schema v0.8 정합]** **3.3** 평일 메모 — 같은 날에도 메모 여러 개 누적 저장 가능으로 정책 변경. UPSERT(1일 1메모, 덮어쓰기) → INSERT(다중 누적). 메모 리스트에 시간(HH:MM) 표시 추가, `(memo_date, created_at)` 시간순 정렬. **4.** 평일 메모 저장 동작 INSERT 누적으로 갱신. 11 홈 타임라인 메모 요약은 v1.2에서 제거됨에 따라 renderTimeline 호출 불필요. **5.2** daily_memos UPSERT → INSERT (다중 누적). **6.** 같은 날 메모 중복 저장 예외 처리 변경 — UPSERT 처리 → 다중 INSERT 허용 (`UNIQUE(user_id, memo_date)` 제약 제거됨, schema v0.8). |
