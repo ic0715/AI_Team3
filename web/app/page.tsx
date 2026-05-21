@@ -94,13 +94,13 @@ export default function LandingPage() {
   return (
     <div style={{
       width: '390px',
-      minHeight: '100dvh',
+      height: '100dvh',
       background: 'var(--surface)',
       display: 'flex',
       flexDirection: 'column',
       margin: '0 auto',
       boxShadow: '0 0 40px rgba(0,0,0,.18)',
-      overflowX: 'hidden',
+      overflow: 'hidden',
     }}>
 
       {/* ── 헤더 ── */}
@@ -144,7 +144,7 @@ export default function LandingPage() {
       </header>
 
       {/* ── 메인 콘텐츠 ── */}
-      <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '28px 22px 24px' }}>
+      <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 22px 16px' }}>
 
         {/* 아이브로우 태그 */}
         <div style={{
