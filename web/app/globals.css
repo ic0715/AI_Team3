@@ -28,7 +28,7 @@ html, body {
 
 body {
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
-  background: #e8eaee;
+  background: var(--surface);
   color: var(--text-primary);
   font-size: 16px;
   line-height: 1.6;
