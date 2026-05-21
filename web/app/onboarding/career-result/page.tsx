@@ -956,7 +956,7 @@ const wrapStyle: React.CSSProperties = {
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  padding: '16px 20px',
+  padding: '10px 16px',
   gap: '12px',
   position: 'sticky',
   top: 0,
@@ -967,8 +967,8 @@ const headerStyle: React.CSSProperties = {
 };
 
 const backBtnStyle: React.CSSProperties = {
-  width: '36px',
-  height: '36px',
+  width: '44px',
+  height: '44px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

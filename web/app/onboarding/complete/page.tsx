@@ -304,9 +304,12 @@ const wrapStyle: React.CSSProperties = {
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  padding: '16px 20px',
+  padding: '10px 16px',
   gap: '12px',
+  position: 'sticky',
+  top: 0,
   background: 'var(--surface)',
+  zIndex: 10,
   borderBottom: '1px solid var(--border)',
   flexShrink: 0,
 };

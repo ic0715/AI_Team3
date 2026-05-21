@@ -57,11 +57,11 @@ export default function CareerIntroPage() {
     <div className="min-h-screen flex justify-center items-start bg-[#e8eaee]">
       <div className="w-[390px] min-h-[100dvh] bg-[var(--surface)] flex flex-col relative overflow-x-hidden shadow-[0_0_40px_rgba(0,0,0,0.18)]">
         {/* Top Bar */}
-        <div className="flex items-center px-4 py-[14px] border-b border-[var(--border)] bg-[var(--surface)] sticky top-0 z-10">
+        <div className="flex items-center px-4 py-[10px] border-b border-[var(--border)] bg-[var(--surface)] sticky top-0 z-10">
           <button
             type="button"
             onClick={() => router.back()}
-            className="bg-transparent border-none text-[22px] cursor-pointer w-9 h-9 flex items-center justify-center text-[var(--text-primary)] font-inherit"
+            className="bg-transparent border-none text-[22px] cursor-pointer w-11 h-11 flex items-center justify-center text-[var(--text-primary)] font-inherit"
             aria-label="뒤로가기"
           >
             ←

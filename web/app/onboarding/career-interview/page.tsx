@@ -402,15 +402,23 @@ function CareerInterviewContent() {
 
       {/* ── 헤더 ─────────────────────────────────────────── */}
       <header style={{
-        padding: '16px 20px 12px',
+        padding: '8px 16px 6px',
         borderBottom: '1px solid var(--border)',
         background: 'var(--surface)',
         flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           <button
             onClick={() => router.push('/onboarding/career-intro')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)', display: 'flex' }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-secondary)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              width: '44px', height: '44px', borderRadius: '8px', flexShrink: 0,
+            }}
             aria-label="이전으로"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

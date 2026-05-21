@@ -501,13 +501,13 @@ const wrapStyle: React.CSSProperties = {
 };
 
 const topBarStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', padding: '16px 20px', gap: '12px',
+  display: 'flex', alignItems: 'center', padding: '10px 16px', gap: '12px',
   position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10,
   borderBottom: '1px solid var(--border)', flexShrink: 0,
 };
 
 const backBtnStyle: React.CSSProperties = {
-  width: '36px', height: '36px', display: 'flex', alignItems: 'center',
+  width: '44px', height: '44px', display: 'flex', alignItems: 'center',
   justifyContent: 'center', border: 'none', background: 'none',
   cursor: 'pointer', borderRadius: 'var(--radius-sm)',
   color: 'var(--text-primary)', fontSize: '20px',
