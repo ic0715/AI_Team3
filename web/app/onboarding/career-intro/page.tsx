@@ -55,9 +55,7 @@ export default function CareerIntroPage() {
 
   return (
     <div className="min-h-screen flex justify-center items-start bg-[#e8eaee]">
-      <div className="w-[390px] h-[100dvh] bg-[var(--surface)] flex flex-col overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.18)]">
-        {/* 스크롤 영역 (헤더+진행바+콘텐츠) */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="w-[390px] min-h-[100dvh] bg-[var(--surface)] flex flex-col shadow-[0_0_40px_rgba(0,0,0,0.18)]">
 
           {/* Top Bar */}
           <div className="flex items-center px-4 py-[10px] border-b border-[var(--border)] bg-[var(--surface)]">
@@ -174,10 +172,9 @@ export default function CareerIntroPage() {
 
           <div className="h-2" />
         </div>
-        </div>{/* end scroll */}
 
         {/* Bottom Bar */}
-        <div className="px-[22px] pt-[14px] pb-[22px] bg-[var(--surface)] border-t border-[var(--border)]">
+        <div className="sticky bottom-0 px-[22px] pt-[14px] pb-[22px] bg-[var(--surface)] border-t border-[var(--border)] z-20">
           <button
             type="button"
             onClick={() => router.push('/onboarding/career-interview')}

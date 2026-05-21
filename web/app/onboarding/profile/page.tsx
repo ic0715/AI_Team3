@@ -240,11 +240,8 @@ function BasicInfoContent() {
   return (
     <div style={wrapStyle}>
 
-      {/* ── 스크롤 영역 (헤더+진행바+콘텐츠) ── */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-
-        {/* ── 상단 바 ── */}
-        <div style={topBarStyle}>
+      {/* ── 상단 바 ── */}
+      <div style={topBarStyle}>
           {isEditMode ? (
             <button
               onClick={() => router.back()}
@@ -426,9 +423,8 @@ function BasicInfoContent() {
           </div>
         </FormGroup>
 
-          <div style={{ height: '8px' }} />
-        </div>
-      </div>{/* end scroll */}
+        <div style={{ height: '8px' }} />
+      </div>
 
       {/* ── 하단 CTA ── */}
       <div style={bottomBarStyle}>
@@ -499,9 +495,9 @@ function ErrorMsg({ id, children }: { id: string; children: React.ReactNode }) {
 
 // ── 스타일 상수 ────────────────────────────────────────────────
 const wrapStyle: React.CSSProperties = {
-  width: '390px', height: '100dvh', background: 'var(--surface)',
+  width: '390px', minHeight: '100dvh', background: 'var(--surface)',
   display: 'flex', flexDirection: 'column', margin: '0 auto',
-  boxShadow: '0 0 40px rgba(0,0,0,.18)', overflow: 'hidden',
+  boxShadow: '0 0 40px rgba(0,0,0,.18)',
 };
 
 const topBarStyle: React.CSSProperties = {
@@ -549,7 +545,10 @@ const selectStyle: React.CSSProperties = {
 };
 
 const bottomBarStyle: React.CSSProperties = {
+  position: 'sticky',
+  bottom: 0,
   padding: '16px 20px',
   paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-  background: 'var(--surface)', borderTop: '1px solid var(--border)', flexShrink: 0,
+  background: 'var(--surface)', borderTop: '1px solid var(--border)',
+  zIndex: 20,
 };

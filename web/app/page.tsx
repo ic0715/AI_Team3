@@ -94,17 +94,16 @@ export default function LandingPage() {
   return (
     <div style={{
       width: '390px',
-      height: '100dvh',
+      minHeight: '100dvh',
       background: 'var(--surface)',
       display: 'flex',
       flexDirection: 'column',
       margin: '0 auto',
       boxShadow: '0 0 40px rgba(0,0,0,.18)',
-      overflow: 'hidden',
     }}>
 
-      {/* ── 스크롤 영역 (헤더 + 콘텐츠 포함) ── */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      {/* ── 스크롤 영역 (헤더 + 콘텐츠) ── */}
+      <div style={{ flex: 1 }}>
 
         {/* ── 헤더 (스크롤과 함께 올라감) ── */}
         <header style={{
@@ -231,13 +230,15 @@ export default function LandingPage() {
         </main>
       </div>
 
-      {/* ── 하단 CTA (항상 고정) ── */}
+      {/* ── 하단 CTA (sticky — 항상 뷰포트 하단 고정) ── */}
       <footer style={{
+        position: 'sticky',
+        bottom: 0,
         padding: '14px 22px',
         paddingBottom: 'max(18px, env(safe-area-inset-bottom))',
         borderTop: '1px solid var(--border)',
         background: 'var(--surface)',
-        flexShrink: 0,
+        zIndex: 20,
       }}>
         <button
           onClick={() => router.push('/login?tab=signup')}

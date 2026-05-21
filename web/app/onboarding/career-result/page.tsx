@@ -466,10 +466,8 @@ function CareerResultContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 스크롤 영역 */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {/* 상단 바 */}
-        <header style={headerStyle}>
+      {/* 상단 바 */}
+      <header style={headerStyle}>
           <button
             onClick={() => router.back()}
             aria-label="뒤로 가기"
@@ -520,9 +518,8 @@ function CareerResultContent() {
           </div>
         ) : null}
 
-          <div style={{ height: '8px' }} />
-        </main>
-      </div>{/* end scroll */}
+        <div style={{ height: '8px' }} />
+      </main>
 
       {/* 하단 CTA */}
       <footer style={footerStyle}>
@@ -946,13 +943,12 @@ function badgeStyle(badge: BadgeKey): React.CSSProperties {
 
 const wrapStyle: React.CSSProperties = {
   width: '390px',
-  height: '100dvh',
+  minHeight: '100dvh',
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflow: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
@@ -1063,11 +1059,13 @@ const tagStyle: React.CSSProperties = {
 };
 
 const footerStyle: React.CSSProperties = {
+  position: 'sticky',
+  bottom: 0,
   padding: '14px 20px',
   paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
   borderTop: '1px solid var(--border)',
   background: 'var(--surface)',
-  flexShrink: 0,
+  zIndex: 20,
 };
 
 const primaryBtnStyle: React.CSSProperties = {
