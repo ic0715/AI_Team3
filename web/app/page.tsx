@@ -2,6 +2,7 @@
 // p01 랜딩 페이지
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 
 // ── 코칭 원칙 카드 데이터 (spec 01_landing.md 3.3 기준) ──────────
@@ -25,6 +26,11 @@ const principles = [
 
 export default function LandingPage() {
   const router = useRouter();
+
+  // 로그인 페이지 미리 로드 — 클릭 즉시 이동하도록
+  useEffect(() => {
+    router.prefetch('/login');
+  }, [router]);
 
   // 이미 로그인된 사용자 → 상태 기반 자동 리다이렉트 (spec 01_landing.md 2번)
   useEffect(() => {
@@ -227,19 +233,21 @@ export default function LandingPage() {
 
         {/* ── CTA 버튼 (본문 하단 인라인) ── */}
         <div style={{ marginTop: '24px' }}>
-          <button
-            onClick={() => router.push('/login?tab=signup')}
+          <Link
+            href="/login?tab=signup"
+            prefetch={true}
             style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '100%', minHeight: '52px', padding: '14px 18px',
               borderRadius: '12px', background: 'var(--accent)',
-              color: '#fff', border: 'none', fontFamily: 'inherit',
+              color: '#fff', textDecoration: 'none', fontFamily: 'inherit',
               fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
               cursor: 'pointer',
               boxShadow: '0 4px 16px rgba(45,91,255,.3)',
             }}
           >
             동의하고 시작하기 →
-          </button>
+          </Link>
         </div>
       </main>
     </div>
