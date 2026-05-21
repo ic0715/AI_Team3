@@ -69,7 +69,7 @@ export default function DevPanel({ steps }: DevPanelProps) {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-[9999] w-12 h-12 rounded-full bg-gray-900 text-white text-xl shadow-lg flex items-center justify-center hover:bg-gray-700 transition-colors"
+        className="fixed top-4 right-4 z-[9999] w-10 h-10 rounded-full bg-gray-900 text-white text-base shadow-lg flex items-center justify-center hover:bg-gray-700 transition-colors"
         title="Dev Panel"
       >
         🧪
@@ -77,7 +77,7 @@ export default function DevPanel({ steps }: DevPanelProps) {
 
       {/* 패널 */}
       {open && (
-        <div className="fixed bottom-20 right-5 z-[9999] w-72 bg-white border border-gray-200 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 text-sm">
+        <div className="fixed top-16 right-4 z-[9999] w-72 bg-white border border-gray-200 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 text-sm">
           {/* 헤더 */}
           <div className="flex items-center justify-between">
             <span className="font-bold text-gray-800">🧪 Dev Panel</span>

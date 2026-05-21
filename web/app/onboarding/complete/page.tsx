@@ -132,15 +132,15 @@ function CompleteContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 (뒤로가기 없음 — 1회성 안내) */}
+      {/* 상단 바 */}
       <header style={headerStyle}>
-        <span style={{ width: '36px' }} />
-        <span style={pageTitleStyle}>커리어 방향 설정 완료</span>
-        <span style={{ width: '36px' }} />
-      </header>
+          <span style={{ width: '36px' }} />
+          <span style={pageTitleStyle}>커리어 방향 설정 완료</span>
+          <span style={{ width: '36px' }} />
+        </header>
 
-      {/* 본문 */}
-      <main style={mainStyle}>
+        {/* 본문 */}
+        <main style={mainStyle}>
         {/* Hero (스펙 3.2) */}
         <section style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ fontSize: '56px', lineHeight: 1, marginBottom: '14px' }} aria-hidden="true">
@@ -215,7 +215,7 @@ function CompleteContent() {
         </div>
       </main>
 
-      {/* CTA (스펙 3.5) */}
+      {/* CTA */}
       <footer style={footerStyle}>
         <button type="button" onClick={handleGoHome} style={primaryBtnStyle}>
           홈으로 가기 →
@@ -298,13 +298,12 @@ const wrapStyle: React.CSSProperties = {
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
 };
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  padding: '16px 20px',
+  padding: '10px 16px',
   gap: '12px',
   background: 'var(--surface)',
   borderBottom: '1px solid var(--border)',
@@ -320,9 +319,7 @@ const pageTitleStyle: React.CSSProperties = {
 };
 
 const mainStyle: React.CSSProperties = {
-  flex: 1,
-  overflowY: 'auto',
-  padding: '32px 20px 24px',
+  padding: '28px 20px 16px',
 };
 
 const summaryCardStyle: React.CSSProperties = {
@@ -370,11 +367,13 @@ const cheerBoxStyle: React.CSSProperties = {
 };
 
 const footerStyle: React.CSSProperties = {
+  position: 'sticky',
+  bottom: 0,
   padding: '16px 20px',
   paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
   borderTop: '1px solid var(--border)',
   background: 'var(--surface)',
-  flexShrink: 0,
+  zIndex: 20,
 };
 
 const primaryBtnStyle: React.CSSProperties = {

@@ -242,35 +242,35 @@ function BasicInfoContent() {
 
       {/* ── 상단 바 ── */}
       <div style={topBarStyle}>
-        {isEditMode ? (
-          <button
-            onClick={() => router.back()}
-            style={backBtnStyle}
-            aria-label="뒤로가기"
-          >
-            ←
-          </button>
-        ) : (
-          <div style={{ width: '36px' }} />
-        )}
-        <span style={{ fontSize: '16px', fontWeight: 600, flex: 1, textAlign: 'center' }}>
-          {isEditMode ? '기본 정보 수정' : '기본 정보'}
-        </span>
-        <div style={{ width: '36px' }} />
-      </div>
-
-      {/* ── 진행 상태 (신규 모드만) ── */}
-      {!isEditMode && (
-        <div style={{ padding: '0 20px 4px', background: 'var(--surface)', flexShrink: 0 }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>1 / 5 단계</div>
-          <div style={{ height: '4px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
-            <div style={{ width: '20%', height: '100%', background: 'var(--accent)', borderRadius: '999px' }} />
-          </div>
+          {isEditMode ? (
+            <button
+              onClick={() => router.back()}
+              style={backBtnStyle}
+              aria-label="뒤로가기"
+            >
+              ←
+            </button>
+          ) : (
+            <div style={{ width: '44px' }} />
+          )}
+          <span style={{ fontSize: '16px', fontWeight: 600, flex: 1, textAlign: 'center' }}>
+            {isEditMode ? '기본 정보 수정' : '기본 정보'}
+          </span>
+          <div style={{ width: '44px' }} />
         </div>
-      )}
 
-      {/* ── 콘텐츠 ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
+        {/* ── 진행 상태 (신규 모드만) ── */}
+        {!isEditMode && (
+          <div style={{ padding: '0 20px 4px', background: 'var(--surface)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>1 / 5 단계</div>
+            <div style={{ height: '4px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{ width: '20%', height: '100%', background: 'var(--accent)', borderRadius: '999px' }} />
+            </div>
+          </div>
+        )}
+
+        {/* ── 콘텐츠 ── */}
+        <div style={{ padding: '24px 20px' }}>
 
         {/* 인트로 */}
         <div style={{ marginBottom: '24px' }}>
@@ -497,17 +497,17 @@ function ErrorMsg({ id, children }: { id: string; children: React.ReactNode }) {
 const wrapStyle: React.CSSProperties = {
   width: '390px', minHeight: '100dvh', background: 'var(--surface)',
   display: 'flex', flexDirection: 'column', margin: '0 auto',
-  boxShadow: '0 0 40px rgba(0,0,0,.18)', overflowX: 'hidden',
+  boxShadow: '0 0 40px rgba(0,0,0,.18)',
 };
 
 const topBarStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', padding: '16px 20px', gap: '12px',
-  position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10,
-  borderBottom: '1px solid var(--border)', flexShrink: 0,
+  display: 'flex', alignItems: 'center', padding: '10px 16px', gap: '12px',
+  background: 'var(--surface)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const backBtnStyle: React.CSSProperties = {
-  width: '36px', height: '36px', display: 'flex', alignItems: 'center',
+  width: '44px', height: '44px', display: 'flex', alignItems: 'center',
   justifyContent: 'center', border: 'none', background: 'none',
   cursor: 'pointer', borderRadius: 'var(--radius-sm)',
   color: 'var(--text-primary)', fontSize: '20px',
@@ -545,7 +545,10 @@ const selectStyle: React.CSSProperties = {
 };
 
 const bottomBarStyle: React.CSSProperties = {
+  position: 'sticky',
+  bottom: 0,
   padding: '16px 20px',
   paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-  background: 'var(--surface)', borderTop: '1px solid var(--border)', flexShrink: 0,
+  background: 'var(--surface)', borderTop: '1px solid var(--border)',
+  zIndex: 20,
 };

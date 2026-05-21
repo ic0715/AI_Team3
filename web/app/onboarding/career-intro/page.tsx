@@ -55,38 +55,39 @@ export default function CareerIntroPage() {
 
   return (
     <div className="min-h-screen flex justify-center items-start bg-[#e8eaee]">
-      <div className="w-[390px] min-h-[100dvh] bg-[var(--surface)] flex flex-col relative overflow-x-hidden shadow-[0_0_40px_rgba(0,0,0,0.18)]">
-        {/* Top Bar */}
-        <div className="flex items-center px-4 py-[14px] border-b border-[var(--border)] bg-[var(--surface)] sticky top-0 z-10">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="bg-transparent border-none text-[22px] cursor-pointer w-9 h-9 flex items-center justify-center text-[var(--text-primary)] font-inherit"
-            aria-label="뒤로가기"
-          >
-            ←
-          </button>
-          <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-primary)]">
-            커리어 인터뷰
-          </span>
-          <div className="w-9" />
-        </div>
+      <div className="w-[390px] min-h-[100dvh] bg-[var(--surface)] flex flex-col shadow-[0_0_40px_rgba(0,0,0,0.18)]">
 
-        {/* Progress */}
-        <div className="px-[22px] pt-4 pb-2">
-          <div className="text-[11px] font-bold text-[var(--text-muted)] tracking-[0.06em] mb-2">
-            4 / 5 단계
+          {/* Top Bar */}
+          <div className="flex items-center px-4 py-[10px] border-b border-[var(--border)] bg-[var(--surface)]">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="bg-transparent border-none text-[22px] cursor-pointer w-11 h-11 flex items-center justify-center text-[var(--text-primary)] font-inherit"
+              aria-label="뒤로가기"
+            >
+              ←
+            </button>
+            <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-primary)]">
+              커리어 인터뷰
+            </span>
+            <div className="w-11" />
           </div>
-          <div className="h-[6px] bg-[var(--border)] rounded-[var(--radius-full)] overflow-hidden">
-            <div
-              className="h-full bg-[var(--accent)] rounded-[var(--radius-full)] transition-[width] duration-[400ms]"
-              style={{ width: '80%' }}
-            />
-          </div>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-[22px] pb-4">
+          {/* Progress */}
+          <div className="px-[22px] pt-4 pb-2">
+            <div className="text-[11px] font-bold text-[var(--text-muted)] tracking-[0.06em] mb-2">
+              4 / 5 단계
+            </div>
+            <div className="h-[6px] bg-[var(--border)] rounded-[var(--radius-full)] overflow-hidden">
+              <div
+                className="h-full bg-[var(--accent)] rounded-[var(--radius-full)] transition-[width] duration-[400ms]"
+                style={{ width: '80%' }}
+              />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-[22px] pb-4">
           {/* Hero */}
           <div className="flex flex-col items-center text-center px-[6px] pt-7">
             <div className="text-[72px] mb-6 leading-none">🗺️</div>
@@ -173,7 +174,7 @@ export default function CareerIntroPage() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="px-[22px] pt-[14px] pb-[22px] bg-[var(--surface)] border-t border-[var(--border)]">
+        <div className="sticky bottom-0 px-[22px] pt-[14px] pb-[22px] bg-[var(--surface)] border-t border-[var(--border)] z-20">
           <button
             type="button"
             onClick={() => router.push('/onboarding/career-interview')}
