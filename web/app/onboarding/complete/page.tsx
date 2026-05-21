@@ -171,11 +171,10 @@ function CompleteContent() {
             <div
               style={{
                 display: 'flex',
-                flexWrap: 'nowrap',
+                flexWrap: 'wrap',
                 gap: '4px',
+                rowGap: '5px',
                 justifyContent: 'flex-end',
-                overflowX: 'auto',
-                paddingBottom: '2px',
               }}
             >
               {data.strengths.length === 0 ? (
