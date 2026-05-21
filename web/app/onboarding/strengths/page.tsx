@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { STRENGTHS_BY_DOMAIN, type Strength } from '@/lib/constants/strengths';
+import { STRENGTHS_BY_DOMAIN, type Strength, type Domain } from '@/lib/constants/strengths';
 
 // ── 로컬스토리지 키 ───────────────────────────────────────────
 const LS_KEY = 'selectedStrengths';
@@ -13,7 +13,7 @@ interface SelectedStrength {
   id: string;
   name: string;
   nameEn: string;
-  domain: string;
+  domain: Domain;
 }
 
 // ── 도메인 색상 매핑 ──────────────────────────────────────────
@@ -307,12 +307,12 @@ function StrengthsContent() {
         })}
       </main>
 
-      {/* ── 하단 카운터 + CTA ── */}
+      {/* ── 하단 선택 요약 + CTA ── */}
       <footer style={footerStyle}>
         {/* 에러 메시지 */}
         {error && (
           <div style={{
-            padding: '10px 14px', marginBottom: '12px',
+            padding: '10px 14px', marginBottom: '10px',
             background: '#FEF2F2', border: '1px solid #FECACA',
             borderRadius: '10px', fontSize: '13px',
             color: 'var(--danger)', fontWeight: 500,
@@ -321,44 +321,111 @@ function StrengthsContent() {
           </div>
         )}
 
-        {/* 카운터 */}
+        {/* 선택된 강점 칩 목록 */}
         <div
           aria-live="polite"
-          aria-atomic="true"
+          aria-label="선택한 강점 목록"
           style={{
-            textAlign: 'center', marginBottom: '12px',
-            fontSize: '14px', fontWeight: 500,
-            color: 'var(--text-secondary)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '6px',
+            minHeight: '32px',
+            marginBottom: '10px',
+            alignItems: 'center',
           }}
         >
-          선택한 강점{' '}
-          <strong style={{ color: isFull ? 'var(--accent)' : 'var(--text-primary)', fontSize: '16px' }}>
-            {count}
-          </strong>
-          {' '}/ 5
+          {selected.length === 0 ? (
+            <span style={{
+              fontSize: '13px', color: 'var(--text-muted)',
+              fontWeight: 500, lineHeight: 1,
+            }}>
+              강점을 선택하면 여기에 표시돼요
+            </span>
+          ) : (
+            selected.map((s) => {
+              const ds = DOMAIN_STYLES[s.domain];
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleToggle(s)}
+                  aria-label={`${s.name} 선택 해제`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px 5px 11px',
+                    borderRadius: '999px',
+                    border: `1.5px solid ${ds.color}`,
+                    background: ds.color,
+                    color: '#fff',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    lineHeight: 1,
+                    userSelect: 'none',
+                    transition: 'opacity .15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  {s.name}
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                    <path d="M2 2l7 7M9 2l-7 7" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </button>
+              );
+            })
+          )}
         </div>
 
-        {/* CTA 버튼 */}
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          style={{
-            width: '100%', minHeight: '54px', padding: '16px 18px',
-            borderRadius: '12px',
-            background: canSubmit ? 'var(--accent)' : 'var(--border)',
-            color: canSubmit ? '#fff' : 'var(--text-muted)',
-            border: 'none', fontFamily: 'inherit',
-            fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
-            cursor: canSubmit ? 'pointer' : 'not-allowed',
-            transition: 'background .2s, transform .1s',
-          }}
-          onMouseOver={(e) => { if (canSubmit) e.currentTarget.style.background = 'var(--accent-deep)'; }}
-          onMouseOut={(e) => { if (canSubmit) e.currentTarget.style.background = 'var(--accent)'; }}
-          onMouseDown={(e) => { if (canSubmit) e.currentTarget.style.transform = 'scale(0.99)'; }}
-          onMouseUp={(e) => { if (canSubmit) e.currentTarget.style.transform = 'scale(1)'; }}
-        >
-          {saving ? '저장 중...' : '다음으로 →'}
-        </button>
+        {/* 카운터 + CTA 버튼 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* 카운터 뱃지 */}
+          <div
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              flexShrink: 0,
+              minWidth: '44px',
+              textAlign: 'center',
+              fontSize: '13px',
+              fontWeight: 700,
+              color: isFull ? 'var(--accent)' : 'var(--text-secondary)',
+              background: isFull ? 'var(--accent-light)' : 'var(--bg)',
+              borderRadius: '999px',
+              padding: '6px 10px',
+              transition: 'color .2s, background .2s',
+              lineHeight: 1,
+            }}
+          >
+            {count} / 5
+          </div>
+
+          {/* CTA 버튼 */}
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            style={{
+              flex: 1,
+              minHeight: '50px',
+              padding: '14px 18px',
+              borderRadius: '12px',
+              background: canSubmit ? 'var(--accent)' : 'var(--border)',
+              color: canSubmit ? '#fff' : 'var(--text-muted)',
+              border: 'none', fontFamily: 'inherit',
+              fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              transition: 'background .2s, transform .1s',
+            }}
+            onMouseOver={(e) => { if (canSubmit) e.currentTarget.style.background = 'var(--accent-dark)'; }}
+            onMouseOut={(e) => { if (canSubmit) e.currentTarget.style.background = 'var(--accent)'; }}
+            onMouseDown={(e) => { if (canSubmit) e.currentTarget.style.transform = 'scale(0.99)'; }}
+            onMouseUp={(e) => { if (canSubmit) e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            {saving ? '저장 중...' : '다음으로 →'}
+          </button>
+        </div>
       </footer>
     </div>
   );
