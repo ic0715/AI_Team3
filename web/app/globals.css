@@ -31,6 +31,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* iOS Safari: input 포커스 시 자동 확대 방지 (font-size 16px 미만이면 확대됨) */
+input, textarea, select {
+  font-size: 16px;
+}
+
 ::-webkit-scrollbar {
   width: 0;
 }
