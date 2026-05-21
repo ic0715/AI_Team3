@@ -37,10 +37,16 @@ input, textarea, select {
   line-height: 1.5;
 }
 
-/* iOS Safari: type="date" 기본 높이를 text input과 동일하게 */
+/* iOS Safari: type="date" 기본 높이/너비를 text input과 동일하게 */
 input[type="date"] {
+  -webkit-appearance: none; /* iOS Safari 기본 스타일 제거 → 내부 최소 너비 초기화 */
+  appearance: none;
   min-height: unset;
   line-height: 1.5;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 ::-webkit-scrollbar {
