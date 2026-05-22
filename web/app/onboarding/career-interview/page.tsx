@@ -187,10 +187,6 @@ function CareerInterviewContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // visualViewport.height: 키보드가 올라온 만큼 정확히 뺀 가시 높이
-  // 100dvh는 iOS Safari에서 keyboard 높이를 타이밍상 못 빼는 경우 있음
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const savedSessionRef = useRef<{ messages: Message[]; coreIndex: number } | null>(null);
@@ -289,18 +285,39 @@ function CareerInterviewContent() {
     scrollToBottom();
   }, [messages, isSending, scrollToBottom]);
 
+  // ── body 스크롤 잠금 (이 페이지에서만) ──────────────────
+  // iOS Safari는 input focus 시 page 자체를 스크롤시킴
+  // → position: fixed + overflow: hidden으로 막아야
+  //   100dvh가 키보드 높이를 정확히 반영하고 레이아웃이 흐트러지지 않음
+  // → 페이지 이탈 시 원복 필수 (다른 페이지 영향 방지)
+  useEffect(() => {
+    const prev = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      width: document.body.style.width,
+      height: document.body.style.height,
+    };
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+
+    return () => {
+      document.body.style.overflow = prev.overflow;
+      document.body.style.position = prev.position;
+      document.body.style.width = prev.width;
+      document.body.style.height = prev.height;
+    };
+  }, []);
+
   // ── iOS Safari 키보드 대응 ────────────────────────────────
-  // visualViewport.height = 키보드가 올라온 만큼 정확히 줄어드는 값
-  // → 컨테이너 높이를 이 값으로 맞추면 입력창↔키보드 사이 여백 없어짐
+  // body가 fixed이면 page scroll이 없으므로 100dvh가 정확히 동작함
   // scroll 리스너 금지: scroll → resize 무한 루프(떨림) 원인
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    setViewportHeight(viewport.height);
-
     const onResize = () => {
-      setViewportHeight(viewport.height);
       // 새 메시지가 가려질 것 같을 때만 스크롤 (KakaoTalk 동작)
       scrollIfNearBottom();
     };
@@ -438,9 +455,9 @@ function CareerInterviewContent() {
   return (
     <div style={{
       width: '390px',
-      // visualViewport.height 우선 사용 (키보드 높이 정확히 반영)
-      // 초기 로드 전 fallback으로 100dvh 사용
-      height: viewportHeight != null ? `${viewportHeight}px` : '100dvh',
+      // body가 position:fixed이면 iOS Safari의 강제 page scroll이 없으므로
+      // 100dvh가 키보드 높이를 정확히 반영함
+      height: '100dvh',
       background: 'var(--surface)',
       display: 'flex',
       flexDirection: 'column',
