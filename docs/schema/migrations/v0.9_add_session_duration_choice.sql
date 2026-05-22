@@ -17,6 +17,14 @@ COMMENT ON COLUMN career_interview_results.session_duration_choice IS
   '인터뷰 시작 시 사용자가 답한 가용 시간 분류. AI가 자연어 응답을 보고 추출 단계에서 결정. short=15~25분, medium=30~45분, long=50분+';
 
 -- =============================================================
+-- key_insights nullable 변경
+-- Path C(정서 위기 가드레일 작동) 시 key_insights = NULL로 저장하기 위해
+-- =============================================================
+
+ALTER TABLE career_interview_results
+  ALTER COLUMN key_insights DROP NOT NULL;
+
+-- =============================================================
 -- 검증 쿼리 (실행 후 확인용)
 -- =============================================================
 

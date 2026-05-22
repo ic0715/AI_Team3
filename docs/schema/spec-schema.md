@@ -287,7 +287,7 @@ auth.users (Supabase 관리)
 | `id` | `uuid` | PK, default gen_random_uuid() | 인터뷰 결과 고유 ID | `z1y2x3w4-...` |
 | `user_id` | `uuid` | NOT NULL, FK → `profiles.id` | 유저 ID | `a1b2c3d4-...` |
 | `interviewed_at` | `timestamptz` | NOT NULL, default now() | 인터뷰 완료 일시 | `2026-04-16 10:30:00+09` |
-| `key_insights` | `jsonb` | NOT NULL | AI가 대화에서 추출한 핵심 인사이트 (아래 참고). Path C(정서 위기 redirect) 시 NULL | 아래 참고 |
+| `key_insights` | `jsonb` | **nullable** | AI가 대화에서 추출한 핵심 인사이트 (아래 참고). Path C(정서 위기 redirect) 시 NULL로 저장 | 아래 참고 |
 | `session_duration_choice` | `text` | NOT NULL, DEFAULT 'medium', CHECK | **v0.9 신규** — 인터뷰 시작 시 사용자가 답한 가용 시간 분류. `short`=15~25분 / `medium`=30~45분 / `long`=50분+ | `medium` |
 | `ai_summary` | `text` | NOT NULL | AI가 생성한 인터뷰 종합 한 줄 요약 | `성취 지향적이며 방향성보다 성장 환경을 중시함` |
 | `recommended_competencies` | `jsonb` | nullable | #3 단계에서 산출되는 5개 옵션 (아래 참고) | 아래 참고 |
