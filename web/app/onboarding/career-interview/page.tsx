@@ -271,6 +271,19 @@ function CareerInterviewContent() {
     el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'instant' : 'smooth' });
   }, []);
 
+  // ── KakaoTalk식 스크롤: bottom 근처였을 때만 bottom 유지 ──
+  // 사용자가 위로 스크롤해 과거 메시지 보는 중이면 방해하지 않음
+  const scrollIfNearBottom = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // bottom에서 120px 이내였으면 키보드 올라와도 bottom 유지
+    if (distFromBottom < 120) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+    }
+    // 위로 스크롤 중이었으면 그 위치 그대로 유지
+  }, []);
+
   // ── 새 메시지 도착 시 스크롤 ──────────────────────────────
   useEffect(() => {
     scrollToBottom();
@@ -278,23 +291,23 @@ function CareerInterviewContent() {
 
   // ── iOS Safari 키보드 대응 ────────────────────────────────
   // visualViewport.height = 키보드가 올라온 만큼 정확히 줄어드는 값
-  // 이걸 컨테이너 높이로 사용하면 입력창 아래 빈 공간 제거됨
+  // → 컨테이너 높이를 이 값으로 맞추면 입력창↔키보드 사이 여백 없어짐
   // scroll 리스너 금지: scroll → resize 무한 루프(떨림) 원인
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    // 초기 높이 설정
     setViewportHeight(viewport.height);
 
     const onResize = () => {
-      setViewportHeight(viewport.height); // 컨테이너 높이를 가시 영역에 맞춤
-      scrollToBottom(true);               // 최신 메시지 표시
+      setViewportHeight(viewport.height);
+      // 새 메시지가 가려질 것 같을 때만 스크롤 (KakaoTalk 동작)
+      scrollIfNearBottom();
     };
 
     viewport.addEventListener('resize', onResize);
     return () => viewport.removeEventListener('resize', onResize);
-  }, [scrollToBottom]);
+  }, [scrollIfNearBottom]);
 
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
