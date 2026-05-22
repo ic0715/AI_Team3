@@ -187,6 +187,10 @@ function CareerInterviewContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // visualViewport.height: 키보드가 올라온 만큼 정확히 뺀 가시 높이
+  // 100dvh는 iOS Safari에서 keyboard 높이를 타이밍상 못 빼는 경우 있음
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const savedSessionRef = useRef<{ messages: Message[]; coreIndex: number } | null>(null);
@@ -273,16 +277,19 @@ function CareerInterviewContent() {
   }, [messages, isSending, scrollToBottom]);
 
   // ── iOS Safari 키보드 대응 ────────────────────────────────
-  // visualViewport resize = 키보드 출현/소멸 시 발생
-  // scroll 리스너는 추가하지 않음 — 스크롤 이벤트가 resize를 유발해
-  // 무한 루프(떨림)가 생기기 때문
+  // visualViewport.height = 키보드가 올라온 만큼 정확히 줄어드는 값
+  // 이걸 컨테이너 높이로 사용하면 입력창 아래 빈 공간 제거됨
+  // scroll 리스너 금지: scroll → resize 무한 루프(떨림) 원인
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
+    // 초기 높이 설정
+    setViewportHeight(viewport.height);
+
     const onResize = () => {
-      // 키보드가 올라오면 최신 메시지가 보이도록 즉시 스크롤
-      scrollToBottom(true);
+      setViewportHeight(viewport.height); // 컨테이너 높이를 가시 영역에 맞춤
+      scrollToBottom(true);               // 최신 메시지 표시
     };
 
     viewport.addEventListener('resize', onResize);
@@ -418,7 +425,9 @@ function CareerInterviewContent() {
   return (
     <div style={{
       width: '390px',
-      height: '100dvh',
+      // visualViewport.height 우선 사용 (키보드 높이 정확히 반영)
+      // 초기 로드 전 fallback으로 100dvh 사용
+      height: viewportHeight != null ? `${viewportHeight}px` : '100dvh',
       background: 'var(--surface)',
       display: 'flex',
       flexDirection: 'column',
