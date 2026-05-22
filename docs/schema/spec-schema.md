@@ -1166,6 +1166,6 @@ CREATE INDEX IF NOT EXISTS idx_daily_memos_user_goal_week
 | --- | --- | --- | --- |
 | v0.7.2 | 2026-05-08 | 민선 | push_subscriptions 테이블, profile_completed 컬럼 등 |
 | v0.8 | 2026-05-22 | 민선 | action_items.strength_link, coaching_insights.badge/comment 추가, daily_memos UNIQUE 제거, 인덱스 추가 |
-| v0.9 | 2026-05-22 | 민선 | career_interview_results.session_duration_choice 컬럼 추가 (커리어 인터뷰 v2 개편) |
+| v0.9 | 2026-05-22 | 민선 | career_interview_results.session_duration_choice 컬럼 추가, key_insights nullable 변경 (커리어 인터뷰 v2 개편) — **반영 완료** |
 
 *CareerPT DB 스키마 v0.9 · 최종 수정 2026-05-22 · Supabase 반영 완료 2026-05-22*
