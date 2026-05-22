@@ -1,10 +1,21 @@
-# CareerPT — DB 스키마 설계 (Draft v0.8)
+# CareerPT — DB 스키마 설계 (Draft v0.9)
 
 > 기준 프로토타입: `home_0520_v2.html`
 > 작성일: 2026-05-04
-> 최종 수정: 2026-05-21
+> 최종 수정: 2026-05-22
 > 상태: 기획 요건 확정 → Supabase 테이블 생성 준비
 > DB: Supabase (PostgreSQL)
+
+---
+
+### v0.8 → v0.9 변경 사항 (2026-05-22) — 커리어 인터뷰 v2 개편 반영
+
+| # | 변경 내용 |
+| --- | --- |
+| 1 | `career_interview_results.session_duration_choice` 컬럼 신규 추가 (TEXT NOT NULL DEFAULT 'medium', CHECK IN ('short','medium','long')) — 커리어 인터뷰 v2 자유 흐름 구조에서 사용자가 선택한 인터뷰 시간 깊이 저장. `short`=15~25분, `medium`=30~45분, `long`=50분+ |
+| 2 | `career_interview_results.key_insights` JSONB 구조 변경 — 신규 4키 (`presenting_issue` / `agreed_focus` / `agreement_evolution` / `user_takeaway`) 추가, 기존 7키(current_satisfaction ~ dream)는 모두 optional로 변경하고 중첩 객체(`key_insights`) 안으로 이동. JSONB schema-less이므로 ALTER 불필요, AI 출력 JSON이 통째로 저장됨 |
+
+> 변경 근거: `docs/CAREER_INTERVIEW_V2_DECISIONS.md` Part 7 (추출 스키마)
 
 ---
 
@@ -276,24 +287,45 @@ auth.users (Supabase 관리)
 | `id` | `uuid` | PK, default gen_random_uuid() | 인터뷰 결과 고유 ID | `z1y2x3w4-...` |
 | `user_id` | `uuid` | NOT NULL, FK → `profiles.id` | 유저 ID | `a1b2c3d4-...` |
 | `interviewed_at` | `timestamptz` | NOT NULL, default now() | 인터뷰 완료 일시 | `2026-04-16 10:30:00+09` |
-| `key_insights` | `jsonb` | NOT NULL | AI가 대화에서 추출한 핵심 인사이트 (아래 참고) | 아래 참고 |
+| `key_insights` | `jsonb` | NOT NULL | AI가 대화에서 추출한 핵심 인사이트 (아래 참고). Path C(정서 위기 redirect) 시 NULL | 아래 참고 |
+| `session_duration_choice` | `text` | NOT NULL, DEFAULT 'medium', CHECK | **v0.9 신규** — 인터뷰 시작 시 사용자가 답한 가용 시간 분류. `short`=15~25분 / `medium`=30~45분 / `long`=50분+ | `medium` |
 | `ai_summary` | `text` | NOT NULL | AI가 생성한 인터뷰 종합 한 줄 요약 | `성취 지향적이며 방향성보다 성장 환경을 중시함` |
 | `recommended_competencies` | `jsonb` | nullable | #3 단계에서 산출되는 5개 옵션 (아래 참고) | 아래 참고 |
 
-**`key_insights` JSONB 구조 (v0.7.1):**
+**`session_duration_choice` CHECK 제약:**
 
-```json
+```sql
+CHECK (session_duration_choice IN ('short', 'medium', 'long'))
+```
+
+**`key_insights` JSONB 구조 (v0.9 — 커리어 인터뷰 v2):**
+
+```jsonc
 {
-  "current_satisfaction": "팀원들과 협업할 때 에너지를 얻어요",
-  "current_frustration": "내가 성장하고 있는지 방향이 불명확해요",
-  "future_vision": "3~5년 안에 팀을 이끄는 리더가 되고 싶어요",
-  "work_style": "자율성이 보장되는 소규모 팀 선호",
-  "values": ["성장", "인정", "자율"],
-  "career_concern": "이직을 해야 하는지 현 직장에서 성장해야 하는지 모르겠어요",
-  "dream": "언젠가 나만의 팀을 만들어 제품을 만들고 싶어요",
+  // 신규 4키 (v0.9)
+  "presenting_issue": "...",     // 필수 — 사용자가 처음 가져온 표면 이슈
+  "agreed_focus": "...",         // 필수 — 최종 합의된 다루기로 한 주제
+  "agreement_evolution": "...",  // optional — 합의 재조정이 있었다면 그 흐름
+  "user_takeaway": "...",        // 필수 — 사용자의 마무리 인사이트
+
+  // 기존 7키 (모두 optional로 변경, 중첩 객체로 이동)
+  "key_insights": {
+    "current_satisfaction": "팀원들과 협업할 때 에너지를 얻어요",
+    "current_frustration": "내가 성장하고 있는지 방향이 불명확해요",
+    "future_vision": "3~5년 안에 팀을 이끄는 리더가 되고 싶어요",
+    "work_style": "자율성이 보장되는 소규모 팀 선호",
+    "values": ["성장", "인정", "자율"],
+    "career_concern": "이직을 해야 하는지 현 직장에서 성장해야 하는지 모르겠어요",
+    "dream": "언젠가 나만의 팀을 만들어 제품을 만들고 싶어요"
+  },
+
+  // 역량 추출 (기존 로직 유지)
   "mentioned_competencies": ["I-2", "T-1"]
 }
 ```
+
+> ⚠️ JSONB는 schema-less이므로 ALTER 불필요. AI 출력 JSON이 통째로 저장됨.
+> ⚠️ Path C(정서 위기 redirect) 발생 시 추출 단계 건너뛰고 `key_insights = NULL`로 저장.
 
 **`mentioned_competencies` 키 (v0.7.1 신규):**
 - 인터뷰 중 사용자가 명시적·암묵적으로 언급한 12개 역량 코드 목록
@@ -1133,5 +1165,6 @@ CREATE INDEX IF NOT EXISTS idx_daily_memos_user_goal_week
 | --- | --- | --- | --- |
 | v0.7.2 | 2026-05-08 | 민선 | push_subscriptions 테이블, profile_completed 컬럼 등 |
 | v0.8 | 2026-05-22 | 민선 | action_items.strength_link, coaching_insights.badge/comment 추가, daily_memos UNIQUE 제거, 인덱스 추가 |
+| v0.9 | 2026-05-22 | 민선 | career_interview_results.session_duration_choice 컬럼 추가 (커리어 인터뷰 v2 개편) |
 
-*CareerPT DB 스키마 v0.8 · 최종 수정 2026-05-21 · Supabase 반영 완료 2026-05-22*
+*CareerPT DB 스키마 v0.9 · 최종 수정 2026-05-22 · Supabase 반영 완료 2026-05-22*
