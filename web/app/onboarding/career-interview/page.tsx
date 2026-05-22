@@ -185,6 +185,12 @@ function CareerInterviewContent() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+
+  // 키보드 오프셋 (iOS Safari: 키보드 높이만큼 푸터를 위로 밀기)
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  // 푸터 높이 (메시지 영역 하단 여백 계산용)
+  const [footerHeight, setFooterHeight] = useState(80);
 
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
@@ -262,21 +268,42 @@ function CareerInterviewContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
-  // ── 키보드 출현 시 최신 메시지로 스크롤 (iOS Safari) ────
-  // visualViewport.resize = 소프트 키보드 올라오는 순간 발생
+  // ── iOS Safari 키보드 대응 ────────────────────────────────
+  // visualViewport.resize = 키보드 출현/소멸 시 발생
+  // → 키보드 높이만큼 푸터 bottom을 올려서 입력창이 키보드 위에 뜨도록
+  // → 대화창은 position: fixed 푸터 아래 paddingBottom으로 공간 확보
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    const onKeyboardOpen = () => {
-      // 키보드 슬라이드 애니메이션이 끝난 뒤 스크롤 (300ms)
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 300);
+    const update = () => {
+      const kb = Math.max(0, window.innerHeight - viewport.height);
+      setKeyboardOffset(kb);
+      // 키보드가 올라올 때 최신 메시지로 스크롤
+      if (kb > 0) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     };
 
-    viewport.addEventListener('resize', onKeyboardOpen);
-    return () => viewport.removeEventListener('resize', onKeyboardOpen);
+    viewport.addEventListener('resize', update);
+    viewport.addEventListener('scroll', update);
+    return () => {
+      viewport.removeEventListener('resize', update);
+      viewport.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  // ── 푸터 높이 실시간 측정 (메시지 영역 여백 계산용) ──────
+  useEffect(() => {
+    const el = footerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setFooterHeight(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // ── 메시지 전송 ───────────────────────────────────────────
@@ -509,6 +536,8 @@ function CareerInterviewContent() {
       <div style={{
         flex: 1, overflowY: 'auto',
         padding: '20px 16px 8px',
+        // 고정 푸터에 가려지지 않도록 하단 여백 확보
+        paddingBottom: footerHeight + 16,
         display: 'flex', flexDirection: 'column', gap: '16px',
       }}>
         {messages.map((msg) => (
@@ -559,13 +588,24 @@ function CareerInterviewContent() {
         </div>
       )}
 
-      {/* ── 하단 영역 ────────────────────────────────────── */}
-      <div style={{
-        flexShrink: 0,
-        borderTop: '1px solid var(--border)',
-        background: 'var(--surface)',
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-      }}>
+      {/* ── 하단 입력 영역 (키보드 위에 고정) ──────────── */}
+      {/* position: fixed + keyboardOffset → 키보드가 올라와도 입력창은 키보드 바로 위에 위치 */}
+      {/* 대화창은 flex 레이아웃에서 분리되어 키보드에 영향 받지 않음 */}
+      <div
+        ref={footerRef}
+        style={{
+          position: 'fixed',
+          bottom: keyboardOffset,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '390px',
+          zIndex: 20,
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface)',
+          // 키보드가 내려가 있을 때만 safe-area 적용
+          paddingBottom: keyboardOffset > 0 ? '8px' : 'max(16px, env(safe-area-inset-bottom))',
+        }}
+      >
 
         {/* 에러 메시지 */}
         {finalizeError && (
@@ -602,12 +642,6 @@ function CareerInterviewContent() {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              onFocus={() => {
-                // 포커스 시 키보드 애니메이션 대기 후 스크롤
-                setTimeout(() => {
-                  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                }, 350);
-              }}
               placeholder="답변을 입력해주세요 (Shift+Enter로 줄바꿈)"
               rows={1}
               style={{
