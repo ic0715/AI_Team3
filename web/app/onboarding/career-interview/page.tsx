@@ -186,6 +186,10 @@ function CareerInterviewContent() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+
+  // composer 높이 (메시지 영역 paddingBottom 계산용)
+  const [composerHeight, setComposerHeight] = useState(80);
 
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
@@ -267,19 +271,6 @@ function CareerInterviewContent() {
     el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'instant' : 'smooth' });
   }, []);
 
-  // ── KakaoTalk식 스크롤: bottom 근처였을 때만 bottom 유지 ──
-  // 사용자가 위로 스크롤해 과거 메시지 보는 중이면 방해하지 않음
-  const scrollIfNearBottom = useCallback(() => {
-    const el = messagesContainerRef.current;
-    if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    // bottom에서 120px 이내였으면 키보드 올라와도 bottom 유지
-    if (distFromBottom < 120) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
-    }
-    // 위로 스크롤 중이었으면 그 위치 그대로 유지
-  }, []);
-
   // ── 새 메시지 도착 시 스크롤 ──────────────────────────────
   useEffect(() => {
     scrollToBottom();
@@ -310,21 +301,55 @@ function CareerInterviewContent() {
     };
   }, []);
 
-  // ── iOS Safari 키보드 대응 ────────────────────────────────
-  // body가 fixed이면 page scroll이 없으므로 100dvh가 정확히 동작함
-  // scroll 리스너 금지: scroll → resize 무한 루프(떨림) 원인
+  // ── KakaoTalk식 키보드 대응 ──────────────────────────────
+  // 1) --keyboard-height CSS 변수로 composer를 키보드 바로 위에 고정
+  // 2) composer가 마지막 메시지를 가릴 때만 scrollTop 보정 (전체 translate 금지)
+  // scroll + resize 둘 다 필요: iOS Safari는 키보드 올릴 때 resize + scroll 동시 발생
   useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
 
-    const onResize = () => {
-      // 새 메시지가 가려질 것 같을 때만 스크롤 (KakaoTalk 동작)
-      scrollIfNearBottom();
+    const update = () => {
+      const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+
+      if (keyboardHeight > 0) {
+        requestAnimationFrame(() => {
+          const composerEl = composerRef.current;
+          const messagesEl = messagesContainerRef.current;
+          const endEl = messagesEndRef.current;
+          if (!composerEl || !messagesEl || !endEl) return;
+
+          const composerTop = composerEl.getBoundingClientRect().top;
+          const lastBottom = endEl.getBoundingClientRect().bottom;
+          const overlap = lastBottom - composerTop;
+          if (overlap > 0) {
+            messagesEl.scrollTop += overlap + 8;
+          }
+        });
+      }
     };
 
-    viewport.addEventListener('resize', onResize);
-    return () => viewport.removeEventListener('resize', onResize);
-  }, [scrollIfNearBottom]);
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      document.documentElement.style.removeProperty('--keyboard-height');
+    };
+  }, []);
+
+  // ── composer 높이 감지 (ResizeObserver) ──────────────────
+  // paddingBottom을 동적으로 맞춰 메시지가 composer 뒤에 숨지 않도록
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setComposerHeight(Math.round(entry.contentRect.height) + 1); // +1: border-top
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -555,11 +580,12 @@ function CareerInterviewContent() {
       )}
 
       {/* ── 채팅 메시지 영역 ─────────────────────────────── */}
+      {/* paddingBottom = composerHeight + 여유 → fixed composer에 가려지지 않도록 */}
       <div
         ref={messagesContainerRef}
         style={{
           flex: 1, overflowY: 'auto',
-          padding: '20px 16px 16px',
+          padding: `20px 16px ${composerHeight + 16}px`,
           display: 'flex', flexDirection: 'column', gap: '16px',
         }}
       >
@@ -611,15 +637,23 @@ function CareerInterviewContent() {
         </div>
       )}
 
-      {/* ── 하단 입력 영역 ──────────────────────────────── */}
-      {/* flex-shrink:0 + height:100dvh 조합으로 동작 */}
-      {/* 100dvh = dynamic viewport height: iOS Safari가 키보드 크기를 자동 반영 */}
-      <div style={{
-        flexShrink: 0,
-        borderTop: '1px solid var(--border)',
-        background: 'var(--surface)',
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-      }}>
+      {/* ── 하단 입력 영역 (카카오톡식 fixed composer) ─── */}
+      {/* position: fixed + bottom: var(--keyboard-height) → 키보드 바로 위에 고정 */}
+      {/* left: 50% + translateX(-50%) + width: 390px → 모바일 레이아웃 중앙 유지 */}
+      <div
+        ref={composerRef}
+        style={{
+          position: 'fixed',
+          bottom: 'var(--keyboard-height, 0px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '390px',
+          zIndex: 20,
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface)',
+          paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+        }}
+      >
 
         {/* 에러 메시지 */}
         {finalizeError && (
