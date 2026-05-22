@@ -304,17 +304,17 @@ function HomeContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 */}
-      <header style={topbarStyle}>
-        <div style={brandStyle}>
-          CareerPT
-          <sup style={brandDotStyle}>·</sup>
-        </div>
-        <span style={stepPillStyle}>🏠 홈</span>
-      </header>
-
-      {/* 본문 (스크롤) */}
+      {/* 본문 (스크롤) — 헤더 포함, 스크롤 시 URL창 위로 올라감 */}
       <main style={screenStyle}>
+        {/* 상단 바 — main 안에 있어 스크롤과 함께 위로 사라짐 */}
+        <header style={topbarStyle}>
+          <div style={brandStyle}>
+            CareerPT
+            <sup style={brandDotStyle}>·</sup>
+          </div>
+          <span style={stepPillStyle}>🏠 홈</span>
+        </header>
+
         {/* 인사 영역 */}
         <section style={greetingStyle}>
           <div style={greetingTitleStyle}>
@@ -367,7 +367,7 @@ function HomeContent() {
         <div style={{ height: '12px' }} />
       </main>
 
-      {/* 탭바 */}
+      {/* 탭바 — main 밖, 항상 하단 고정 */}
       <TabBar active="home" />
     </div>
   );
@@ -782,9 +782,8 @@ const topbarStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '18px 22px 14px',
+  padding: '18px 0 14px',   // main의 좌우 padding 22px 안에 있으므로 좌우 0
   background: 'var(--bg)',
-  flexShrink: 0,
 };
 
 const brandStyle: CSSProperties = {
