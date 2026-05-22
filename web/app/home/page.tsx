@@ -290,18 +290,12 @@ function HomeContent() {
     [data, completedDates, today],
   );
 
-  const handleToggleToday = useCallback(() => {
-    handleToggleDay(today);
-  }, [handleToggleDay, today]);
-
   // ── 렌더 분기 ─────────────────────────────────────────────
   if (!ready || loading) return <LoadingScreen text="홈을 준비하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 
   const todayISO = formatLocalISO(today);
   const todayCompleted = completedDates.has(todayISO);
-  const todayStrength =
-    data.currentAction?.strength_link ?? data.strengths[0]?.name_ko ?? '체계';
 
   // 이번 주 doneCount (월~일)
   const doneCountWeek = weekDays.filter((d) =>
@@ -310,13 +304,13 @@ function HomeContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 상단 바 */}
+      {/* 상단 바 — 회고 페이지와 동일한 sticky 헤더 */}
       <header style={topbarStyle}>
         <div style={brandStyle}>
           CareerPT
           <sup style={brandDotStyle}>·</sup>
         </div>
-        <span style={stepPillStyle}>🏠 홈</span>
+        <span style={stepPillStyle}>홈</span>
       </header>
 
       {/* 본문 (스크롤) */}
@@ -347,13 +341,11 @@ function HomeContent() {
         {/* 오늘의 액션 카드 (3.4) */}
         <TodayCard
           action={data.currentAction}
-          strength={todayStrength}
           todayCompleted={todayCompleted}
           doneCountWeek={doneCountWeek}
           weekDays={weekDays}
           today={today}
           completedDates={completedDates}
-          onToggleToday={handleToggleToday}
           onToggleDay={handleToggleDay}
         />
 
@@ -375,7 +367,7 @@ function HomeContent() {
         <div style={{ height: '12px' }} />
       </main>
 
-      {/* 탭바 */}
+      {/* 탭바 — main 밖, 항상 하단 고정 */}
       <TabBar active="home" />
     </div>
   );
@@ -443,23 +435,19 @@ function ThemeCard({ goal }: { goal: ActiveGoal }) {
 
 function TodayCard({
   action,
-  strength,
   todayCompleted,
   doneCountWeek,
   weekDays,
   today,
   completedDates,
-  onToggleToday,
   onToggleDay,
 }: {
   action: ActionItem | null;
-  strength: string;
   todayCompleted: boolean;
   doneCountWeek: number;
   weekDays: Date[];
   today: Date;
   completedDates: Set<string>;
-  onToggleToday: () => void;
   onToggleDay: (date: Date) => void;
 }) {
   return (
@@ -474,31 +462,6 @@ function TodayCard({
       </div>
 
       <div style={todayActionTextStyle}>{action?.title ?? '액션이 설정되지 않았어요'}</div>
-
-      <button
-        type="button"
-        onClick={onToggleToday}
-        style={{
-          ...todayToggleStyle,
-          background: todayCompleted ? 'var(--accent-tint)' : 'var(--bg-soft)',
-          borderColor: todayCompleted ? 'var(--accent-soft)' : 'var(--line)',
-        }}
-        aria-pressed={todayCompleted}
-      >
-        <span style={{ fontSize: '20px' }} aria-hidden="true">
-          {todayCompleted ? '✅' : '⭕'}
-        </span>
-        <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {todayCompleted ? '🎉 오늘 완료했어요!' : '오늘 했나요? 탭해서 체크 👆'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            {todayCompleted
-              ? '잘했어요! 한 번의 체크가 다음 주를 만들어요 💪'
-              : `강점 「${strength}」을 발휘하는 시간 ✨`}
-          </div>
-        </div>
-      </button>
 
       {/* 7일 그리드 */}
       <div style={todaysGridStyle}>
@@ -533,6 +496,20 @@ function TodayCard({
             </button>
           );
         })}
+      </div>
+
+      {/* 체크 안내 메시지 */}
+      <div
+        style={{
+          marginTop: '10px',
+          fontSize: '12px',
+          color: todayCompleted ? 'var(--accent)' : 'var(--text-muted)',
+          fontWeight: todayCompleted ? 700 : 500,
+          textAlign: 'center',
+        }}
+        aria-live="polite"
+      >
+        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요 ✅'}
       </div>
     </div>
   );
@@ -791,13 +768,13 @@ function LoadingScreen({ text }: { text: string }) {
 
 const wrapStyle: CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',        // minHeight → height: 화면 높이 고정
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
+  overflow: 'hidden',      // 내부 main이 스크롤, wrapper는 고정
   position: 'relative',
 };
 
@@ -810,15 +787,14 @@ const topbarStyle: CSSProperties = {
   justifyContent: 'space-between',
   padding: '18px 22px 14px',
   background: 'var(--bg)',
-  backdropFilter: 'blur(6px)',
   flexShrink: 0,
 };
 
 const brandStyle: CSSProperties = {
   fontWeight: 800,
   fontSize: '18px',
-  letterSpacing: '-.01em',
-  color: 'var(--text-primary)',
+  letterSpacing: '-.02em',
+  color: 'var(--ink)',
 };
 
 const brandDotStyle: CSSProperties = {
@@ -837,9 +813,10 @@ const stepPillStyle: CSSProperties = {
 };
 
 const screenStyle: CSSProperties = {
-  padding: '8px 22px 16px',
+  padding: '8px 22px 24px',
   flex: 1,
   overflowY: 'auto',
+  // TabBar는 wrapper flex 맨 아래 고정 → main이 남은 공간 전부 차지하며 스크롤
 };
 
 const greetingStyle: CSSProperties = {
@@ -1016,20 +993,6 @@ const todayActionTextStyle: CSSProperties = {
   letterSpacing: '-.01em',
 };
 
-const todayToggleStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  background: 'var(--bg-soft)',
-  border: '1px solid var(--line)',
-  borderRadius: '12px',
-  padding: '12px 14px',
-  cursor: 'pointer',
-  transition: 'all .25s',
-  userSelect: 'none',
-  width: '100%',
-  fontFamily: 'inherit',
-};
 
 const todaysGridStyle: CSSProperties = {
   display: 'flex',

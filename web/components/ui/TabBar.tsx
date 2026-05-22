@@ -74,8 +74,7 @@ export function TabBar({ active }: TabBarProps) {
 }
 
 const navStyle: CSSProperties = {
-  position: 'sticky',
-  bottom: 0,
+  flexShrink: 0,           // flex column 맨 아래 고정 (항상 보임)
   zIndex: 40,
   background: '#fff',
   borderTop: '1px solid var(--line)',
@@ -83,7 +82,6 @@ const navStyle: CSSProperties = {
   gridTemplateColumns: '1fr 1fr 1fr',
   paddingBottom: 'env(safe-area-inset-bottom, 0)',
   boxShadow: '0 -2px 12px -8px rgba(17,20,24,.08)',
-  flexShrink: 0,
 };
 
 const itemStyle: CSSProperties = {
