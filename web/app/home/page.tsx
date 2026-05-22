@@ -791,13 +791,13 @@ function LoadingScreen({ text }: { text: string }) {
 
 const wrapStyle: CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',        // minHeight → height: 화면 높이 고정
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
+  overflow: 'hidden',      // 내부 main이 스크롤, wrapper는 고정
   position: 'relative',
 };
 
@@ -837,9 +837,10 @@ const stepPillStyle: CSSProperties = {
 };
 
 const screenStyle: CSSProperties = {
-  padding: '8px 22px 16px',
+  padding: '8px 22px 24px',
   flex: 1,
   overflowY: 'auto',
+  // TabBar는 wrapper flex 맨 아래 고정 → main이 남은 공간 전부 차지하며 스크롤
 };
 
 const greetingStyle: CSSProperties = {
