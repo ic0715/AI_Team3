@@ -257,10 +257,27 @@ function CareerInterviewContent() {
     if (context) startNewInterview(context);
   }, [context, startNewInterview]);
 
-  // ── 스크롤 ────────────────────────────────────────────────
+  // ── 스크롤 (새 메시지 도착 시) ──────────────────────────
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
+
+  // ── 키보드 출현 시 최신 메시지로 스크롤 (iOS Safari) ────
+  // visualViewport.resize = 소프트 키보드 올라오는 순간 발생
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const onKeyboardOpen = () => {
+      // 키보드 슬라이드 애니메이션이 끝난 뒤 스크롤 (300ms)
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    };
+
+    viewport.addEventListener('resize', onKeyboardOpen);
+    return () => viewport.removeEventListener('resize', onKeyboardOpen);
+  }, []);
 
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -585,12 +602,18 @@ function CareerInterviewContent() {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onFocus={() => {
+                // 포커스 시 키보드 애니메이션 대기 후 스크롤
+                setTimeout(() => {
+                  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 350);
+              }}
               placeholder="답변을 입력해주세요 (Shift+Enter로 줄바꿈)"
               rows={1}
               style={{
                 flex: 1,
                 resize: 'none',
-                fontSize: '14px',
+                fontSize: '16px', // iOS Safari: 16px 미만이면 포커스 시 자동 확대됨
                 padding: '12px 14px',
                 borderRadius: '12px',
                 border: '1.5px solid var(--border)',
