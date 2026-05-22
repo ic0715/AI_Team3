@@ -183,13 +183,10 @@ function CareerInterviewContent() {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState('');
 
+  const containerRef = useRef<HTMLDivElement>(null);      // 전체 컨테이너 (높이 동적 제어)
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
-
-  // composer 높이 (메시지 영역 paddingBottom 계산용)
-  const [composerHeight, setComposerHeight] = useState(80);
 
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
@@ -277,78 +274,52 @@ function CareerInterviewContent() {
   }, [messages, isSending, scrollToBottom]);
 
   // ── body 스크롤 잠금 (이 페이지에서만) ──────────────────
-  // iOS Safari는 input focus 시 page 자체를 스크롤시킴
-  // → position: fixed + overflow: hidden으로 막아야
-  //   100dvh가 키보드 높이를 정확히 반영하고 레이아웃이 흐트러지지 않음
-  // → 페이지 이탈 시 원복 필수 (다른 페이지 영향 방지)
+  // overflow:hidden만으로도 page scroll 방지 가능
+  // position:fixed는 쓰지 않음 → visualViewport.height 계산이 깨짐
   useEffect(() => {
-    const prev = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      width: document.body.style.width,
-      height: document.body.style.height,
-    };
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.height = '100%';
-
-    return () => {
-      document.body.style.overflow = prev.overflow;
-      document.body.style.position = prev.position;
-      document.body.style.width = prev.width;
-      document.body.style.height = prev.height;
-    };
+    return () => { document.body.style.overflow = prevOverflow; };
   }, []);
 
-  // ── KakaoTalk식 키보드 대응 ──────────────────────────────
-  // 1) --keyboard-height CSS 변수로 composer를 키보드 바로 위에 고정
-  // 2) composer가 마지막 메시지를 가릴 때만 scrollTop 보정 (전체 translate 금지)
-  // scroll + resize 둘 다 필요: iOS Safari는 키보드 올릴 때 resize + scroll 동시 발생
+  // ── 키보드 대응: 컨테이너 높이를 visualViewport에 맞춤 ──
+  // 핵심 원리: containerRef(position:fixed)의 height를 vv.height로 직접 설정
+  //   → 키보드가 올라오면 vv.height가 줄어들고 → 컨테이너도 같이 줄어들고
+  //   → composer(flex-shrink:0)가 자연스럽게 컨테이너 맨 아래 = 키보드 바로 위
+  //   → 갭 없음, translate 없음, CSS 변수 없음
+  //
+  // body:fixed를 쓰지 않는 이유:
+  //   body가 position:fixed면 iOS Safari가 visualViewport.height를 업데이트 안 해서
+  //   키보드 높이 계산이 항상 0이 됨
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
+    const el = containerRef.current;
+    if (!vv || !el) return;
 
     const update = () => {
-      const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+      // 컨테이너 크기를 시각적 뷰포트(키보드 제외)에 정확히 맞춤
+      el.style.height = `${vv.height}px`;
+      el.style.top = `${vv.offsetTop}px`;
 
-      if (keyboardHeight > 0) {
-        requestAnimationFrame(() => {
-          const composerEl = composerRef.current;
-          const messagesEl = messagesContainerRef.current;
-          const endEl = messagesEndRef.current;
-          if (!composerEl || !messagesEl || !endEl) return;
-
-          const composerTop = composerEl.getBoundingClientRect().top;
-          const lastBottom = endEl.getBoundingClientRect().bottom;
-          const overlap = lastBottom - composerTop;
-          if (overlap > 0) {
-            messagesEl.scrollTop += overlap + 8;
-          }
-        });
+      // 키보드가 올라왔을 때 마지막 메시지가 composer에 가려지면 스크롤
+      const messagesEl = messagesContainerRef.current;
+      if (messagesEl) {
+        const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+        if (dist < 120) {
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
       }
     };
 
+    update();
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
     return () => {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
-      document.documentElement.style.removeProperty('--keyboard-height');
+      el.style.height = '';
+      el.style.top = '';
     };
-  }, []);
-
-  // ── composer 높이 감지 (ResizeObserver) ──────────────────
-  // paddingBottom을 동적으로 맞춰 메시지가 composer 뒤에 숨지 않도록
-  useEffect(() => {
-    const el = composerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setComposerHeight(Math.round(entry.contentRect.height) + 1); // +1: border-top
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
   }, []);
 
   // ── 메시지 전송 ───────────────────────────────────────────
@@ -468,7 +439,7 @@ function CareerInterviewContent() {
   // ── 로딩 상태 ────────────────────────────────────────────
   if (loadingContext) {
     return (
-      <div style={{ width: '390px', minHeight: '100dvh', background: 'var(--surface)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(0,0,0,.18)' }}>
+      <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: '390px', height: '100dvh', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(0,0,0,.18)' }}>
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
           <div style={{ marginBottom: '12px', fontSize: '24px' }}>✨</div>
           인터뷰 준비 중...
@@ -478,18 +449,24 @@ function CareerInterviewContent() {
   }
 
   return (
-    <div style={{
-      width: '390px',
-      // body가 position:fixed이면 iOS Safari의 강제 page scroll이 없으므로
-      // 100dvh가 키보드 높이를 정확히 반영함
-      height: '100dvh',
-      background: 'var(--surface)',
-      display: 'flex',
-      flexDirection: 'column',
-      margin: '0 auto',
-      boxShadow: '0 0 40px rgba(0,0,0,.18)',
-      overflow: 'hidden',
-    }}>
+    <div
+      ref={containerRef}
+      style={{
+        // position:fixed + top/height를 JS로 visualViewport에 맞춤
+        // → 키보드 열리면 컨테이너 자체가 줄어들고, composer가 자연스럽게 키보드 위에 딱 붙음
+        position: 'fixed',
+        top: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '390px',
+        height: '100dvh', // JS update() 호출 전 초기값
+        background: 'var(--surface)',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 0 40px rgba(0,0,0,.18)',
+        overflow: 'hidden',
+      }}
+    >
 
       {/* ── 헤더 ─────────────────────────────────────────── */}
       <header style={{
@@ -580,12 +557,11 @@ function CareerInterviewContent() {
       )}
 
       {/* ── 채팅 메시지 영역 ─────────────────────────────── */}
-      {/* paddingBottom = composerHeight + 여유 → fixed composer에 가려지지 않도록 */}
       <div
         ref={messagesContainerRef}
         style={{
           flex: 1, overflowY: 'auto',
-          padding: `20px 16px ${composerHeight + 16}px`,
+          padding: '20px 16px 16px',
           display: 'flex', flexDirection: 'column', gap: '16px',
         }}
       >
@@ -637,23 +613,14 @@ function CareerInterviewContent() {
         </div>
       )}
 
-      {/* ── 하단 입력 영역 (카카오톡식 fixed composer) ─── */}
-      {/* position: fixed + bottom: var(--keyboard-height) → 키보드 바로 위에 고정 */}
-      {/* left: 50% + translateX(-50%) + width: 390px → 모바일 레이아웃 중앙 유지 */}
-      <div
-        ref={composerRef}
-        style={{
-          position: 'fixed',
-          bottom: 'var(--keyboard-height, 0px)',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '390px',
-          zIndex: 20,
-          borderTop: '1px solid var(--border)',
-          background: 'var(--surface)',
-          paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-        }}
-      >
+      {/* ── 하단 입력 영역 ──────────────────────────────── */}
+      {/* flex-shrink:0 → 컨테이너 높이가 줄어들면 메시지 영역이 줄고, composer는 맨 아래 유지 */}
+      <div style={{
+        flexShrink: 0,
+        borderTop: '1px solid var(--border)',
+        background: 'var(--surface)',
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+      }}>
 
         {/* 에러 메시지 */}
         {finalizeError && (
