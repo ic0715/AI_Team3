@@ -1130,9 +1130,10 @@ BEGIN
   END LOOP;
 END $$;
 
--- 4. action_completions: created_at 기반 정렬 인덱스 (선택)
-CREATE INDEX IF NOT EXISTS idx_action_completions_user_goal_date
-  ON action_completions (user_id, goal_id, completed_date);
+-- 4. action_completions: 날짜별 완료 조회 인덱스 (선택)
+-- ⚠️ action_completions에는 goal_id 컬럼 없음 → action_item_id 사용
+CREATE INDEX IF NOT EXISTS idx_action_completions_user_date
+  ON action_completions (user_id, action_item_id, completed_date);
 
 -- 5. daily_memos: 주차 + 날짜 + 시간 정렬용 인덱스 (선택)
 CREATE INDEX IF NOT EXISTS idx_daily_memos_user_goal_week
