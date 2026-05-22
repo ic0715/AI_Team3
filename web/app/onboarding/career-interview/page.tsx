@@ -183,6 +183,8 @@ function CareerInterviewContent() {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState('');
 
+  const containerRef = useRef<HTMLDivElement>(null);      // 전체 컨테이너 (높이 동적 제어)
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -257,10 +259,68 @@ function CareerInterviewContent() {
     if (context) startNewInterview(context);
   }, [context, startNewInterview]);
 
-  // ── 스크롤 ────────────────────────────────────────────────
+  // ── 스크롤 헬퍼 ──────────────────────────────────────────
+  // iOS Safari에서 scrollIntoView는 overflow 컨테이너가 아닌
+  // 페이지를 스크롤하는 버그가 있음 → scrollTop 직접 제어
+  const scrollToBottom = useCallback((instant = false) => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'instant' : 'smooth' });
+  }, []);
+
+  // ── 새 메시지 도착 시 스크롤 ──────────────────────────────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isSending]);
+    scrollToBottom();
+  }, [messages, isSending, scrollToBottom]);
+
+  // ── body 스크롤 잠금 (이 페이지에서만) ──────────────────
+  // overflow:hidden만으로도 page scroll 방지 가능
+  // position:fixed는 쓰지 않음 → visualViewport.height 계산이 깨짐
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
+  // ── 키보드 대응: 컨테이너 높이를 visualViewport에 맞춤 ──
+  // 핵심 원리: containerRef(position:fixed)의 height를 vv.height로 직접 설정
+  //   → 키보드가 올라오면 vv.height가 줄어들고 → 컨테이너도 같이 줄어들고
+  //   → composer(flex-shrink:0)가 자연스럽게 컨테이너 맨 아래 = 키보드 바로 위
+  //   → 갭 없음, translate 없음, CSS 변수 없음
+  //
+  // body:fixed를 쓰지 않는 이유:
+  //   body가 position:fixed면 iOS Safari가 visualViewport.height를 업데이트 안 해서
+  //   키보드 높이 계산이 항상 0이 됨
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const el = containerRef.current;
+    if (!vv || !el) return;
+
+    const update = () => {
+      // 컨테이너 크기를 시각적 뷰포트(키보드 제외)에 정확히 맞춤
+      el.style.height = `${vv.height}px`;
+      el.style.top = `${vv.offsetTop}px`;
+
+      // 키보드가 올라왔을 때 마지막 메시지가 composer에 가려지면 스크롤
+      const messagesEl = messagesContainerRef.current;
+      if (messagesEl) {
+        const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+        if (dist < 120) {
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+      }
+    };
+
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      el.style.height = '';
+      el.style.top = '';
+    };
+  }, []);
 
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -379,7 +439,7 @@ function CareerInterviewContent() {
   // ── 로딩 상태 ────────────────────────────────────────────
   if (loadingContext) {
     return (
-      <div style={{ width: '390px', minHeight: '100dvh', background: 'var(--surface)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(0,0,0,.18)' }}>
+      <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: '390px', height: '100dvh', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(0,0,0,.18)' }}>
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
           <div style={{ marginBottom: '12px', fontSize: '24px' }}>✨</div>
           인터뷰 준비 중...
@@ -389,16 +449,24 @@ function CareerInterviewContent() {
   }
 
   return (
-    <div style={{
-      width: '390px',
-      height: '100dvh',
-      background: 'var(--surface)',
-      display: 'flex',
-      flexDirection: 'column',
-      margin: '0 auto',
-      boxShadow: '0 0 40px rgba(0,0,0,.18)',
-      overflow: 'hidden',
-    }}>
+    <div
+      ref={containerRef}
+      style={{
+        // position:fixed + top/height를 JS로 visualViewport에 맞춤
+        // → 키보드 열리면 컨테이너 자체가 줄어들고, composer가 자연스럽게 키보드 위에 딱 붙음
+        position: 'fixed',
+        top: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '390px',
+        height: '100dvh', // JS update() 호출 전 초기값
+        background: 'var(--surface)',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 0 40px rgba(0,0,0,.18)',
+        overflow: 'hidden',
+      }}
+    >
 
       {/* ── 헤더 ─────────────────────────────────────────── */}
       <header style={{
@@ -489,11 +557,14 @@ function CareerInterviewContent() {
       )}
 
       {/* ── 채팅 메시지 영역 ─────────────────────────────── */}
-      <div style={{
-        flex: 1, overflowY: 'auto',
-        padding: '20px 16px 8px',
-        display: 'flex', flexDirection: 'column', gap: '16px',
-      }}>
+      <div
+        ref={messagesContainerRef}
+        style={{
+          flex: 1, overflowY: 'auto',
+          padding: '20px 16px 16px',
+          display: 'flex', flexDirection: 'column', gap: '16px',
+        }}
+      >
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
@@ -542,7 +613,8 @@ function CareerInterviewContent() {
         </div>
       )}
 
-      {/* ── 하단 영역 ────────────────────────────────────── */}
+      {/* ── 하단 입력 영역 ──────────────────────────────── */}
+      {/* flex-shrink:0 → 컨테이너 높이가 줄어들면 메시지 영역이 줄고, composer는 맨 아래 유지 */}
       <div style={{
         flexShrink: 0,
         borderTop: '1px solid var(--border)',
@@ -585,12 +657,12 @@ function CareerInterviewContent() {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="답변을 입력해주세요 (Shift+Enter로 줄바꿈)"
+              placeholder="답변을 입력해주세요"
               rows={1}
               style={{
                 flex: 1,
                 resize: 'none',
-                fontSize: '14px',
+                fontSize: '16px', // iOS Safari: 16px 미만이면 포커스 시 자동 확대됨
                 padding: '12px 14px',
                 borderRadius: '12px',
                 border: '1.5px solid var(--border)',
