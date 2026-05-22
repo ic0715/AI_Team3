@@ -290,18 +290,12 @@ function HomeContent() {
     [data, completedDates, today],
   );
 
-  const handleToggleToday = useCallback(() => {
-    handleToggleDay(today);
-  }, [handleToggleDay, today]);
-
   // ── 렌더 분기 ─────────────────────────────────────────────
   if (!ready || loading) return <LoadingScreen text="홈을 준비하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 
   const todayISO = formatLocalISO(today);
   const todayCompleted = completedDates.has(todayISO);
-  const todayStrength =
-    data.currentAction?.strength_link ?? data.strengths[0]?.name_ko ?? '체계';
 
   // 이번 주 doneCount (월~일)
   const doneCountWeek = weekDays.filter((d) =>
@@ -347,13 +341,11 @@ function HomeContent() {
         {/* 오늘의 액션 카드 (3.4) */}
         <TodayCard
           action={data.currentAction}
-          strength={todayStrength}
           todayCompleted={todayCompleted}
           doneCountWeek={doneCountWeek}
           weekDays={weekDays}
           today={today}
           completedDates={completedDates}
-          onToggleToday={handleToggleToday}
           onToggleDay={handleToggleDay}
         />
 
@@ -443,23 +435,19 @@ function ThemeCard({ goal }: { goal: ActiveGoal }) {
 
 function TodayCard({
   action,
-  strength,
   todayCompleted,
   doneCountWeek,
   weekDays,
   today,
   completedDates,
-  onToggleToday,
   onToggleDay,
 }: {
   action: ActionItem | null;
-  strength: string;
   todayCompleted: boolean;
   doneCountWeek: number;
   weekDays: Date[];
   today: Date;
   completedDates: Set<string>;
-  onToggleToday: () => void;
   onToggleDay: (date: Date) => void;
 }) {
   return (
@@ -474,31 +462,6 @@ function TodayCard({
       </div>
 
       <div style={todayActionTextStyle}>{action?.title ?? '액션이 설정되지 않았어요'}</div>
-
-      <button
-        type="button"
-        onClick={onToggleToday}
-        style={{
-          ...todayToggleStyle,
-          background: todayCompleted ? 'var(--accent-tint)' : 'var(--bg-soft)',
-          borderColor: todayCompleted ? 'var(--accent-soft)' : 'var(--line)',
-        }}
-        aria-pressed={todayCompleted}
-      >
-        <span style={{ fontSize: '20px' }} aria-hidden="true">
-          {todayCompleted ? '✅' : '⭕'}
-        </span>
-        <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {todayCompleted ? '🎉 오늘 완료했어요!' : '오늘 했나요? 탭해서 체크 👆'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            {todayCompleted
-              ? '잘했어요! 한 번의 체크가 다음 주를 만들어요 💪'
-              : `강점 「${strength}」을 발휘하는 시간 ✨`}
-          </div>
-        </div>
-      </button>
 
       {/* 7일 그리드 */}
       <div style={todaysGridStyle}>
@@ -533,6 +496,20 @@ function TodayCard({
             </button>
           );
         })}
+      </div>
+
+      {/* 체크 안내 메시지 */}
+      <div
+        style={{
+          marginTop: '10px',
+          fontSize: '12px',
+          color: todayCompleted ? 'var(--accent)' : 'var(--text-muted)',
+          fontWeight: todayCompleted ? 700 : 500,
+          textAlign: 'center',
+        }}
+        aria-live="polite"
+      >
+        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요 ✅'}
       </div>
     </div>
   );
@@ -802,15 +779,11 @@ const wrapStyle: CSSProperties = {
 };
 
 const topbarStyle: CSSProperties = {
-  position: 'sticky',
-  top: 0,
-  zIndex: 50,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   padding: '18px 22px 14px',
   background: 'var(--bg)',
-  backdropFilter: 'blur(6px)',
   flexShrink: 0,
 };
 
@@ -1017,20 +990,6 @@ const todayActionTextStyle: CSSProperties = {
   letterSpacing: '-.01em',
 };
 
-const todayToggleStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  background: 'var(--bg-soft)',
-  border: '1px solid var(--line)',
-  borderRadius: '12px',
-  padding: '12px 14px',
-  cursor: 'pointer',
-  transition: 'all .25s',
-  userSelect: 'none',
-  width: '100%',
-  fontFamily: 'inherit',
-};
 
 const todaysGridStyle: CSSProperties = {
   display: 'flex',
