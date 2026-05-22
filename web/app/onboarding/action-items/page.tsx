@@ -378,8 +378,6 @@ function ActionItemsContent() {
   if (!goal) return <LoadingScreen text={error ?? '목표를 찾을 수 없어요.'} />;
   if (aiLoading) return <LoadingScreen text="AI가 당신에게 맞는 액션을 만들고 있어요..." />;
 
-  const selectedCount = selectedId ? 1 : 0;
-
   return (
     <div style={wrapStyle}>
       {/* 상단 바 */}
@@ -395,27 +393,17 @@ function ActionItemsContent() {
           <span style={{ width: '44px' }} />
         </header>
 
-        {/* 상단 goal pill */}
-        <div style={topGoalRowStyle}>
-          <span style={goalPillStyle}>🎯 {goal.goal_title}</span>
-          <span style={{
-            ...countBadgeStyle,
-            background: selectedCount ? 'var(--accent)' : 'var(--border)',
-            color: selectedCount ? '#fff' : 'var(--text-secondary)',
-          }}
-            aria-live="polite"
-          >
-            {selectedCount}
-          </span>
-        </div>
-
         {/* 본문 */}
         <main style={mainStyle}>
-        {/* 안내 패널 (스펙 3.3) */}
+        {/* 안내 패널 (스펙 3.3) — 선택한 목표 + 액션 선택 안내 */}
         <div style={infoPanelStyle}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '.06em', marginBottom: '6px', opacity: 0.75 }}>
+            내가 선택한 목표
+          </div>
           <div style={infoTitleStyle}>
             {seedEmoji} {goal.goal_title}
           </div>
+          <div style={{ borderTop: '1px solid rgba(45,91,255,0.15)', margin: '10px 0' }} />
           <div style={infoDescStyle}>
             AI가 추천하는 액션 아이템이에요.
             <br />
@@ -591,21 +579,6 @@ function ActionItemsContent() {
               )}
             </>
           )}
-        </div>
-
-        {/* 하단 summary (스펙 3.6) */}
-        <div style={summaryWrapStyle}>
-          <span style={goalPillStyle}>🎯 {goal.goal_title}</span>
-          <span
-            style={{
-              ...countBadgeStyle,
-              background: selectedCount ? 'var(--accent)' : 'var(--border)',
-              color: selectedCount ? '#fff' : 'var(--text-primary)',
-            }}
-            aria-live="polite"
-          >
-            {selectedCount}
-          </span>
         </div>
 
         <div style={{ height: '4px' }} />
@@ -819,45 +792,6 @@ const pageTitleStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 
-const topGoalRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  padding: '12px 20px',
-  background: 'var(--surface)',
-  borderBottom: '1px solid var(--border)',
-  flexShrink: 0,
-};
-
-const goalPillStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '6px 12px',
-  borderRadius: '999px',
-  background: 'var(--accent)',
-  color: '#fff',
-  fontSize: '13px',
-  fontWeight: 700,
-  flex: 1,
-  justifyContent: 'center',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-};
-
-const countBadgeStyle: React.CSSProperties = {
-  minWidth: '28px',
-  height: '24px',
-  padding: '0 8px',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: '999px',
-  fontSize: '12px',
-  fontWeight: 800,
-  transition: 'background .15s, color .15s',
-};
 
 const mainStyle: React.CSSProperties = {
   padding: '20px',
@@ -973,15 +907,6 @@ const removeBtnStyle: React.CSSProperties = {
   justifyContent: 'center',
 };
 
-const summaryWrapStyle: React.CSSProperties = {
-  marginTop: '20px',
-  padding: '12px 14px',
-  background: 'var(--bg)',
-  borderRadius: '12px',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-};
 
 const footerStyle: React.CSSProperties = {
   position: 'sticky',
