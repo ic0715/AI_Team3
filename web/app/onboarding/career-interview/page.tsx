@@ -183,14 +183,9 @@ function CareerInterviewContent() {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState('');
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const footerRef = useRef<HTMLDivElement>(null);
-
-  // 키보드 오프셋 (iOS Safari: 키보드 높이만큼 푸터를 위로 밀기)
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-  // 푸터 높이 (메시지 영역 하단 여백 계산용)
-  const [footerHeight, setFooterHeight] = useState(80);
 
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
@@ -263,48 +258,36 @@ function CareerInterviewContent() {
     if (context) startNewInterview(context);
   }, [context, startNewInterview]);
 
-  // ── 스크롤 (새 메시지 도착 시) ──────────────────────────
+  // ── 스크롤 헬퍼 ──────────────────────────────────────────
+  // iOS Safari에서 scrollIntoView는 overflow 컨테이너가 아닌
+  // 페이지를 스크롤하는 버그가 있음 → scrollTop 직접 제어
+  const scrollToBottom = useCallback((instant = false) => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'instant' : 'smooth' });
+  }, []);
+
+  // ── 새 메시지 도착 시 스크롤 ──────────────────────────────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isSending]);
+    scrollToBottom();
+  }, [messages, isSending, scrollToBottom]);
 
   // ── iOS Safari 키보드 대응 ────────────────────────────────
-  // visualViewport.resize = 키보드 출현/소멸 시 발생
-  // → 키보드 높이만큼 푸터 bottom을 올려서 입력창이 키보드 위에 뜨도록
-  // → 대화창은 position: fixed 푸터 아래 paddingBottom으로 공간 확보
+  // visualViewport resize = 키보드 출현/소멸 시 발생
+  // scroll 리스너는 추가하지 않음 — 스크롤 이벤트가 resize를 유발해
+  // 무한 루프(떨림)가 생기기 때문
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
 
-    const update = () => {
-      const kb = Math.max(0, window.innerHeight - viewport.height);
-      setKeyboardOffset(kb);
-      // 키보드가 올라올 때 최신 메시지로 스크롤
-      if (kb > 0) {
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
-      }
+    const onResize = () => {
+      // 키보드가 올라오면 최신 메시지가 보이도록 즉시 스크롤
+      scrollToBottom(true);
     };
 
-    viewport.addEventListener('resize', update);
-    viewport.addEventListener('scroll', update);
-    return () => {
-      viewport.removeEventListener('resize', update);
-      viewport.removeEventListener('scroll', update);
-    };
-  }, []);
-
-  // ── 푸터 높이 실시간 측정 (메시지 영역 여백 계산용) ──────
-  useEffect(() => {
-    const el = footerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setFooterHeight(entry.contentRect.height);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    viewport.addEventListener('resize', onResize);
+    return () => viewport.removeEventListener('resize', onResize);
+  }, [scrollToBottom]);
 
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -533,13 +516,14 @@ function CareerInterviewContent() {
       )}
 
       {/* ── 채팅 메시지 영역 ─────────────────────────────── */}
-      <div style={{
-        flex: 1, overflowY: 'auto',
-        padding: '20px 16px 8px',
-        // 고정 푸터에 가려지지 않도록 하단 여백 확보
-        paddingBottom: footerHeight + 16,
-        display: 'flex', flexDirection: 'column', gap: '16px',
-      }}>
+      <div
+        ref={messagesContainerRef}
+        style={{
+          flex: 1, overflowY: 'auto',
+          padding: '20px 16px 16px',
+          display: 'flex', flexDirection: 'column', gap: '16px',
+        }}
+      >
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
@@ -588,24 +572,15 @@ function CareerInterviewContent() {
         </div>
       )}
 
-      {/* ── 하단 입력 영역 (키보드 위에 고정) ──────────── */}
-      {/* position: fixed + keyboardOffset → 키보드가 올라와도 입력창은 키보드 바로 위에 위치 */}
-      {/* 대화창은 flex 레이아웃에서 분리되어 키보드에 영향 받지 않음 */}
-      <div
-        ref={footerRef}
-        style={{
-          position: 'fixed',
-          bottom: keyboardOffset,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '390px',
-          zIndex: 20,
-          borderTop: '1px solid var(--border)',
-          background: 'var(--surface)',
-          // 키보드가 내려가 있을 때만 safe-area 적용
-          paddingBottom: keyboardOffset > 0 ? '8px' : 'max(16px, env(safe-area-inset-bottom))',
-        }}
-      >
+      {/* ── 하단 입력 영역 ──────────────────────────────── */}
+      {/* flex-shrink:0 + height:100dvh 조합으로 동작 */}
+      {/* 100dvh = dynamic viewport height: iOS Safari가 키보드 크기를 자동 반영 */}
+      <div style={{
+        flexShrink: 0,
+        borderTop: '1px solid var(--border)',
+        background: 'var(--surface)',
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+      }}>
 
         {/* 에러 메시지 */}
         {finalizeError && (
@@ -642,7 +617,7 @@ function CareerInterviewContent() {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="답변을 입력해주세요 (Shift+Enter로 줄바꿈)"
+              placeholder="답변을 입력해주세요"
               rows={1}
               style={{
                 flex: 1,
