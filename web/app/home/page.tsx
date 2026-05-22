@@ -304,17 +304,17 @@ function HomeContent() {
 
   return (
     <div style={wrapStyle}>
-      {/* 본문 (스크롤) — 헤더 포함, 스크롤 시 URL창 위로 올라감 */}
-      <main style={screenStyle}>
-        {/* 상단 바 — main 안에 있어 스크롤과 함께 위로 사라짐 */}
-        <header style={topbarStyle}>
-          <div style={brandStyle}>
-            CareerPT
-            <sup style={brandDotStyle}>·</sup>
-          </div>
-          <span style={stepPillStyle}>🏠 홈</span>
-        </header>
+      {/* 상단 바 — 회고 페이지와 동일한 sticky 헤더 */}
+      <header style={topbarStyle}>
+        <div style={brandStyle}>
+          CareerPT
+          <sup style={brandDotStyle}>·</sup>
+        </div>
+        <span style={stepPillStyle}>홈</span>
+      </header>
 
+      {/* 본문 (스크롤) */}
+      <main style={screenStyle}>
         {/* 인사 영역 */}
         <section style={greetingStyle}>
           <div style={greetingTitleStyle}>
@@ -779,18 +779,22 @@ const wrapStyle: CSSProperties = {
 };
 
 const topbarStyle: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 50,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '18px 0 14px',   // main의 좌우 padding 22px 안에 있으므로 좌우 0
+  padding: '18px 22px 14px',
   background: 'var(--bg)',
+  flexShrink: 0,
 };
 
 const brandStyle: CSSProperties = {
   fontWeight: 800,
   fontSize: '18px',
-  letterSpacing: '-.01em',
-  color: 'var(--text-primary)',
+  letterSpacing: '-.02em',
+  color: 'var(--ink)',
 };
 
 const brandDotStyle: CSSProperties = {

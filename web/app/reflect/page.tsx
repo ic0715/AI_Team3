@@ -632,13 +632,13 @@ function LoadingScreen({ text }: { text: string }) {
 
 const wrapStyle: CSSProperties = {
   width: '390px',
-  minHeight: '100dvh',
+  height: '100dvh',
   background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column',
   margin: '0 auto',
   boxShadow: '0 0 40px rgba(0,0,0,.18)',
-  overflowX: 'hidden',
+  overflow: 'hidden',
   position: 'relative',
 };
 
