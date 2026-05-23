@@ -200,9 +200,12 @@ accent-tint 배경, accent 1.5px 보더, 18px radius.
 | --- | --- | --- |
 | coaching_insights | INSERT | 코칭 완료 시 |
 | action_items | INSERT (3~5건, week_number=current_week+1) | 코칭 완료 시 |
+| **goals** | **`current_week +1` UPDATE (max=`total_weeks` 클램프)** | **코칭 완료 시 (MVP 주차 수동 전환)** |
 | action_items | UPDATE (재협의 revised=true 시) | 재협의 종료 시 |
 | coaching_insights | next_action_title UPDATE (재협의 revised=true 시) | 재협의 종료 시 |
 | goals | status='abandoned' UPDATE + 새 goals INSERT | suggest_change 분기에서 사용자가 역량 변경 선택 시 |
+
+> ⚠️ **주차 전환 정책 (MVP)**: 스펙상 매주 월요일 자정 자동 전환이 정상이나 MVP에선 cron이 없어 미구현. **코칭 완료가 사실상 "한 주의 마무리 의식"이므로 finalize 시점에 `goals.current_week +1` 수동 UPDATE**. 이렇게 해야 코칭이 결정한 다음 주 액션(`week_number = current_week + 1`)이 11 홈 "오늘의 액션" 카드에 즉시 표시됨. 12주를 넘지 않도록 `max=total_weeks` (기본 12) 클램프.
 
 **`coaching_insights` INSERT 필드 (schema v0.8/v0.9 정합):**
 

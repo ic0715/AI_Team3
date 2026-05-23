@@ -155,10 +155,11 @@ async function finalizeCoaching(
 
   // action_items INSERT (다음 주차)
   // v0.8: strength_link 포함 — 11 홈 "오늘의 액션" 카드 강점 표시용
+  const nextWeek = context.goal.current_week + 1;
   const { error: actionErr } = await supabase.from('action_items').insert({
     user_id: userId,
     goal_id: context.goal.id,
-    week_number: context.goal.current_week + 1,
+    week_number: nextWeek,
     title: result.nextActionTitle,
     description: result.patternInsight,
     tags: [],
@@ -168,6 +169,20 @@ async function finalizeCoaching(
   });
   if (actionErr) {
     console.error('[13] action_items INSERT:', actionErr);
+  }
+
+  // 주차 전환: 코칭 완료 = 한 주의 마무리 → goals.current_week +1
+  // 스펙상 매주 월요일 자정 자동 전환이지만 MVP에서는 코칭 시점에 수동 전환.
+  // 12주를 넘기지 않도록 클램프 (total_weeks 기본값 12).
+  const TOTAL_WEEKS = 12;
+  if (nextWeek <= TOTAL_WEEKS) {
+    const { error: goalErr } = await supabase
+      .from('goals')
+      .update({ current_week: nextWeek })
+      .eq('id', context.goal.id);
+    if (goalErr) {
+      console.error('[13] goals.current_week UPDATE:', goalErr);
+    }
   }
 
   return result;
