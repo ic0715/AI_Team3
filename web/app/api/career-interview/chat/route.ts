@@ -13,21 +13,21 @@ interface ChatRequestBody {
     mainConcern?: string;
     strengths: Array<{ name_ko: string; name_en: string; domain: string }>;
   };
-  coreQuestionIndex: number;
-  isExtraMode: boolean;
 }
 
-// 안전망: 사용자 메시지가 너무 많으면 강제 완료 (실제로는 LLM의 종료 키워드로 끝남)
-const HARD_COMPLETE_THRESHOLD = 24;
+interface ChatResponse {
+  content: string;
+  isInterviewComplete: boolean;
+}
 
-// LLM의 종료 신호 키워드 (03 spec §4.1)
+// 안전망: 사용자 메시지가 너무 많으면 강제 완료 (long 세션 평균 20턴, 최대 25턴 + 안전 마진)
+const HARD_COMPLETE_THRESHOLD = 30;
+
+// LLM의 종료 신호 키워드 — CONTRACT_v2.md §4.1 COACH_CLOSING_KEYWORDS와 정확히 동일
 const ENDING_KEYWORDS = [
   '오늘 인터뷰는 여기서',
-  '충분히 들었어요',
-  '마무리하겠습니다',
-  '마무리할게요',
-  '여기서 마무리',
-  '커리어 방향을 분석',
+  '오늘은 여기까지',
+  '여기서 마무리할게요',
 ];
 
 function detectEnding(text: string): boolean {
@@ -37,7 +37,7 @@ function detectEnding(text: string): boolean {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequestBody;
-    const { messages, context, isExtraMode } = body;
+    const { messages, context } = body;
 
     const userMsgCount = messages.filter((m) => m.role === 'user').length;
 
@@ -54,7 +54,8 @@ export async function POST(req: Request) {
 
     const message = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 500,           // 평시 2~3문장 + 🔴 정서 위기 redirect 멘트(다중 줄 + 자원 번호) 여유 포함
+      temperature: 0.7,          // 명세 §4.6.A
       system: [
         { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
       ],
@@ -63,17 +64,15 @@ export async function POST(req: Request) {
 
     const text = extractText(message).trim();
 
-    // 완료 판단: LLM 종료 키워드 || 안전망(18턴)
     const llmSignaledEnd = detectEnding(text);
     const overThreshold = userMsgCount >= HARD_COMPLETE_THRESHOLD;
-    const isComplete = !isExtraMode && (llmSignaledEnd || overThreshold);
+    const isComplete = llmSignaledEnd || overThreshold;
 
-    return NextResponse.json({
+    const response: ChatResponse = {
       content: text,
-      // 진행률 표시: 사용자 답변 ÷ 3 ≈ 메인 주제 진행 (메인 1개당 ~3턴: 메인+follow-up 1~2)
-      nextCoreQuestionIndex: Math.min(Math.ceil(userMsgCount / 3), 6),
       isInterviewComplete: isComplete,
-    });
+    };
+    return NextResponse.json(response);
   } catch (e) {
     console.error('[career-interview/chat] error:', e);
     return NextResponse.json(
