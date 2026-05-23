@@ -89,6 +89,10 @@ export default function LandingPage() {
       if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
       if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
 
+      // active 목표가 없으면 career-result로 돌려보냄
+      // (recommended_competencies는 있지만 goals INSERT가 안 된 경우 대비)
+      if (!activeGoal) { router.push('/onboarding/career-result'); return; }
+
       // 온보딩 마지막 단계 → 액션 아이템 선택
       router.push('/onboarding/action-items');
     };
