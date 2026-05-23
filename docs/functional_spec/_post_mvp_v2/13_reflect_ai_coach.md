@@ -1,8 +1,8 @@
 # 13. 회고 AI 코칭
 
 기준 프로토타입: home_0520.html (p13)
-DB 스키마: docs/schema/spec-schema.md v0.7.2
-작성일: 2026-05-19 / 최종 수정: 2026-05-20
+DB 스키마: docs/schema/spec-schema.md v0.9
+작성일: 2026-05-19 / 최종 수정: 2026-05-23
 
 ---
 
@@ -204,6 +204,43 @@ accent-tint 배경, accent 1.5px 보더, 18px radius.
 | coaching_insights | next_action_title UPDATE (재협의 revised=true 시) | 재협의 종료 시 |
 | goals | status='abandoned' UPDATE + 새 goals INSERT | suggest_change 분기에서 사용자가 역량 변경 선택 시 |
 
+**`coaching_insights` INSERT 필드 (schema v0.8/v0.9 정합):**
+
+```
+user_id:             현재 user
+goal_id:             현재 active goal
+weekly_retro_id:     이번 주차 weekly_retros.id (FK, v0.8 — 11 홈 타임라인 링크용)
+week_number:         goal.current_week
+topic:               이번 주 코칭 핵심 주제 (AI 생성)
+pattern_insight:     발견된 행동 패턴 (AI 생성)
+next_action_title:   다음 주 추천 액션 제목
+next_action_reason:  추천 이유 (nullable, AI 생성)
+strength_link:       연결된 강점명 (자유 텍스트, 예: "체계 + 학습")
+badge:               완료율 기반 이모지 (v0.8 — 11 홈 타임라인 done 카드용)
+                     • 7/7 → 🔥  • 5~6 → 👍  • 3~4 → 😊  • 0~2 → 🌱
+comment:             완료율 기반 짧은 코멘트 (v0.8)
+                     • 7/7 → "완벽한 한 주!"
+                     • 5~6 → "꾸준함이 쌓이고 있어요"
+                     • 3~4 → "절반을 해냈어요"
+                     • 0~2 → "다음 주를 기대해요"
+```
+
+**`action_items` INSERT 필드 (다음 주차, schema v0.8/v0.9 정합):**
+
+```
+user_id, goal_id:    현재 사용자/목표
+week_number:         current_week + 1
+title:               next_action_title
+description:         AI가 생성한 상세 설명 (nullable)
+tags:                태그 배열 (nullable)
+is_custom:           false (AI 추천이므로)
+source_seed_id:      재해석한 시드 ID (nullable, 디버깅용)
+strength_link:       이 액션과 연결된 강점명 (v0.8, 자유 텍스트)
+                     11 홈 "오늘의 액션" 카드 "강점 「○○」을 발휘하는 시간 ✨" 표시용
+```
+
+> ⚠️ v0.8 신규 컬럼(`strength_link`, `badge`, `comment`, `weekly_retro_id`)을 누락하면 11 홈 화면의 강점 표시·타임라인 done 카드 배지/코멘트가 빈칸으로 표시됨. INSERT 시 반드시 채울 것.
+
 ---
 
 ## 7. 탭바
@@ -251,3 +288,4 @@ accent-tint 배경, accent 1.5px 보더, 18px radius.
 | v1.1 | 2026-05-20 | **[디자인 전면 개편]** p08 커리어 인터뷰 화면과 동일한 스타일로 통일 (4.1~4.4). 상단바 우측 Q레이블 추가. 진행률 바 얇은 전체너비 바로 변경. 코치 말풍선 흰색 카드 + 테두리, 아바타 제거. 입력창 사각형 박스 + 사각형 전송 버튼(종이비행기 SVG)으로 변경. **[CTA 변경]** 요약 화면 좌측 CTA "위클리 회고로"(→ p12) → "추가로 더 이야기하기"로 변경. **[재협의 플로우 추가]** "추가로 더 이야기하기" 탭 시 채팅 복귀 + 액션 재협의 모드 진입. 확정어 감지 시 요약 화면 재전환 + 동일 2개 CTA 표시. **[이슈 등록]** BUG-01 디자인 통일 미완, BUG-02 재협의 종료 불안정 — 9. 미결 사항에 기재. |
 | v1.2 | 2026-05-20 | **[06 v1.2 반영 + BUG 해소]** **3.** 참조 파일 버전을 06_reflect_coaching.md v1.2로 업데이트. 종료 감지 방식 차이(메인=문자열, 재협의=구분자) 인터페이스 표로 명시. **4.5** "추가로 더 이야기하기" 세션 내 최대 2회 제한 및 초과 시 버튼 숨김 동작 명시. **5.** 재협의 진입 시 코치 첫 발화를 "어떤 부분이 다르게 느껴지셨나요?"로 확정. 재협의 종료 감지를 확정어 방식 → `---ACTION_REVISED---` 구분자 파싱 방식으로 교체. 재협의 후 요약 재표시 동작 명시. **6.2** action_items UPDATE + coaching_insights UPDATE 쓰기 항목 추가. **8.** 예외 처리 — "재협의 중 확정어 미감지" 항목 제거 및 "3턴 초과 처리", "파싱 실패 처리", "2회 초과 진입" 항목으로 교체. **9.** BUG-01(p08 디자인 통일) 해소 — 미결 사항에서 제거하고 4.1~4.4 확정 스펙으로 전환. BUG-02(재협의 종료 불안정) 해소 — 06 v1.2 구조적 해결로 미결 사항에서 제거. |
 | v1.3 | 2026-05-21 | **[feature/12 구현 상태 명시]** **2.** 진입 조건 — feature/12 테스트 모드에서 weekly_retros 가드 임시 비활성화 (코드 주석 `테스트용 — production 복구 필요` 마커, 머지 전 복구 필요). **3.** AI 연동 참조 — MVP는 mock 시나리오(Q1~Q4 정적 + 정적 요약) 명시. 실제 Claude 연동은 `web/docs/HANDOFF_AI.md` (Phase 1.7) 인계 예정. 시그니처 유지하므로 함수 본문만 교체. **8.** 예외 처리 — mock 단계 한계 2건 추가: 확정어 단순 `.includes()` 매칭(`---ACTION_REVISED---` 구분자 미구현), 동일 week_number 재 INSERT idempotency 미구현. |
+| v1.4 | 2026-05-23 | **[schema v0.9 정합성 정렬]** **헤더 schema 버전** v0.7.2 → v0.9. **6.2 쓰기** — `coaching_insights` / `action_items` INSERT 필드 상세 명시. v0.8 신규 컬럼 명세 반영: (1) `coaching_insights.weekly_retro_id` (FK, 11 홈 타임라인 링크용) / (2) `coaching_insights.badge` (완료율 기반 이모지 🔥/👍/😊/🌱) / (3) `coaching_insights.comment` (완료율 기반 코멘트) / (4) `action_items.strength_link` (11 홈 "오늘의 액션" 카드 강점 표시용). INSERT 누락 시 11 홈 화면 표시 빈칸 발생 경고 추가. |
