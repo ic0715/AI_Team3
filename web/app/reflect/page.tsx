@@ -134,7 +134,8 @@ function ReflectContent() {
         const [actionRes, memoRes, completionRes] = await Promise.all([
           supabase
             .from('action_items')
-            .select('title')
+            // id 포함 — action_completions 조회 FK로 사용
+            .select('id, title')
             .eq('user_id', user.id)
             .eq('goal_id', g.id)
             .eq('week_number', g.current_week)
@@ -149,11 +150,12 @@ function ReflectContent() {
             .gte('memo_date', mondayISO)
             .lte('memo_date', sundayISO)
             .order('created_at', { ascending: true }),
+          // schema v0.8 노트: action_completions에는 goal_id 컬럼 없음.
+          // user_id + 이번 주 날짜 범위만으로 충분 (주 1액션 정책).
           supabase
             .from('action_completions')
             .select('completed_date')
             .eq('user_id', user.id)
-            .eq('goal_id', g.id)
             .gte('completed_date', mondayISO)
             .lte('completed_date', sundayISO),
         ]);
