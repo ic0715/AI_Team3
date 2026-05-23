@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
 // 12 회고 — 단일 회고 화면 (스펙 v1.5)
@@ -18,7 +19,9 @@ import { TabBar } from '@/components/ui/TabBar';
 
 interface ActiveGoal {
   id: string;
+  /** v1.5: started_at 기준 계산된 현재 주차 */
   current_week: number;
+  started_at: string | null;
 }
 
 // 데일리 메모 — schema v0.8 다중 누적 정책 (UNIQUE 제거)
@@ -105,7 +108,8 @@ function ReflectContent() {
 
         const goalRes = await supabase
           .from('goals')
-          .select('id, current_week')
+          // v1.5: started_at 포함 — 주차 계산에 사용
+          .select('id, current_week, started_at')
           .eq('user_id', user.id)
           .eq('status', 'active')
           .limit(1)
@@ -117,7 +121,9 @@ function ReflectContent() {
           router.replace('/onboarding/action-items');
           return;
         }
-        const g = goalRes.data as ActiveGoal;
+        // v1.5: DB의 current_week 무시하고 started_at 기준 계산
+        const goalRow = goalRes.data as ActiveGoal;
+        const g: ActiveGoal = { ...goalRow, current_week: calculateCurrentWeek(goalRow.started_at) };
         setGoal(g);
 
         // 2차 fetch: action_items + memos 병렬 (둘 다 action_item_id에 의존하지 않음)

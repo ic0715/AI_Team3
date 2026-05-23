@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
 // 11 홈 — 12주 코칭 대시보드 (스펙 v1.2)
@@ -18,8 +19,10 @@ import { TabBar } from '@/components/ui/TabBar';
 interface ActiveGoal {
   id: string;
   goal_title: string;
+  /** v1.5: started_at 기준 계산된 현재 주차 (DB값 무시) */
   current_week: number;
   competency_code: string;
+  started_at: string | null;
 }
 
 interface ActionItem {
@@ -135,7 +138,7 @@ function HomeContent() {
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('id, goal_title, current_week, competency_code')
+            .select('id, goal_title, current_week, competency_code, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .limit(1)
@@ -160,8 +163,10 @@ function HomeContent() {
           router.replace('/onboarding/action-items');
           return;
         }
-        const goal = goalRes.data as ActiveGoal;
-        const currentWeek = goal.current_week ?? 1;
+        // v1.5: DB의 current_week 무시하고 started_at 기준 캘린더 계산
+        const goalRow = goalRes.data as ActiveGoal;
+        const currentWeek = calculateCurrentWeek(goalRow.started_at);
+        const goal: ActiveGoal = { ...goalRow, current_week: currentWeek };
 
         // 2차 fetch: action_items + insights 병렬 (둘 다 action_item_id에 의존하지 않음)
         const mondayISO = formatLocalISO(monday);
