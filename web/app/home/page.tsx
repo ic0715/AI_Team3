@@ -163,11 +163,11 @@ function HomeContent() {
         const goal = goalRes.data as ActiveGoal;
         const currentWeek = goal.current_week ?? 1;
 
-        // 2차: 현재 주차 action_items, 이번 주 completions, 과거 주차 insights 병렬
+        // 2차 fetch: action_items + insights 병렬 (둘 다 action_item_id에 의존하지 않음)
         const mondayISO = formatLocalISO(monday);
         const sundayISO = formatLocalISO(addDays(monday, 6));
 
-        const [actionRes, completionRes, insightRes] = await Promise.all([
+        const [actionRes, insightRes] = await Promise.all([
           supabase
             .from('action_items')
             // v0.8: strength_link 컬럼 사용 — 오늘의 액션 카드 "강점 「○○」을 발휘하는 시간" 표시
@@ -178,14 +178,6 @@ function HomeContent() {
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
-          // schema v0.8 노트: action_completions에는 goal_id 컬럼 없음 (action_item_id 사용).
-          // 이번 주 범위로 user 필터 — 주 1개 액션 정책이라 결과는 모두 현재 주차 액션 것.
-          supabase
-            .from('action_completions')
-            .select('completed_date')
-            .eq('user_id', user.id)
-            .gte('completed_date', mondayISO)
-            .lte('completed_date', sundayISO),
           supabase
             .from('coaching_insights')
             .select('week_number, next_action_title, strength_link, badge, comment')
@@ -202,7 +194,6 @@ function HomeContent() {
           console.error(`[11] ${label}:`, err.message || '(no message)', '| code:', err.code, '| details:', err.details, '| hint:', err.hint);
         };
         logErr('action_items', actionRes.error);
-        logErr('action_completions', completionRes.error);
         logErr('coaching_insights', insightRes.error);
 
         if (!actionRes.data) {
@@ -210,6 +201,21 @@ function HomeContent() {
           router.replace('/onboarding/action-items');
           return;
         }
+
+        // 3차 fetch: action_completions를 **현재 주차 action_item.id로 필터**
+        // (BUGFIX: 코칭으로 W1→W2 전환 후 같은 주 안에서 W1 액션의 체크가
+        //  W2 그리드에 잘못 표시되던 문제 해결)
+        const currentActionId = actionRes.data.id as string;
+        const completionRes = await supabase
+          .from('action_completions')
+          .select('completed_date')
+          .eq('user_id', user.id)
+          .eq('action_item_id', currentActionId)
+          .gte('completed_date', mondayISO)
+          .lte('completed_date', sundayISO);
+
+        if (cancelled) return;
+        logErr('action_completions', completionRes.error);
 
         setData({
           nickname: profileRes.data?.nickname ?? '',

@@ -120,7 +120,8 @@ function ReflectContent() {
         const g = goalRes.data as ActiveGoal;
         setGoal(g);
 
-        const [actionRes, completionRes, memoRes] = await Promise.all([
+        // 2차 fetch: action_items + memos 병렬 (둘 다 action_item_id에 의존하지 않음)
+        const [actionRes, memoRes] = await Promise.all([
           supabase
             .from('action_items')
             // id 포함 — action_completions 조회 FK로 사용
@@ -131,14 +132,6 @@ function ReflectContent() {
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
-          // schema v0.8 노트: action_completions에는 goal_id 컬럼 없음.
-          // user_id + 이번 주 날짜 범위만으로 충분 (주 1액션 정책).
-          supabase
-            .from('action_completions')
-            .select('completed_date')
-            .eq('user_id', user.id)
-            .gte('completed_date', mondayISO)
-            .lte('completed_date', sundayISO),
           // 이번 주 데일리 메모 (v1.4 — 다중 누적, schema v0.8)
           // 정렬: memo_date 오름차순, 동일 날 created_at 오름차순 (시간 순)
           supabase
@@ -155,12 +148,30 @@ function ReflectContent() {
         if (cancelled) return;
 
         if (actionRes.error) console.error('[12] action_items:', actionRes.error);
-        if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
         if (memoRes.error) console.error('[12] daily_memos:', memoRes.error);
 
         setActionTitle(actionRes.data?.title ?? '액션이 설정되지 않았어요');
-        setDoneCountWeek((completionRes.data ?? []).length);
         setMemos((memoRes.data ?? []) as DailyMemo[]);
+
+        // 3차 fetch: action_completions를 **현재 주차 action_item.id로 필터**
+        // (BUGFIX: 코칭으로 W1→W2 전환 후 같은 주 안의 W1 체크가 잘못 집계되던 문제 해결)
+        const currentActionId = actionRes.data?.id as string | undefined;
+        if (currentActionId) {
+          const completionRes = await supabase
+            .from('action_completions')
+            .select('completed_date')
+            .eq('user_id', user.id)
+            .eq('action_item_id', currentActionId)
+            .gte('completed_date', mondayISO)
+            .lte('completed_date', sundayISO);
+
+          if (cancelled) return;
+          if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
+          setDoneCountWeek((completionRes.data ?? []).length);
+        } else {
+          // 현재 주차 action_item 없음 → 카운트 0
+          setDoneCountWeek(0);
+        }
 
         // v1.5: weekly_retros 로드 제거 — 회고 입력 영역 자체가 없어졌으므로
         // 기존 회고 프리필 / retroSaved 동기화 로직 모두 불필요
