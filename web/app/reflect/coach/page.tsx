@@ -15,13 +15,13 @@ import { calculateCurrentWeek } from '@/lib/utils/week';
 // ────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-// 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
+// 🤖 AI 연동 (06 v1.3)
 //
-// 현재: mock 구현 (Q1~Q4 시나리오 순차 응답 + 정적 요약)
-// 교체: sendCoachMessage / finalizeCoaching 함수 본문을 Claude API 호출로 변경
+// sendCoachMessage    → POST /api/reflect-coach/chat
+// finalizeCoaching    → POST /api/reflect-coach/finalize (AI 추출만) + 클라이언트가 DB INSERT
 //
-// 자세한 명세는 docs/HANDOFF_AI.md (Phase 1.7) 참조 — 추가 예정.
-// 본 화면의 AI 동작은 docs/ai_prompt/06_reflect_coaching.md 를 구현 기준으로 따름.
+// 구현 기준: docs/ai_prompt/06_reflect_coaching.md
+// 품질 기법: Prompt Caching + Temperature 분리 (대화 0.7 / 추출 0) + 🔴 가드레일
 // ─────────────────────────────────────────────────────────────
 
 interface Message {
@@ -68,97 +68,74 @@ interface CoachingResult {
   strengthLink: string;
 }
 
-// ── 🤖 mock — 코치 메시지 (Q1~Q4 시나리오) ─────────────────────
+// ── 🤖 코치 메시지 — POST /api/reflect-coach/chat ───────────────
 async function sendCoachMessage(params: CoachMessageParams): Promise<CoachMessageResult> {
-  const { questionIndex, isRenegotiate, context } = params;
-  await new Promise((r) => setTimeout(r, 900));
-
-  if (isRenegotiate) {
-    return {
-      content: '어떤 액션이 더 잘 맞을 것 같아요? 자유롭게 말씀해주세요.',
-      nextQuestionIndex: questionIndex,
-      isComplete: false,
-    };
+  const res = await fetch('/api/reflect-coach/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`reflect-coach/chat ${res.status}: ${errBody}`);
   }
-
-  // Q2: 강점 언급 / Q3: 다음 주 방향 / Q4: 액션 제안 + 확정
-  const strength = context.topStrength ?? '집중';
-  const nextIndex = questionIndex + 1;
-
-  const QUESTIONS: Record<number, string> = {
-    2: `이번 주 회고를 보니 ${context.doneCountWeek}/7로 진행하셨네요. 그 중 가장 인상 깊었던 한 가지는 뭐였어요?`,
-    3: `그 부분에서 강점 「${strength}」이(가) 작동한 것 같아요. 다음 주에는 어떤 방향으로 이어가고 싶으세요?`,
-    4: `좋아요. 그 방향이라면 "${context.goal.goal_title}" 흐름에서 한 단계 더 깊게 가볼 수 있어요. 다음 주에 ${nextIndex - 3}회 정도 실행 가능한 작은 액션 하나를 떠올려볼까요? 이 액션으로 다음 주 시작해볼까요?`,
-  };
-
-  if (questionIndex >= 4) {
-    return {
-      content: '좋아요, 그 액션으로 다음 주 정리할게요. 잠시만 기다려주세요...',
-      nextQuestionIndex: 5,
-      isComplete: true,
-    };
-  }
-
-  return {
-    content: QUESTIONS[nextIndex] ?? '이야기 잘 들었어요.',
-    nextQuestionIndex: nextIndex,
-    isComplete: false,
-  };
+  return res.json();
 }
 
-// ── 🤖 mock — 종료 시 coaching_insights + action_items INSERT ──
+// ── 🤖 종료 시: AI 추출 (서버) + coaching_insights/action_items INSERT (클라이언트) ──
 async function finalizeCoaching(
   history: Message[],
   context: CoachContext,
   userId: string,
 ): Promise<CoachingResult> {
-  await new Promise((r) => setTimeout(r, 1500));
-
-  // 사용자가 마지막에 말한 내용을 next_action_title로 활용 (mock 단순화)
-  const lastUserMsg = [...history].reverse().find((m) => m.role === 'user');
-  const nextActionTitle =
-    lastUserMsg?.content?.slice(0, 50) ??
-    `${context.goal.goal_title} — 다음 주 첫 실행`;
-
-  const result: CoachingResult = {
-    topic: context.goal.goal_title,
-    patternInsight:
-      context.doneCountWeek >= 5
-        ? '꾸준함이 쌓이고 있어요. 다음 주는 깊이를 한 단계 더 시도해봐도 좋아요.'
-        : context.doneCountWeek >= 2
-          ? '실행과 회피의 패턴이 보여요. 다음 주는 트리거를 명확히 정해두면 좋겠어요.'
-          : '실행이 어려웠던 한 주였네요. 다음 주는 더 작은 단위로 시작해볼까요?',
-    nextActionTitle,
-    strengthLink: context.topStrength ?? '집중',
+  // 1) AI 추출 (06 §5.2)
+  const res = await fetch('/api/reflect-coach/finalize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: history, context }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`reflect-coach/finalize ${res.status}: ${errBody}`);
+  }
+  const ai = (await res.json()) as {
+    topic: string;
+    pattern_insight: string;
+    next_action_title: string;
+    next_action_reason: string;
+    strength_link: string;
   };
 
-  // v0.8: 완료율 기반 badge/comment 산출 (11 홈 타임라인 done 카드용)
+  const result: CoachingResult = {
+    topic: ai.topic,
+    patternInsight: ai.pattern_insight || `${context.goal.goal_title} — 이번 주 코칭 정리`,
+    nextActionTitle: ai.next_action_title,
+    strengthLink: ai.strength_link || (context.topStrength ?? ''),
+  };
+
+  // 2) v0.8: 완료율 기반 badge/comment (11 홈 타임라인 done 카드용)
   const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
 
-  // coaching_insights INSERT
-  // schema v0.8/v0.9 정합: weekly_retro_id (FK), badge, comment, next_action_reason 포함
+  // 3) coaching_insights INSERT — schema v0.8/v0.9
   const { error: insightErr } = await supabase.from('coaching_insights').insert({
     user_id: userId,
     goal_id: context.goal.id,
-    weekly_retro_id: context.weeklyRetroId, // v0.8: 연결된 주차 회고 FK
+    weekly_retro_id: context.weeklyRetroId,
     week_number: context.goal.current_week,
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
-    next_action_reason: result.patternInsight, // mock: 추후 AI가 별도 생성
+    next_action_reason: ai.next_action_reason || result.patternInsight,
     strength_link: result.strengthLink,
-    badge,    // v0.8: 11 홈 타임라인 done 카드 이모지
-    comment,  // v0.8: 11 홈 타임라인 done 카드 코멘트
+    badge,
+    comment,
   });
   if (insightErr) {
     console.error('[13] coaching_insights INSERT:', insightErr);
   }
 
-  // action_items INSERT (다음 주차)
-  // v0.8: strength_link 포함 — 11 홈 "오늘의 액션" 카드 강점 표시용
-  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준
-  //   계산된 currentWeek 사용. 코칭 시점의 실제 주차 + 1을 다음 주로.
-  //   12주 넘기지 않도록 클램프.
+  // 4) action_items INSERT (다음 주차)
+  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준 계산값 사용. 12주 클램프.
   const TOTAL_WEEKS = 12;
   const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
   const { error: actionErr } = await supabase.from('action_items').insert({
@@ -166,19 +143,15 @@ async function finalizeCoaching(
     goal_id: context.goal.id,
     week_number: nextWeek,
     title: result.nextActionTitle,
-    description: result.patternInsight,
+    description: ai.next_action_reason || result.patternInsight,
     tags: [],
     is_custom: false,
     source_seed_id: null,
-    strength_link: result.strengthLink, // v0.8: top 강점명 (자유 텍스트)
+    strength_link: result.strengthLink,
   });
   if (actionErr) {
     console.error('[13] action_items INSERT:', actionErr);
   }
-
-  // v1.5: goals.current_week UPDATE 제거.
-  // 주차는 항상 started_at 기준 날짜 계산으로 결정되므로 DB값 변경 불필요.
-  // (이전 로직: 코칭 시점에 +1 → 사용자가 같은 주에 코칭 여러 번 하면 주차 부풀림)
 
   return result;
 }
