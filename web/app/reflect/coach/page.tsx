@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
 // 13 회고 AI 코칭 — 채팅 + 다음 주 액션 정하기 (스펙 v1.1)
@@ -155,7 +156,11 @@ async function finalizeCoaching(
 
   // action_items INSERT (다음 주차)
   // v0.8: strength_link 포함 — 11 홈 "오늘의 액션" 카드 강점 표시용
-  const nextWeek = context.goal.current_week + 1;
+  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준
+  //   계산된 currentWeek 사용. 코칭 시점의 실제 주차 + 1을 다음 주로.
+  //   12주 넘기지 않도록 클램프.
+  const TOTAL_WEEKS = 12;
+  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
   const { error: actionErr } = await supabase.from('action_items').insert({
     user_id: userId,
     goal_id: context.goal.id,
@@ -171,19 +176,9 @@ async function finalizeCoaching(
     console.error('[13] action_items INSERT:', actionErr);
   }
 
-  // 주차 전환: 코칭 완료 = 한 주의 마무리 → goals.current_week +1
-  // 스펙상 매주 월요일 자정 자동 전환이지만 MVP에서는 코칭 시점에 수동 전환.
-  // 12주를 넘기지 않도록 클램프 (total_weeks 기본값 12).
-  const TOTAL_WEEKS = 12;
-  if (nextWeek <= TOTAL_WEEKS) {
-    const { error: goalErr } = await supabase
-      .from('goals')
-      .update({ current_week: nextWeek })
-      .eq('id', context.goal.id);
-    if (goalErr) {
-      console.error('[13] goals.current_week UPDATE:', goalErr);
-    }
-  }
+  // v1.5: goals.current_week UPDATE 제거.
+  // 주차는 항상 started_at 기준 날짜 계산으로 결정되므로 DB값 변경 불필요.
+  // (이전 로직: 코칭 시점에 +1 → 사용자가 같은 주에 코칭 여러 번 하면 주차 부풀림)
 
   return result;
 }
@@ -244,7 +239,7 @@ function CoachContent() {
         if (cancelled) return;
         setUserId(user.id);
 
-        // active goal + this week's weekly_retros 필수
+        // 1차: profile + goal(+started_at) + strengths
         const [profileRes, goalRes, strengthRes] = await Promise.all([
           supabase
             .from('profiles')
@@ -253,7 +248,8 @@ function CoachContent() {
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('id, goal_title, current_week, competency_code')
+            // v1.5: started_at 포함 — 주차 계산에 사용
+            .select('id, goal_title, current_week, competency_code, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .limit(1)
@@ -273,26 +269,37 @@ function CoachContent() {
           return;
         }
 
-        const goal = goalRes.data as CoachContext['goal'];
+        const goalRow = goalRes.data as { id: string; goal_title: string; current_week: number; competency_code: string; started_at: string | null };
+        // v1.5: started_at 기준 캘린더 날짜로 주차 계산 (DB의 current_week 무시)
+        const calculatedWeek = calculateCurrentWeek(goalRow.started_at);
+        const goal: CoachContext['goal'] = {
+          id: goalRow.id,
+          goal_title: goalRow.goal_title,
+          current_week: calculatedWeek,
+          competency_code: goalRow.competency_code,
+        };
 
-        // weekly_retros for this week + action_completions 병렬
-        const [retroRes, completionRes] = await Promise.all([
+        // 2차: 현재 주차 action_item + weekly_retros 병렬
+        const [actionItemRes, retroRes] = await Promise.all([
+          supabase
+            .from('action_items')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .eq('week_number', calculatedWeek)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
           supabase
             .from('weekly_retros')
             // v0.8: id 포함 — coaching_insights.weekly_retro_id (FK) 저장용
             .select('id, summary_one_line, completion_count, target_count')
             .eq('user_id', user.id)
             .eq('goal_id', goal.id)
-            .eq('week_number', goal.current_week)
+            .eq('week_number', calculatedWeek)
             .order('retro_date', { ascending: false })
             .limit(1)
             .maybeSingle(),
-          supabase
-            .from('action_completions')
-            .select('completed_date')
-            .eq('user_id', user.id)
-            .eq('goal_id', goal.id)
-            .eq('week_number', goal.current_week),
         ]);
 
         if (cancelled) return;
@@ -304,6 +311,18 @@ function CoachContent() {
         //   return;
         // }
 
+        // 3차: action_completions를 action_item_id로 필터 (이번 주 완료 카운트)
+        let doneFromCompletions = 0;
+        if (actionItemRes.data?.id) {
+          const completionRes = await supabase
+            .from('action_completions')
+            .select('completed_date')
+            .eq('user_id', user.id)
+            .eq('action_item_id', actionItemRes.data.id as string);
+          if (cancelled) return;
+          doneFromCompletions = (completionRes.data ?? []).length;
+        }
+
         const strengths = (strengthRes.data?.strengths as Array<{ name_ko: string }> | undefined) ?? [];
         const ctx: CoachContext = {
           nickname: profileRes.data?.nickname ?? '친구',
@@ -313,7 +332,7 @@ function CoachContent() {
           weeklyRetroId: (retroRes.data?.id as string | undefined) ?? null,
           doneCountWeek:
             (retroRes.data?.completion_count as number | undefined) ??
-            (completionRes.data?.length ?? 0),
+            doneFromCompletions,
         };
         setContext(ctx);
 
@@ -322,7 +341,7 @@ function CoachContent() {
         const openingMessage: Message = {
           id: crypto.randomUUID(),
           role: 'coach',
-          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${ctx.goal.current_week} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
+          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${calculatedWeek} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
         };
         setMessages([openingMessage]);
         setLoadingContext(false);
