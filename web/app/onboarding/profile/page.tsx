@@ -259,15 +259,6 @@ function BasicInfoContent() {
           <div style={{ width: '44px' }} />
         </div>
 
-        {/* ── 진행 상태 (신규 모드만) ── */}
-        {!isEditMode && (
-          <div style={{ padding: '0 20px 4px', background: 'var(--surface)' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>1 / 5 단계</div>
-            <div style={{ height: '4px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
-              <div style={{ width: '20%', height: '100%', background: 'var(--accent)', borderRadius: '999px' }} />
-            </div>
-          </div>
-        )}
 
         {/* ── 콘텐츠 ── */}
         <div style={{ padding: '24px 20px' }}>
