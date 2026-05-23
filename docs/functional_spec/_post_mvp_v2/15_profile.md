@@ -12,9 +12,9 @@
 | --- | --- |
 | 화면 ID | 15_profile (별칭: 14_profile, feature/12 라우트 `/profile`) |
 | 페이즈 | MAINTAIN |
-| 역할 | 사용자 정보 조회·수정 + 강점/커리어 방향 확인 + 비밀번호 변경 + 로그아웃/탈퇴 |
-| 진입 경로 | 탭바 [프로필] |
-| 다음 화면 | 07 커리어 인터뷰 인트로 (커리어 방향 재설정) / NEW07 비밀번호 변경 (`/profile/password-change`) / 01 랜딩 (로그아웃·탈퇴) |
+| 역할 | 사용자 정보 조회·수정 + 강점 수정 + 커리어 방향 재설정 + 비밀번호 변경 + 로그아웃/탈퇴 |
+| 진입 경로 | 탭바 [프로필] / 04 강점 선택 (?from=profile 저장 완료 시 자동 복귀) |
+| 다음 화면 | 04 강점 선택 (`/onboarding/strengths?from=profile`, 강점 수정) / 07 커리어 인터뷰 인트로 (커리어 방향 재설정) / NEW07 비밀번호 변경 (`/profile/password-change`) / 01 랜딩 (로그아웃·탈퇴) |
 
 > **v1.2: ID 별칭 안내** — `_mvp/14_profile.md`와 동일 화면. _post_mvp_v2 문서는 ID 15로 유지(이력 보존), feature/12 코드 라우트는 `/profile` 사용.
 
@@ -48,13 +48,17 @@ accent 배경, 22px radius, 중앙 정렬, 흰색 텍스트.
 > `streak_days`는 v1에서 정책 미확정. 고정값 표시 또는 미노출 처리.
 > `career_level_label`: `junior_new`→"신입", `junior`→"주니어", `senior_mid`→"미드", `senior`→"시니어"
 
-### 3.3 내 강점 Top 5 섹션
+### 3.3 내 강점 Top 5 섹션 `v1.3 — 강점 수정 메뉴 추가`
 
 section-card 스타일 (bg-soft 배경, line 보더, 18px radius).
 
 - 섹션 타이틀: "⭐ 내 강점 Top 5"
 - 강점 chip 5개: `strength_analyses.strengths` (is_latest=true) Top 5 테마명
   - 스타일: 흰색 배경, accent 글씨, accent-soft 보더, 999px radius
+- **메뉴 아이템 (chip 영역 아래)**: "✏️ 강점 수정" + 서브 "다른 강점 5개로 다시 선택할 수 있어요" → `/onboarding/strengths?from=profile` 이동
+  - 04 강점 선택 페이지로 진입 (재선택 흐름)
+  - 저장 완료 시 04 페이지가 `?from=profile` 파라미터를 감지해 `/profile`로 복귀
+  - 04 진입 시 04 페이지 타이틀이 "강점 선택" → "강점 수정"으로 변경, CTA 버튼이 "다음으로 →" → "강점 수정 저장"으로 변경
 
 ### 3.4 커리어 방향 섹션
 
@@ -184,3 +188,4 @@ section-card 스타일 (border 없음, 버튼만).
 | v1.0 | 2026-05-18 | home_0518.html p15 기준으로 최초 작성. 정보 수정·비밀번호 변경·알림 설정 Post-MVP로 명시. 읽기 전용 기본 정보 표시만 구현 범위에 포함. |
 | v1.1 | 2026-05-20 | **[HTML 미반영 항목 반영 + Post-MVP 승격]** **1.** 역할에 "사용자 정보 수정" 추가. 다음 화면에 "NEW07 비밀번호 변경" 추가. **3.5** 기본 정보 섹션을 읽기 전용에서 인라인 편집 모드 포함으로 전면 개정 — "수정" 버튼, 편집 모드 UI(input·select·취소/저장하기 버튼), 토글 동작 상세 명시. **3.6** 비밀번호 변경을 "준비 중 토스트"에서 NEW07 화면 이동으로 변경. **4.** 기본 정보 수정·비밀번호 변경 기능 행 추가. **5.2** `profiles` UPDATE 쓰기 항목 추가. **6.** 기본 정보 저장 실패·닉네임 빈 값 예외 처리 추가. **7.** "기본 정보 수정", "비밀번호 변경" Post-MVP 항목 제거 (MVP 구현으로 승격). |
 | v1.2 | 2026-05-21 | **[feature/12 구현 반영]** **1.** 화면 ID에 별칭 `14_profile` 표기 (라우트 `/profile`). _mvp/14_profile.md와 동일 화면이고 _post_mvp_v2 문서는 ID 15로 이력 보존. **3.7** 회원 탈퇴 — MVP는 `signOut`만 수행, 실제 데이터 삭제는 서버 admin API 권한 필요로 미구현 (TODO 마커). Post-MVP로 분류. |
+| v1.3 | 2026-05-23 | **[강점 수정 기능 추가]** **1.** 역할에 "강점 수정" 추가. 진입 경로에 "04 강점 선택 ?from=profile 저장 완료 시 자동 복귀" 추가, 다음 화면에 "04 강점 선택 (`/onboarding/strengths?from=profile`)" 추가. **3.3** 내 강점 Top 5 섹션 — chip 영역 아래에 "✏️ 강점 수정" 메뉴 아이템 신규 추가. 클릭 시 `/onboarding/strengths?from=profile`로 이동. 04 페이지는 `from=profile` 파라미터를 감지해 저장 완료 시 `/profile`로 자동 복귀하고, 페이지 타이틀 + CTA 버튼 라벨을 컨텍스트에 맞게 변경. |

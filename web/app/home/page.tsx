@@ -403,12 +403,6 @@ function ThemeCard({ goal }: { goal: ActiveGoal }) {
         <span style={themeProgPct}>{progressPct}%</span>
       </div>
 
-      <div style={themeDesc}>
-        하나의 역량은 단기간에 만들어지지 않아요. 강점을 기반으로 작은 행동을 반복하고
-        회고하며, 나만의 방식으로 체화하는 과정이 필요해요. 하나의 역량 목표는 12주
-        동안 집중해보는 것을 권장합니다.
-      </div>
-
       {/* 주차 도트 트랙 */}
       <div style={weeksTrack} role="list" aria-label="12주 진행 도트">
         {Array.from({ length: TOTAL_WEEKS }, (_, i) => {
@@ -709,9 +703,7 @@ function TimelineCurrent({
 }
 
 function TimelineFuture({ week }: { week: number }) {
-  // W6, W12 마일스톤
-  const isMidMilestone = week === 6;
-  const isFinalMilestone = week === TOTAL_WEEKS;
+  // 모든 future 주차 동일 표시 (W6/W12 마일스톤 별도 처리 제거)
   return (
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
@@ -719,27 +711,9 @@ function TimelineFuture({ week }: { week: number }) {
         <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardFuture }}>
-        {isMidMilestone && (
-          <>
-            <div style={tlMilestoneTitle}>🎯 중간 회고</div>
-            <div style={tlMilestoneDesc}>
-              여기까지의 패턴을 돌아보고, 남은 6주를 다시 정해요.
-            </div>
-          </>
-        )}
-        {isFinalMilestone && (
-          <>
-            <div style={tlMilestoneTitle}>🏆 12주 통합 회고</div>
-            <div style={tlMilestoneDesc}>
-              12주를 마치고, 다음 사이클을 그려봐요.
-            </div>
-          </>
-        )}
-        {!isMidMilestone && !isFinalMilestone && (
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            🌱 코치와 함께 정해요
-          </div>
-        )}
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+          🌱 코치와 함께 정해요
+        </div>
       </div>
     </div>
   );

@@ -293,7 +293,7 @@ function ProfileContent() {
         {/* 강점 Top 5 섹션 */}
         <section style={sectionCardStyle}>
           <div style={sectionTitleStyle}>⭐ 내 강점 Top 5</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '0 16px 16px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '0 16px 14px' }}>
             {strengths.length === 0 ? (
               <span style={{ fontSize: '13px', color: 'var(--ink-mute)' }}>
                 아직 분석된 강점이 없어요
@@ -306,6 +306,18 @@ function ProfileContent() {
               ))
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => router.push('/onboarding/strengths?from=profile')}
+            style={menuItemStyle}
+          >
+            <span style={menuIconStyle}>✏️</span>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={menuTitleStyle}>강점 수정</div>
+              <div style={menuSubStyle}>다른 강점 5개로 다시 선택할 수 있어요</div>
+            </div>
+            <span style={{ color: 'var(--ink-mute)' }}>›</span>
+          </button>
         </section>
 
         {/* 커리어 방향 섹션 */}
