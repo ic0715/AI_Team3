@@ -182,7 +182,8 @@ function HomeContent() {
             .from('action_completions')
             .select('completed_date')
             .eq('user_id', user.id)
-            .eq('goal_id', goal.id)
+            // action_completions에는 goal_id 컬럼 없음 → user_id + 날짜 범위로 조회
+            // 유저당 active goal 1개, 주간 action 1개 → 범위 내 데이터가 현재 액션 완료 기록과 동일
             .gte('completed_date', mondayISO)
             .lte('completed_date', sundayISO),
           supabase
