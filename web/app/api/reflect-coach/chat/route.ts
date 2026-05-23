@@ -5,7 +5,9 @@ import { buildChatSystemPrompt, type ReflectChatContext } from '@/lib/prompts/re
 export const runtime = 'nodejs';
 
 interface ChatRequestBody {
-  messages: Array<{ role: 'coach' | 'user'; content: string }>;
+  // 페이지는 `history`로 보냄. 호환을 위해 둘 다 허용.
+  history?: Array<{ role: 'coach' | 'user'; content: string }>;
+  messages?: Array<{ role: 'coach' | 'user'; content: string }>;
   context: ReflectChatContext;
   questionIndex: number;     // 1~4 (페이지 UI 진행도 표시용)
   isRenegotiate: boolean;
@@ -36,7 +38,8 @@ function detectEnding(text: string): boolean {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequestBody;
-    const { messages, context, questionIndex, isRenegotiate } = body;
+    const { context, questionIndex, isRenegotiate } = body;
+    const messages = body.history ?? body.messages ?? [];
 
     const userMsgCount = messages.filter((m) => m.role === 'user').length;
 
