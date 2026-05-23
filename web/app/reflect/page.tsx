@@ -8,11 +8,12 @@ import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
 
 // ────────────────────────────────────────────────────────────
-// 12 회고 — 단일 회고 화면 (스펙 v1.4)
+// 12 회고 — 단일 회고 화면 (스펙 v1.5)
 //
 // 매일 동일한 화면. 평일/주말 분기 없음.
-// 구성: 데일리 메모(다중 누적, schema v0.8) + 주간 회고(weekly_retros, 1주 1개)
-//      + AI 코치 CTA 카드 (주간 회고 저장 후 노출)
+// 구성: 데일리 메모(다중 누적, schema v0.8) + AI 코치 CTA 카드 (항상 노출)
+// v1.5: 주간 회고 입력 영역 제거. weekly_retros 저장 없이도
+//        AI 코치와 다음 주 액션 정하기 진입 가능.
 // ────────────────────────────────────────────────────────────
 
 interface ActiveGoal {
@@ -83,10 +84,8 @@ function ReflectContent() {
   const [memoText, setMemoText] = useState('');
   const [savingMemo, setSavingMemo] = useState(false);
 
-  // 주간 회고 (1주 1개)
-  const [retroText, setRetroText] = useState('');
-  const [savingRetro, setSavingRetro] = useState(false);
-  const [retroSaved, setRetroSaved] = useState(false);
+  // v1.5: 주간 회고 입력 영역 제거 — weekly_retros 저장 없이도
+  // AI 코치 CTA를 항상 노출. weekly_retros 관련 state/handler 모두 삭제.
 
   const today = new Date();
   const monday = startOfWeekMonday(today);
@@ -121,7 +120,7 @@ function ReflectContent() {
         const g = goalRes.data as ActiveGoal;
         setGoal(g);
 
-        const [actionRes, completionRes, retroRes, memoRes] = await Promise.all([
+        const [actionRes, completionRes, memoRes] = await Promise.all([
           supabase
             .from('action_items')
             // id 포함 — action_completions 조회 FK로 사용
@@ -140,15 +139,6 @@ function ReflectContent() {
             .eq('user_id', user.id)
             .gte('completed_date', mondayISO)
             .lte('completed_date', sundayISO),
-          // 이번 주차 weekly_retros 존재 여부 확인 (이미 저장된 경우 CTA 노출 + 저장 비활성)
-          supabase
-            .from('weekly_retros')
-            .select('id, summary_one_line')
-            .eq('user_id', user.id)
-            .eq('goal_id', g.id)
-            .eq('week_number', g.current_week)
-            .limit(1)
-            .maybeSingle(),
           // 이번 주 데일리 메모 (v1.4 — 다중 누적, schema v0.8)
           // 정렬: memo_date 오름차순, 동일 날 created_at 오름차순 (시간 순)
           supabase
@@ -166,18 +156,14 @@ function ReflectContent() {
 
         if (actionRes.error) console.error('[12] action_items:', actionRes.error);
         if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
-        if (retroRes.error) console.error('[12] weekly_retros:', retroRes.error);
         if (memoRes.error) console.error('[12] daily_memos:', memoRes.error);
 
         setActionTitle(actionRes.data?.title ?? '액션이 설정되지 않았어요');
         setDoneCountWeek((completionRes.data ?? []).length);
         setMemos((memoRes.data ?? []) as DailyMemo[]);
 
-        // 이미 저장된 회고가 있으면 표시 + 저장 비활성 + CTA 노출
-        if (retroRes.data) {
-          setRetroText((retroRes.data.summary_one_line as string | null) ?? '');
-          setRetroSaved(true);
-        }
+        // v1.5: weekly_retros 로드 제거 — 회고 입력 영역 자체가 없어졌으므로
+        // 기존 회고 프리필 / retroSaved 동기화 로직 모두 불필요
 
         setLoading(false);
       } catch (e) {
@@ -247,50 +233,8 @@ function ReflectContent() {
     }
   }, [goal, memoText, savingMemo, today]);
 
-  // ── 회고 저장 ─────────────────────────────────────────────
-  const handleSaveRetro = useCallback(async () => {
-    if (!goal || savingRetro) return;
-    const trimmed = retroText.trim();
-    if (!trimmed) return;
-
-    setSavingRetro(true);
-    setError(null);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요해요.');
-
-      const todayISO = formatLocalISO(today);
-      const { error: insErr } = await supabase
-        .from('weekly_retros')
-        .insert({
-          user_id: user.id,
-          goal_id: goal.id,
-          week_number: goal.current_week,
-          retro_date: todayISO,
-          summary_one_line: trimmed,
-          completion_count: doneCountWeek,
-          target_count: 7,
-        });
-      if (insErr) throw insErr;
-
-      // 저장 완료 표시 + CTA 노출
-      setRetroSaved(true);
-    } catch (e) {
-      console.error('[12] save retro:', e);
-      // Postgres UNIQUE 위반(23505) — (user_id, goal_id, week_number) 주차별 1개
-      const err = e as { code?: string; message?: string };
-      if (err?.code === '23505') {
-        // 이미 저장된 회고가 있음 → 화면을 저장됨 상태로 동기화 (CTA 노출)
-        setRetroSaved(true);
-        setError(null);
-      } else {
-        const detail = err?.message ? ` (${err.message})` : '';
-        setError(`회고 저장에 실패했어요. 다시 시도해주세요.${detail}`);
-      }
-    } finally {
-      setSavingRetro(false);
-    }
-  }, [goal, retroText, savingRetro, today, doneCountWeek]);
+  // v1.5: handleSaveRetro 제거 — 주간 회고 입력 영역 자체가 없어짐.
+  // weekly_retros INSERT 없이도 AI 코치 CTA 진입 가능 (13 페이지의 weekly_retros 의존성은 nullable로 처리됨).
 
   // ── 렌더 분기 ─────────────────────────────────────────────
   if (!ready || loading) return <LoadingScreen text="회고를 준비하고 있어요..." />;
@@ -317,11 +261,6 @@ function ReflectContent() {
           setMemoText={setMemoText}
           savingMemo={savingMemo}
           onSaveMemo={handleSaveMemo}
-          retroText={retroText}
-          setRetroText={setRetroText}
-          savingRetro={savingRetro}
-          retroSaved={retroSaved}
-          onSaveRetro={handleSaveRetro}
           onGoCoach={() => router.push('/reflect/coach')}
           today={today}
           error={error}
@@ -334,7 +273,8 @@ function ReflectContent() {
 }
 
 // ────────────────────────────────────────────────────────────
-// 회고 단일 화면 (v1.4 — 데일리 메모(다중) + 주간 회고 + AI 코치 CTA)
+// 회고 단일 화면 (v1.5 — 데일리 메모(다중) + AI 코치 CTA 항상 노출)
+// 주간 회고 입력 영역 제거됨 (v1.4 → v1.5).
 // ────────────────────────────────────────────────────────────
 
 function ReflectScreen({
@@ -346,11 +286,6 @@ function ReflectScreen({
   setMemoText,
   savingMemo,
   onSaveMemo,
-  retroText,
-  setRetroText,
-  savingRetro,
-  retroSaved,
-  onSaveRetro,
   onGoCoach,
   today,
   error,
@@ -363,11 +298,6 @@ function ReflectScreen({
   setMemoText: (v: string) => void;
   savingMemo: boolean;
   onSaveMemo: () => void;
-  retroText: string;
-  setRetroText: (v: string) => void;
-  savingRetro: boolean;
-  retroSaved: boolean;
-  onSaveRetro: () => void;
   onGoCoach: () => void;
   today: Date;
   error: string | null;
@@ -384,11 +314,11 @@ function ReflectScreen({
       {/* 안내 문구 */}
       <div style={noticeCardStyle}>
         <div style={noticeHeaderStyle}>
-          💡 매일 짧게 기록하고, 한 주를 마무리하며 정리해요
+          💡 오늘의 느낌을 짧게 기록하고, 다음 주는 AI 코치와 함께 정해요
         </div>
         <div style={noticeBodyStyle}>
-          오늘 액션을 실행하면서 느낀 점을 짧게 메모로 남기고, 한 주가 끝날 즈음
-          한 줄로 마무리해보세요. 다음 주는 AI 코치와 함께 정해요.
+          오늘 액션을 실행하면서 느낀 점을 메모로 남겨두세요. 한 주를 마무리할
+          때쯤 AI 코치와 다음 주 액션을 정해보세요.
         </div>
       </div>
 
@@ -441,74 +371,38 @@ function ReflectScreen({
         </div>
       )}
 
-      {/* 구분선 */}
-      <div style={{ ...dividerLineStyle, margin: '28px 0 20px' }} aria-hidden="true" />
-
-      {/* 주간 회고 입력 */}
-      <div style={{ marginBottom: '6px' }}>
-        <label style={formLabelStyle}>한 주를 한 줄로 표현하면</label>
-        <textarea
-          value={retroText}
-          onChange={(e) => setRetroText(e.target.value)}
-          placeholder="예: 야근이 많아서 1번밖에 못했어요."
-          rows={3}
-          style={{ ...textareaStyle, minHeight: '80px' }}
-          disabled={retroSaved}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={onSaveRetro}
-        disabled={savingRetro || !retroText.trim() || retroSaved}
-        style={{
-          ...accentBtnStyle,
-          opacity: savingRetro || !retroText.trim() || retroSaved ? 0.6 : 1,
-          cursor:
-            savingRetro || !retroText.trim() || retroSaved ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {retroSaved ? '✓ 저장 완료' : savingRetro ? '저장 중...' : '회고 저장하기'}
-      </button>
-
-      <div style={retroNoticeStyle}>
-        회고를 저장하면, 다음 주 액션을 AI 코치와 함께 정해볼 수 있어요.
-      </div>
-
       {error && (
         <div role="alert" style={errorAlertStyle}>
           {error}
         </div>
       )}
 
-      {/* AI 코치 CTA 카드 (회고 저장 후 노출) */}
-      {retroSaved && (
-        <div style={{ marginTop: '20px' }}>
-          <div style={dividerLineStyle} aria-hidden="true" />
-          <div style={ctaLabelStyle}>다음 주 준비</div>
-          <button
-            type="button"
-            onClick={onGoCoach}
-            style={coachCtaCardStyle}
-            aria-label="AI 코치와 다음 주 액션 정하기"
-          >
-            <div style={coachIconStyle}>🤖</div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--ink)' }}>
-                AI 코치와 다음 주 액션 정하기
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
-                이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요. (주말 시행 권장)
-              </div>
-              <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={tagAccentTintStyle}>✦ 강점 기반 추천</span>
-                <span style={tagBgSoftStyle}>약 3–5분 소요</span>
-              </div>
+      {/* AI 코치 CTA 카드 (v1.5 — 회고 저장 조건 제거, 항상 노출) */}
+      <div style={{ marginTop: '28px' }}>
+        <div style={dividerLineStyle} aria-hidden="true" />
+        <div style={ctaLabelStyle}>다음 주 준비</div>
+        <button
+          type="button"
+          onClick={onGoCoach}
+          style={coachCtaCardStyle}
+          aria-label="AI 코치와 다음 주 액션 정하기"
+        >
+          <div style={coachIconStyle}>🤖</div>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--ink)' }}>
+              AI 코치와 다음 주 액션 정하기
             </div>
-            <span style={{ fontSize: '20px', color: 'var(--accent)' }}>›</span>
-          </button>
-        </div>
-      )}
+            <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
+              이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요. (주말 시행 권장)
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={tagAccentTintStyle}>✦ 강점 기반 추천</span>
+              <span style={tagBgSoftStyle}>약 3–5분 소요</span>
+            </div>
+          </div>
+          <span style={{ fontSize: '20px', color: 'var(--accent)' }}>›</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -686,20 +580,6 @@ const textareaStyle: CSSProperties = {
   lineHeight: 1.55,
 };
 
-const accentBtnStyle: CSSProperties = {
-  width: '100%',
-  padding: '14px',
-  background: 'var(--accent)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '12px',
-  fontSize: '15px',
-  fontWeight: 700,
-  fontFamily: 'inherit',
-  transition: 'opacity .15s',
-  boxShadow: '0 4px 14px -4px rgba(45,91,255,.3)',
-};
-
 const inkBtnStyle: CSSProperties = {
   width: '100%',
   padding: '14px',
@@ -788,14 +668,6 @@ const statChipAccent: CSSProperties = {
   background: 'var(--accent-tint)',
   color: 'var(--accent)',
   borderRadius: '999px',
-};
-
-const retroNoticeStyle: CSSProperties = {
-  marginTop: '10px',
-  fontSize: '12px',
-  color: 'var(--ink-mute)',
-  textAlign: 'center',
-  lineHeight: 1.55,
 };
 
 const dividerLineStyle: CSSProperties = {
