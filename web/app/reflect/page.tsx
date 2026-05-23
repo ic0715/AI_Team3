@@ -8,15 +8,24 @@ import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
 
 // ────────────────────────────────────────────────────────────
-// 12 회고 — 단일 회고 화면 (스펙 v1.3)
+// 12 회고 — 단일 회고 화면 (스펙 v1.4)
 //
-// 매일 동일한 화면. weekly_retros INSERT + AI 코치 CTA 카드.
-// (이전 v1.2의 평일/주말 분기 폐지 — daily_memos UI 미사용)
+// 매일 동일한 화면. 평일/주말 분기 없음.
+// 구성: 데일리 메모(다중 누적, schema v0.8) + 주간 회고(weekly_retros, 1주 1개)
+//      + AI 코치 CTA 카드 (주간 회고 저장 후 노출)
 // ────────────────────────────────────────────────────────────
 
 interface ActiveGoal {
   id: string;
   current_week: number;
+}
+
+// 데일리 메모 — schema v0.8 다중 누적 정책 (UNIQUE 제거)
+interface DailyMemo {
+  id?: string;
+  memo_date: string;        // YYYY-MM-DD
+  content: string;
+  created_at?: string;       // 시간 정렬용
 }
 
 const WEEKDAY_KO_FULL = ['일', '월', '화', '수', '목', '금', '토'];
@@ -69,7 +78,12 @@ function ReflectContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 회고 입력 상태 (v1.3 — 단일 화면, 매일 동일)
+  // 데일리 메모 (v1.4 — 매일 다중 누적 + 리스트 표시)
+  const [memos, setMemos] = useState<DailyMemo[]>([]);
+  const [memoText, setMemoText] = useState('');
+  const [savingMemo, setSavingMemo] = useState(false);
+
+  // 주간 회고 (1주 1개)
   const [retroText, setRetroText] = useState('');
   const [savingRetro, setSavingRetro] = useState(false);
   const [retroSaved, setRetroSaved] = useState(false);
@@ -107,7 +121,7 @@ function ReflectContent() {
         const g = goalRes.data as ActiveGoal;
         setGoal(g);
 
-        const [actionRes, completionRes, retroRes] = await Promise.all([
+        const [actionRes, completionRes, retroRes, memoRes] = await Promise.all([
           supabase
             .from('action_items')
             // id 포함 — action_completions 조회 FK로 사용
@@ -126,7 +140,7 @@ function ReflectContent() {
             .eq('user_id', user.id)
             .gte('completed_date', mondayISO)
             .lte('completed_date', sundayISO),
-          // 이번 주차 weekly_retros 존재 여부 확인 (스펙 §6: 이미 저장된 경우 CTA 노출 + 저장 비활성)
+          // 이번 주차 weekly_retros 존재 여부 확인 (이미 저장된 경우 CTA 노출 + 저장 비활성)
           supabase
             .from('weekly_retros')
             .select('id, summary_one_line')
@@ -135,6 +149,17 @@ function ReflectContent() {
             .eq('week_number', g.current_week)
             .limit(1)
             .maybeSingle(),
+          // 이번 주 데일리 메모 (v1.4 — 다중 누적, schema v0.8)
+          // 정렬: memo_date 오름차순, 동일 날 created_at 오름차순 (시간 순)
+          supabase
+            .from('daily_memos')
+            .select('id, memo_date, content, created_at')
+            .eq('user_id', user.id)
+            .eq('goal_id', g.id)
+            .gte('memo_date', mondayISO)
+            .lte('memo_date', sundayISO)
+            .order('memo_date', { ascending: true })
+            .order('created_at', { ascending: true }),
         ]);
 
         if (cancelled) return;
@@ -142,9 +167,11 @@ function ReflectContent() {
         if (actionRes.error) console.error('[12] action_items:', actionRes.error);
         if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
         if (retroRes.error) console.error('[12] weekly_retros:', retroRes.error);
+        if (memoRes.error) console.error('[12] daily_memos:', memoRes.error);
 
         setActionTitle(actionRes.data?.title ?? '액션이 설정되지 않았어요');
         setDoneCountWeek((completionRes.data ?? []).length);
+        setMemos((memoRes.data ?? []) as DailyMemo[]);
 
         // 이미 저장된 회고가 있으면 표시 + 저장 비활성 + CTA 노출
         if (retroRes.data) {
@@ -166,6 +193,59 @@ function ReflectContent() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, router]);
+
+  // ── 데일리 메모 저장 (v1.4 — 다중 누적, schema v0.8) ──────
+  const handleSaveMemo = useCallback(async () => {
+    if (!goal || savingMemo) return;
+    const trimmed = memoText.trim();
+    if (!trimmed) return;
+
+    setSavingMemo(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('로그인이 필요해요.');
+
+      const todayISO = formatLocalISO(today);
+      const { data: inserted, error: insErr } = await supabase
+        .from('daily_memos')
+        .insert({
+          user_id: user.id,
+          goal_id: goal.id,
+          memo_date: todayISO,
+          week_number: goal.current_week,
+          content: trimmed,
+        })
+        .select('id, memo_date, content, created_at')
+        .maybeSingle();
+      if (insErr) throw insErr;
+
+      // 로컬 리스트에 즉시 append (낙관적 + 응답 데이터로 정확화)
+      const nowISO = new Date().toISOString();
+      const newMemo: DailyMemo = inserted ?? {
+        memo_date: todayISO,
+        content: trimmed,
+        created_at: nowISO,
+      };
+      setMemos((prev) => {
+        const next = [...prev, newMemo];
+        next.sort((a, b) => {
+          const dateDiff = a.memo_date.localeCompare(b.memo_date);
+          if (dateDiff !== 0) return dateDiff;
+          return (a.created_at ?? '').localeCompare(b.created_at ?? '');
+        });
+        return next;
+      });
+      setMemoText('');
+    } catch (e) {
+      console.error('[12] save memo:', e);
+      const err = e as { message?: string };
+      const detail = err?.message ? ` (${err.message})` : '';
+      setError(`메모 저장에 실패했어요. 다시 시도해주세요.${detail}`);
+    } finally {
+      setSavingMemo(false);
+    }
+  }, [goal, memoText, savingMemo, today]);
 
   // ── 회고 저장 ─────────────────────────────────────────────
   const handleSaveRetro = useCallback(async () => {
@@ -232,6 +312,11 @@ function ReflectContent() {
           goal={goal}
           actionTitle={actionTitle}
           doneCountWeek={doneCountWeek}
+          memos={memos}
+          memoText={memoText}
+          setMemoText={setMemoText}
+          savingMemo={savingMemo}
+          onSaveMemo={handleSaveMemo}
           retroText={retroText}
           setRetroText={setRetroText}
           savingRetro={savingRetro}
@@ -249,13 +334,18 @@ function ReflectContent() {
 }
 
 // ────────────────────────────────────────────────────────────
-// 회고 단일 화면 (v1.3 — 평일/주말 분기 폐지)
+// 회고 단일 화면 (v1.4 — 데일리 메모(다중) + 주간 회고 + AI 코치 CTA)
 // ────────────────────────────────────────────────────────────
 
 function ReflectScreen({
   goal,
   actionTitle,
   doneCountWeek,
+  memos,
+  memoText,
+  setMemoText,
+  savingMemo,
+  onSaveMemo,
   retroText,
   setRetroText,
   savingRetro,
@@ -268,6 +358,11 @@ function ReflectScreen({
   goal: ActiveGoal;
   actionTitle: string;
   doneCountWeek: number;
+  memos: DailyMemo[];
+  memoText: string;
+  setMemoText: (v: string) => void;
+  savingMemo: boolean;
+  onSaveMemo: () => void;
   retroText: string;
   setRetroText: (v: string) => void;
   savingRetro: boolean;
@@ -289,11 +384,11 @@ function ReflectScreen({
       {/* 안내 문구 */}
       <div style={noticeCardStyle}>
         <div style={noticeHeaderStyle}>
-          💡 이번 주를 돌아보고, 다음 주 액션도 함께 정해요
+          💡 매일 짧게 기록하고, 한 주를 마무리하며 정리해요
         </div>
         <div style={noticeBodyStyle}>
-          잘 됐든 안 됐든, 그 이유를 들여다보는 것이 다음 주를 바꿔요. 솔직하게 한 줄
-          남기고, 다음 주에 이어갈 액션까지 코치와 함께 정해보세요.
+          오늘 액션을 실행하면서 느낀 점을 짧게 메모로 남기고, 한 주가 끝날 즈음
+          한 줄로 마무리해보세요. 다음 주는 AI 코치와 함께 정해요.
         </div>
       </div>
 
@@ -309,7 +404,47 @@ function ReflectScreen({
         </div>
       </div>
 
-      {/* 회고 입력 */}
+      {/* 데일리 메모 입력 (다중 누적) */}
+      <div style={{ marginBottom: '6px' }}>
+        <label style={formLabelStyle}>오늘의 메모</label>
+        <textarea
+          value={memoText}
+          onChange={(e) => setMemoText(e.target.value)}
+          placeholder="예: 오늘은 30분 읽고 3줄 메모 남김."
+          rows={3}
+          style={{ ...textareaStyle, minHeight: '80px' }}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={onSaveMemo}
+        disabled={savingMemo || !memoText.trim()}
+        style={{
+          ...inkBtnStyle,
+          opacity: savingMemo || !memoText.trim() ? 0.5 : 1,
+          cursor: savingMemo || !memoText.trim() ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {savingMemo ? '저장 중...' : '메모 저장'}
+      </button>
+
+      {/* 이번 주 메모 리스트 (1개 이상일 때만) */}
+      {memos.length > 0 && (
+        <div style={{ marginTop: '28px' }}>
+          <div style={memoSectionTitleStyle}>이번 주 메모 · {memos.length}개</div>
+          <div>
+            {memos.map((m, idx) => (
+              <MemoRow key={m.id ?? `${m.memo_date}-${idx}`} memo={m} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 구분선 */}
+      <div style={{ ...dividerLineStyle, margin: '28px 0 20px' }} aria-hidden="true" />
+
+      {/* 주간 회고 입력 */}
       <div style={{ marginBottom: '6px' }}>
         <label style={formLabelStyle}>한 주를 한 줄로 표현하면</label>
         <textarea
@@ -363,7 +498,7 @@ function ReflectScreen({
                 AI 코치와 다음 주 액션 정하기
               </div>
               <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
-                이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요.
+                이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요. (주말 시행 권장)
               </div>
               <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 <span style={tagAccentTintStyle}>✦ 강점 기반 추천</span>
@@ -374,6 +509,34 @@ function ReflectScreen({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// 메모 row (이번 주 메모 리스트 아이템)
+// ────────────────────────────────────────────────────────────
+
+function MemoRow({ memo }: { memo: DailyMemo }) {
+  const date = new Date(memo.memo_date);
+  const created = memo.created_at ? new Date(memo.created_at) : null;
+  const timeStr = created
+    ? `${String(created.getHours()).padStart(2, '0')}:${String(created.getMinutes()).padStart(2, '0')}`
+    : '';
+  return (
+    <div style={memoRowStyle}>
+      <div style={memoDayColStyle}>
+        <div style={memoDayLabelStyle}>{WEEKDAY_KO_FULL[date.getDay()]}</div>
+        <div style={memoDateStyle}>
+          {date.getMonth() + 1}.{date.getDate()}
+        </div>
+        {timeStr && (
+          <div style={{ ...memoDateStyle, fontSize: '8.5px', marginTop: '1px' }}>
+            {timeStr}
+          </div>
+        )}
+      </div>
+      <div style={memoContentStyle}>{memo.content}</div>
     </div>
   );
 }
@@ -535,6 +698,60 @@ const accentBtnStyle: CSSProperties = {
   fontFamily: 'inherit',
   transition: 'opacity .15s',
   boxShadow: '0 4px 14px -4px rgba(45,91,255,.3)',
+};
+
+const inkBtnStyle: CSSProperties = {
+  width: '100%',
+  padding: '14px',
+  background: 'var(--ink)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '12px',
+  fontSize: '15px',
+  fontWeight: 700,
+  fontFamily: 'inherit',
+  transition: 'opacity .15s',
+};
+
+// 데일리 메모 리스트 스타일 (v1.4)
+const memoSectionTitleStyle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 700,
+  marginBottom: '10px',
+  color: 'var(--ink)',
+};
+
+const memoRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '40px 1fr',
+  gap: '12px',
+  padding: '12px 0',
+  borderBottom: '1px solid var(--line)',
+};
+
+const memoDayColStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+};
+
+const memoDayLabelStyle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 700,
+  color: 'var(--accent)',
+};
+
+const memoDateStyle: CSSProperties = {
+  fontSize: '9px',
+  color: 'var(--ink-mute)',
+  marginTop: '2px',
+};
+
+const memoContentStyle: CSSProperties = {
+  fontSize: '13px',
+  color: 'var(--ink)',
+  lineHeight: 1.55,
+  whiteSpace: 'pre-wrap',
 };
 
 const errorAlertStyle: CSSProperties = {

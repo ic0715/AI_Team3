@@ -256,8 +256,6 @@ function ProfileContent() {
   if (loading) return <LoadingScreen text="프로필을 불러오는 중..." />;
   if (!profile) return <LoadingScreen text={error ?? '프로필을 찾을 수 없어요.'} />;
 
-  const avatar = profile.nickname ? profile.nickname[0] : '👤';
-
   return (
     <div style={wrapStyle}>
       {/* 상단 바 */}
@@ -270,11 +268,8 @@ function ProfileContent() {
       </header>
 
       <main style={screenStyle}>
-        {/* 히어로 카드 */}
+        {/* 히어로 카드 (아바타 영역 제거 — v1.4) */}
         <section style={heroCardStyle}>
-          <div style={avatarStyle} aria-hidden="true">
-            {avatar}
-          </div>
           <div style={heroNameStyle}>{profile.nickname || '닉네임 미설정'}</div>
           <div style={heroEmailStyle}>{profile.email}</div>
           <div style={heroBadgeRowStyle}>
@@ -662,20 +657,6 @@ const heroCardStyle: CSSProperties = {
   textAlign: 'center',
   marginBottom: '16px',
   boxShadow: '0 6px 20px -8px rgba(45,91,255,.4)',
-};
-
-const avatarStyle: CSSProperties = {
-  width: '76px',
-  height: '76px',
-  borderRadius: '50%',
-  background: 'rgba(255,255,255,.2)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '36px',
-  fontWeight: 800,
-  color: '#fff',
-  margin: '0 auto 12px',
 };
 
 const heroNameStyle: CSSProperties = {
