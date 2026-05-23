@@ -138,8 +138,9 @@ function ActionItemsContent() {
         if (goalRes.error) console.error('[10] goals query error:', goalRes.error);
         if (profileRes.error) console.error('[10] profiles query error:', profileRes.error);
 
+        if (goalRes.error) throw new Error(`목표 조회 실패: ${goalRes.error.message}`);
         if (!goalRes.data) {
-          throw new Error('활성 목표를 찾을 수 없어요.');
+          throw new Error('NO_ACTIVE_GOAL');
         }
         setGoal(goalRes.data);
         setCareerLevel(profileRes.data?.career_level ?? 'junior');
@@ -155,7 +156,8 @@ function ActionItemsContent() {
       } catch (e) {
         console.error(e);
         if (!cancelled) {
-          setError('데이터를 불러올 수 없어요. 다시 시도해주세요.');
+          const msg = e instanceof Error ? e.message : String(e);
+          setError(msg === 'NO_ACTIVE_GOAL' ? 'NO_ACTIVE_GOAL' : '데이터를 불러올 수 없어요. 다시 시도해주세요.');
           setLoadingData(false);
         }
       }
@@ -375,7 +377,31 @@ function ActionItemsContent() {
   }, [selectedId, saving, goal, customAdded, seeds, router]);
 
   if (!ready || loadingData) return <LoadingScreen text="액션 아이템을 준비 중이에요..." />;
-  if (!goal) return <LoadingScreen text={error ?? '목표를 찾을 수 없어요.'} />;
+  if (!goal) {
+    if (error === 'NO_ACTIVE_GOAL') {
+      return (
+        <div style={wrapStyle}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: '16px' }}>
+            <div style={{ fontSize: '40px' }}>🔍</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center' }}>
+              선택된 목표가 없어요
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+              역량 방향 결과 화면에서<br />목표를 먼저 선택해주세요.
+            </div>
+            <button
+              type="button"
+              onClick={() => router.replace('/onboarding/career-result')}
+              style={{ marginTop: '8px', padding: '13px 28px', borderRadius: '12px', background: 'var(--accent)', color: '#fff', border: 'none', fontSize: '14px', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}
+            >
+              역량 방향 선택하러 가기
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return <LoadingScreen text={error ?? '목표를 찾을 수 없어요.'} />;
+  }
   if (aiLoading) return <LoadingScreen text="AI가 당신에게 맞는 액션을 만들고 있어요..." />;
 
   return (
