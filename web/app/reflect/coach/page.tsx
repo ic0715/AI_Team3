@@ -34,7 +34,17 @@ interface CoachContext {
   goal: { id: string; goal_title: string; current_week: number; competency_code: string };
   topStrength: string | null;
   weeklyRetro: string;
+  weeklyRetroId: string | null; // v0.8: coaching_insights.weekly_retro_id (FK)
   doneCountWeek: number;
+}
+
+// v0.8: 11 홈 12주 타임라인 done 카드의 badge/comment 산출 (완료율 기반)
+// 스펙 _post_mvp_v2/11_home.md §6 참조
+function computeBadgeAndComment(doneCount: number): { badge: string; comment: string } {
+  if (doneCount >= 7) return { badge: '🔥', comment: '완벽한 한 주!' };
+  if (doneCount >= 5) return { badge: '👍', comment: '꾸준함이 쌓이고 있어요' };
+  if (doneCount >= 3) return { badge: '😊', comment: '절반을 해냈어요' };
+  return { badge: '🌱', comment: '다음 주를 기대해요' };
 }
 
 interface CoachMessageParams {
@@ -121,22 +131,30 @@ async function finalizeCoaching(
     strengthLink: context.topStrength ?? '집중',
   };
 
+  // v0.8: 완료율 기반 badge/comment 산출 (11 홈 타임라인 done 카드용)
+  const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
+
   // coaching_insights INSERT
+  // schema v0.8/v0.9 정합: weekly_retro_id (FK), badge, comment, next_action_reason 포함
   const { error: insightErr } = await supabase.from('coaching_insights').insert({
     user_id: userId,
     goal_id: context.goal.id,
+    weekly_retro_id: context.weeklyRetroId, // v0.8: 연결된 주차 회고 FK
     week_number: context.goal.current_week,
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
+    next_action_reason: result.patternInsight, // mock: 추후 AI가 별도 생성
     strength_link: result.strengthLink,
+    badge,    // v0.8: 11 홈 타임라인 done 카드 이모지
+    comment,  // v0.8: 11 홈 타임라인 done 카드 코멘트
   });
   if (insightErr) {
     console.error('[13] coaching_insights INSERT:', insightErr);
   }
 
   // action_items INSERT (다음 주차)
-  // strength_link는 schema 없을 수 있어 INSERT에서 제외
+  // v0.8: strength_link 포함 — 11 홈 "오늘의 액션" 카드 강점 표시용
   const { error: actionErr } = await supabase.from('action_items').insert({
     user_id: userId,
     goal_id: context.goal.id,
@@ -146,6 +164,7 @@ async function finalizeCoaching(
     tags: [],
     is_custom: false,
     source_seed_id: null,
+    strength_link: result.strengthLink, // v0.8: top 강점명 (자유 텍스트)
   });
   if (actionErr) {
     console.error('[13] action_items INSERT:', actionErr);
@@ -245,7 +264,8 @@ function CoachContent() {
         const [retroRes, completionRes] = await Promise.all([
           supabase
             .from('weekly_retros')
-            .select('summary_one_line, completion_count, target_count')
+            // v0.8: id 포함 — coaching_insights.weekly_retro_id (FK) 저장용
+            .select('id, summary_one_line, completion_count, target_count')
             .eq('user_id', user.id)
             .eq('goal_id', goal.id)
             .eq('week_number', goal.current_week)
@@ -275,6 +295,7 @@ function CoachContent() {
           goal,
           topStrength: strengths[0]?.name_ko ?? null,
           weeklyRetro: retroRes.data?.summary_one_line ?? '',
+          weeklyRetroId: (retroRes.data?.id as string | undefined) ?? null,
           doneCountWeek:
             (retroRes.data?.completion_count as number | undefined) ??
             (completionRes.data?.length ?? 0),

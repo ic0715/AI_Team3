@@ -170,8 +170,8 @@ function HomeContent() {
         const [actionRes, completionRes, insightRes] = await Promise.all([
           supabase
             .from('action_items')
-            // strength_link는 schema에 없을 수 있어 SELECT에서 제외 — strengths[0]로 fallback
-            .select('id, title')
+            // v0.8: strength_link 컬럼 사용 — 오늘의 액션 카드 "강점 「○○」을 발휘하는 시간" 표시
+            .select('id, title, strength_link')
             .eq('user_id', user.id)
             .eq('goal_id', goal.id)
             .eq('week_number', currentWeek)

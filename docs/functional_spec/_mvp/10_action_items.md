@@ -108,6 +108,7 @@
 - 선택된 `action_items` INSERT (week_number=1)
   - `title`, `description`, `tags`(JSONB array), `is_custom` (true/false)
   - **`source_seed_id`**: 시드 기반 추천일 경우 채워짐, 커스텀일 경우 NULL
+  - **`strength_link`** (schema v0.8): 사용자 Top 1 강점 `name_ko` (예: "분석"). `strength_analyses.strengths[0].name_ko`에서 조회. 11 홈 "오늘의 액션" 카드 "강점 「○○」을 발휘하는 시간 ✨" 표시용. 강점 데이터 없으면 NULL.
 - 전체 작업은 트랜잭션으로 처리 (실패 시 롤백)
 
 ### 5.3 시드 데이터 구조 `v1.5 신규`
