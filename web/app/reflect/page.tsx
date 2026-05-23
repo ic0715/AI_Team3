@@ -131,7 +131,7 @@ function ReflectContent() {
         const g = goalRes.data as ActiveGoal;
         setGoal(g);
 
-        const [actionRes, memoRes, completionRes] = await Promise.all([
+        const [actionRes, memoRes, completionRes, retroRes] = await Promise.all([
           supabase
             .from('action_items')
             // id 포함 — action_completions 조회 FK로 사용
@@ -158,6 +158,15 @@ function ReflectContent() {
             .eq('user_id', user.id)
             .gte('completed_date', mondayISO)
             .lte('completed_date', sundayISO),
+          // 이번 주차 weekly_retros 존재 여부 확인 (스펙 §6: 이미 저장된 경우 CTA 노출 + 저장 비활성)
+          supabase
+            .from('weekly_retros')
+            .select('id, summary_one_line')
+            .eq('user_id', user.id)
+            .eq('goal_id', g.id)
+            .eq('week_number', g.current_week)
+            .limit(1)
+            .maybeSingle(),
         ]);
 
         if (cancelled) return;
@@ -165,6 +174,7 @@ function ReflectContent() {
         if (actionRes.error) console.error('[12] action_items:', actionRes.error);
         if (memoRes.error) console.error('[12] daily_memos:', memoRes.error);
         if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
+        if (retroRes.error) console.error('[12] weekly_retros:', retroRes.error);
 
         setActionTitle(actionRes.data?.title ?? '액션이 설정되지 않았어요');
 
@@ -181,6 +191,13 @@ function ReflectContent() {
         setMemoText('');
 
         setDoneCountWeek((completionRes.data ?? []).length);
+
+        // 이미 저장된 위클리 회고가 있으면 표시 + 저장 비활성 + CTA 노출
+        if (retroRes.data) {
+          setRetroText((retroRes.data.summary_one_line as string | null) ?? '');
+          setRetroSaved(true);
+        }
+
         setLoading(false);
       } catch (e) {
         console.error(e);
@@ -278,7 +295,16 @@ function ReflectContent() {
       setRetroSaved(true);
     } catch (e) {
       console.error('[12] save retro:', e);
-      setError('회고 저장에 실패했어요. 다시 시도해주세요.');
+      // Postgres UNIQUE 위반(23505) — (user_id, goal_id, week_number) 주차별 1개
+      const err = e as { code?: string; message?: string };
+      if (err?.code === '23505') {
+        // 이미 저장된 회고가 있음 → 화면을 저장됨 상태로 동기화 (CTA 노출)
+        setRetroSaved(true);
+        setError(null);
+      } else {
+        const detail = err?.message ? ` (${err.message})` : '';
+        setError(`회고 저장에 실패했어요. 다시 시도해주세요.${detail}`);
+      }
     } finally {
       setSavingRetro(false);
     }
