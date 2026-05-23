@@ -15,13 +15,13 @@ import { calculateCurrentWeek } from '@/lib/utils/week';
 // ────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-// 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
+// 🤖 AI 연동 (06 v1.3)
 //
-// 현재: mock 구현 (Q1~Q4 시나리오 순차 응답 + 정적 요약)
-// 교체: sendCoachMessage / finalizeCoaching 함수 본문을 Claude API 호출로 변경
+// sendCoachMessage    → POST /api/reflect-coach/chat
+// finalizeCoaching    → POST /api/reflect-coach/finalize (AI 추출만) + 클라이언트가 DB INSERT
 //
-// 자세한 명세는 docs/HANDOFF_AI.md (Phase 1.7) 참조 — 추가 예정.
-// 본 화면의 AI 동작은 docs/ai_prompt/06_reflect_coaching.md 를 구현 기준으로 따름.
+// 구현 기준: docs/ai_prompt/06_reflect_coaching.md
+// 품질 기법: Prompt Caching + Temperature 분리 (대화 0.7 / 추출 0) + 🔴 가드레일
 // ─────────────────────────────────────────────────────────────
 
 interface Message {
@@ -68,85 +68,67 @@ interface CoachingResult {
   strengthLink: string;
 }
 
-// ── 🤖 mock — 코치 메시지 (Q1~Q4 시나리오) ─────────────────────
+// ── 🤖 코치 메시지 — POST /api/reflect-coach/chat ───────────────
 async function sendCoachMessage(params: CoachMessageParams): Promise<CoachMessageResult> {
-  const { questionIndex, isRenegotiate, context } = params;
-  await new Promise((r) => setTimeout(r, 900));
-
-  if (isRenegotiate) {
-    return {
-      content: '어떤 액션이 더 잘 맞을 것 같아요? 자유롭게 말씀해주세요.',
-      nextQuestionIndex: questionIndex,
-      isComplete: false,
-    };
+  const res = await fetch('/api/reflect-coach/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`reflect-coach/chat ${res.status}: ${errBody}`);
   }
-
-  // Q2: 강점 언급 / Q3: 다음 주 방향 / Q4: 액션 제안 + 확정
-  const strength = context.topStrength ?? '집중';
-  const nextIndex = questionIndex + 1;
-
-  const QUESTIONS: Record<number, string> = {
-    2: `이번 주 회고를 보니 ${context.doneCountWeek}/7로 진행하셨네요. 그 중 가장 인상 깊었던 한 가지는 뭐였어요?`,
-    3: `그 부분에서 강점 「${strength}」이(가) 작동한 것 같아요. 다음 주에는 어떤 방향으로 이어가고 싶으세요?`,
-    4: `좋아요. 그 방향이라면 "${context.goal.goal_title}" 흐름에서 한 단계 더 깊게 가볼 수 있어요. 다음 주에 ${nextIndex - 3}회 정도 실행 가능한 작은 액션 하나를 떠올려볼까요? 이 액션으로 다음 주 시작해볼까요?`,
-  };
-
-  if (questionIndex >= 4) {
-    return {
-      content: '좋아요, 그 액션으로 다음 주 정리할게요. 잠시만 기다려주세요...',
-      nextQuestionIndex: 5,
-      isComplete: true,
-    };
-  }
-
-  return {
-    content: QUESTIONS[nextIndex] ?? '이야기 잘 들었어요.',
-    nextQuestionIndex: nextIndex,
-    isComplete: false,
-  };
+  return res.json();
 }
 
-// ── 🤖 mock — 종료 시 coaching_insights + action_items INSERT ──
+// ── 🤖 종료 시: AI 추출 (서버) + coaching_insights/action_items INSERT (클라이언트) ──
 async function finalizeCoaching(
   history: Message[],
   context: CoachContext,
   userId: string,
 ): Promise<CoachingResult> {
-  await new Promise((r) => setTimeout(r, 1500));
-
-  // 사용자가 마지막에 말한 내용을 next_action_title로 활용 (mock 단순화)
-  const lastUserMsg = [...history].reverse().find((m) => m.role === 'user');
-  const nextActionTitle =
-    lastUserMsg?.content?.slice(0, 50) ??
-    `${context.goal.goal_title} — 다음 주 첫 실행`;
-
-  const result: CoachingResult = {
-    topic: context.goal.goal_title,
-    patternInsight:
-      context.doneCountWeek >= 5
-        ? '꾸준함이 쌓이고 있어요. 다음 주는 깊이를 한 단계 더 시도해봐도 좋아요.'
-        : context.doneCountWeek >= 2
-          ? '실행과 회피의 패턴이 보여요. 다음 주는 트리거를 명확히 정해두면 좋겠어요.'
-          : '실행이 어려웠던 한 주였네요. 다음 주는 더 작은 단위로 시작해볼까요?',
-    nextActionTitle,
-    strengthLink: context.topStrength ?? '집중',
+  // 1) AI 추출 (06 §5.2)
+  const res = await fetch('/api/reflect-coach/finalize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: history, context }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`reflect-coach/finalize ${res.status}: ${errBody}`);
+  }
+  const ai = (await res.json()) as {
+    topic: string;
+    pattern_insight: string;
+    next_action_title: string;
+    next_action_reason: string;
+    strength_link: string;
   };
 
-  // v0.8: 완료율 기반 badge/comment 산출 (11 홈 타임라인 done 카드용)
+  const result: CoachingResult = {
+    topic: ai.topic,
+    patternInsight: ai.pattern_insight || `${context.goal.goal_title} — 이번 주 코칭 정리`,
+    nextActionTitle: ai.next_action_title,
+    strengthLink: ai.strength_link || (context.topStrength ?? ''),
+  };
+
+  // 2) v0.8: 완료율 기반 badge/comment (11 홈 타임라인 done 카드용)
   const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
 
   const TOTAL_WEEKS = 12;
   const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
 
-  // ───── coaching_insights — 같은 주차에 이미 있으면 UPDATE, 없으면 INSERT ─────
+  // ───── 3) coaching_insights — UPSERT 패턴 ─────
   // schema 제약: (user_id, goal_id, week_number) UNIQUE → 같은 주에 다시 코칭하면
   //   UPDATE해야 함 (그냥 INSERT하면 23505 위반).
+  // ※ next_action_reason은 main의 AI 응답(ai.next_action_reason)을 우선 사용.
   const insightPayload = {
     weekly_retro_id: context.weeklyRetroId, // v0.8: 연결된 주차 회고 FK
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
-    next_action_reason: result.patternInsight, // mock: 추후 AI가 별도 생성
+    next_action_reason: ai.next_action_reason || result.patternInsight,
     strength_link: result.strengthLink,
     badge,    // v0.8: 11 홈 타임라인 done 카드 이모지
     comment,  // v0.8: 11 홈 타임라인 done 카드 코멘트
@@ -179,14 +161,15 @@ async function finalizeCoaching(
     if (insErr) console.error('[13] coaching_insights INSERT:', insErr);
   }
 
-  // ───── action_items (다음 주차) — UPSERT 패턴 ─────
+  // ───── 4) action_items (다음 주차) — UPSERT 패턴 ─────
   // 같은 (user_id, goal_id, week_number=nextWeek, is_custom=false) 행이 이미 있으면
   // UPDATE (사용자가 마음 바뀌어 코칭 다시 받음 → 다음 주 액션 덮어쓰기).
   // 없으면 INSERT (첫 코칭).
   // ※ id를 유지하므로 action_completions FK 연결도 안전.
+  // ※ description은 main의 AI 응답(ai.next_action_reason)을 우선 사용.
   const actionPayload = {
     title: result.nextActionTitle,
-    description: result.patternInsight,
+    description: ai.next_action_reason || result.patternInsight,
     tags: [],
     is_custom: false,
     source_seed_id: null,
@@ -233,7 +216,6 @@ async function finalizeCoaching(
 }
 // ─────────────────────────────────────────────────────────────
 
-const TOTAL_Q = 4;
 const CONFIRM_WORDS = ['확정', '좋아요', '네', '응', '맞아', 'OK', 'ok', '괜찮', '이걸로'];
 
 function isConfirmation(text: string): boolean {
@@ -501,7 +483,6 @@ function CoachContent() {
   if (loadingContext) return <LoadingScreen text="코치를 준비하고 있어요..." />;
   if (!context) return <LoadingScreen text={contextError ?? '컨텍스트가 없어요.'} />;
 
-  const progressRatio = Math.min(questionIndex / TOTAL_Q, 1);
   const showSummary = isComplete && !!summary && !isRenegotiate;
 
   return (
@@ -520,23 +501,6 @@ function CoachContent() {
         <span style={{ width: '40px' }} />
       </header>
 
-      {/* 진행률 행 — 질문 N/4 + 바 + % (08 스타일) */}
-      {!showSummary && (
-        <div style={progressRowStyle}>
-          <span style={progressLabelStyle}>
-            질문 <strong style={{ color: 'var(--accent)', fontWeight: 700 }}>{Math.min(questionIndex, TOTAL_Q)}</strong> / {TOTAL_Q}
-          </span>
-          <div style={progressBarTrackStyle}>
-            <div
-              style={{
-                ...progressBarFillNewStyle,
-                width: `${progressRatio * 100}%`,
-              }}
-            />
-          </div>
-          <span style={progressPctStyle}>{Math.round(progressRatio * 100)}%</span>
-        </div>
-      )}
 
       {/* 채팅 영역 또는 요약 화면 */}
       {showSummary ? (
@@ -776,54 +740,6 @@ const topbarTitleStyle: CSSProperties = {
   color: 'var(--ink)',
   textAlign: 'center',
   letterSpacing: '-.02em',
-};
-
-const topbarQStyle: CSSProperties = {
-  fontSize: '13px',
-  fontWeight: 700,
-  color: 'var(--ink-mute)',
-  textAlign: 'right',
-};
-
-// 진행률 행 (08 인터뷰 스타일)
-const progressRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '10px 20px 12px',
-  background: 'var(--surface)',
-  borderBottom: '1px solid var(--line)',
-  flexShrink: 0,
-};
-
-const progressLabelStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-muted)',
-  whiteSpace: 'nowrap',
-};
-
-const progressBarTrackStyle: CSSProperties = {
-  flex: 1,
-  height: '6px',
-  background: 'var(--line)',
-  borderRadius: '999px',
-  overflow: 'hidden',
-};
-
-const progressBarFillNewStyle: CSSProperties = {
-  height: '100%',
-  background: 'var(--accent)',
-  borderRadius: '999px',
-  transition: 'width .4s ease',
-};
-
-const progressPctStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-secondary)',
-  minWidth: '32px',
-  textAlign: 'right',
 };
 
 const chatScrollStyle: CSSProperties = {
