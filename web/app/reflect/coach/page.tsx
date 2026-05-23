@@ -193,6 +193,9 @@ async function finalizeCoaching(
     strength_link: result.strengthLink, // v0.8: top 강점명 (자유 텍스트)
   };
 
+  // 가장 최근 created_at row를 UPDATE 대상으로 (11 home의 future fetch 정렬과 일치).
+  // 같은 주차에 중복 row가 이미 있는 경우 화면에 보이는 것과 동일한 row를 갱신해야
+  // 사용자에게 "업데이트됐다"가 즉시 인지됨.
   const { data: existingAction, error: actionSelectErr } = await supabase
     .from('action_items')
     .select('id')
@@ -200,7 +203,7 @@ async function finalizeCoaching(
     .eq('goal_id', context.goal.id)
     .eq('week_number', nextWeek)
     .eq('is_custom', false)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (actionSelectErr) {
