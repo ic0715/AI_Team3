@@ -1,0 +1,27 @@
+# ── 비밀 (절대 커밋 금지) ───────────────────────────────
+.env
+.env.local
+*.key
+*credentials*
+
+# ── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── OS / IDE ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── ralph-loop 실행 산출물 (~/.careerpt-sim/는 워크스페이스 밖) ──
+# 만약 누군가 SIM_HOME을 워크스페이스 안으로 잡으면 무시
+careerpt-sim-output/
+round_*/
