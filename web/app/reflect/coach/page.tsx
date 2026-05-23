@@ -135,13 +135,14 @@ async function finalizeCoaching(
   // v0.8: 완료율 기반 badge/comment 산출 (11 홈 타임라인 done 카드용)
   const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
 
-  // coaching_insights INSERT
-  // schema v0.8/v0.9 정합: weekly_retro_id (FK), badge, comment, next_action_reason 포함
-  const { error: insightErr } = await supabase.from('coaching_insights').insert({
-    user_id: userId,
-    goal_id: context.goal.id,
+  const TOTAL_WEEKS = 12;
+  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
+
+  // ───── coaching_insights — 같은 주차에 이미 있으면 UPDATE, 없으면 INSERT ─────
+  // schema 제약: (user_id, goal_id, week_number) UNIQUE → 같은 주에 다시 코칭하면
+  //   UPDATE해야 함 (그냥 INSERT하면 23505 위반).
+  const insightPayload = {
     weekly_retro_id: context.weeklyRetroId, // v0.8: 연결된 주차 회고 FK
-    week_number: context.goal.current_week,
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
@@ -149,36 +150,81 @@ async function finalizeCoaching(
     strength_link: result.strengthLink,
     badge,    // v0.8: 11 홈 타임라인 done 카드 이모지
     comment,  // v0.8: 11 홈 타임라인 done 카드 코멘트
-  });
-  if (insightErr) {
-    console.error('[13] coaching_insights INSERT:', insightErr);
+  };
+
+  const { data: existingInsight, error: insightSelectErr } = await supabase
+    .from('coaching_insights')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', context.goal.id)
+    .eq('week_number', context.goal.current_week)
+    .maybeSingle();
+  if (insightSelectErr) {
+    console.error('[13] coaching_insights SELECT:', insightSelectErr);
   }
 
-  // action_items INSERT (다음 주차)
-  // v0.8: strength_link 포함 — 11 홈 "오늘의 액션" 카드 강점 표시용
-  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준
-  //   계산된 currentWeek 사용. 코칭 시점의 실제 주차 + 1을 다음 주로.
-  //   12주 넘기지 않도록 클램프.
-  const TOTAL_WEEKS = 12;
-  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
-  const { error: actionErr } = await supabase.from('action_items').insert({
-    user_id: userId,
-    goal_id: context.goal.id,
-    week_number: nextWeek,
+  if (existingInsight) {
+    const { error: updErr } = await supabase
+      .from('coaching_insights')
+      .update(insightPayload)
+      .eq('id', existingInsight.id);
+    if (updErr) console.error('[13] coaching_insights UPDATE:', updErr);
+  } else {
+    const { error: insErr } = await supabase.from('coaching_insights').insert({
+      user_id: userId,
+      goal_id: context.goal.id,
+      week_number: context.goal.current_week,
+      ...insightPayload,
+    });
+    if (insErr) console.error('[13] coaching_insights INSERT:', insErr);
+  }
+
+  // ───── action_items (다음 주차) — UPSERT 패턴 ─────
+  // 같은 (user_id, goal_id, week_number=nextWeek, is_custom=false) 행이 이미 있으면
+  // UPDATE (사용자가 마음 바뀌어 코칭 다시 받음 → 다음 주 액션 덮어쓰기).
+  // 없으면 INSERT (첫 코칭).
+  // ※ id를 유지하므로 action_completions FK 연결도 안전.
+  const actionPayload = {
     title: result.nextActionTitle,
     description: result.patternInsight,
     tags: [],
     is_custom: false,
     source_seed_id: null,
     strength_link: result.strengthLink, // v0.8: top 강점명 (자유 텍스트)
-  });
-  if (actionErr) {
-    console.error('[13] action_items INSERT:', actionErr);
+  };
+
+  const { data: existingAction, error: actionSelectErr } = await supabase
+    .from('action_items')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', context.goal.id)
+    .eq('week_number', nextWeek)
+    .eq('is_custom', false)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (actionSelectErr) {
+    console.error('[13] action_items SELECT:', actionSelectErr);
+  }
+
+  if (existingAction) {
+    const { error: updErr } = await supabase
+      .from('action_items')
+      .update(actionPayload)
+      .eq('id', existingAction.id);
+    if (updErr) console.error('[13] action_items UPDATE:', updErr);
+  } else {
+    const { error: insErr } = await supabase.from('action_items').insert({
+      user_id: userId,
+      goal_id: context.goal.id,
+      week_number: nextWeek,
+      ...actionPayload,
+    });
+    if (insErr) console.error('[13] action_items INSERT:', insErr);
   }
 
   // v1.5: goals.current_week UPDATE 제거.
   // 주차는 항상 started_at 기준 날짜 계산으로 결정되므로 DB값 변경 불필요.
-  // (이전 로직: 코칭 시점에 +1 → 사용자가 같은 주에 코칭 여러 번 하면 주차 부풀림)
 
   return result;
 }
