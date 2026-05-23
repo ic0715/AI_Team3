@@ -157,7 +157,6 @@ async function finalizeCoaching(
 }
 // ─────────────────────────────────────────────────────────────
 
-const TOTAL_Q = 4;
 const CONFIRM_WORDS = ['확정', '좋아요', '네', '응', '맞아', 'OK', 'ok', '괜찮', '이걸로'];
 
 function isConfirmation(text: string): boolean {
@@ -425,7 +424,6 @@ function CoachContent() {
   if (loadingContext) return <LoadingScreen text="코치를 준비하고 있어요..." />;
   if (!context) return <LoadingScreen text={contextError ?? '컨텍스트가 없어요.'} />;
 
-  const progressRatio = Math.min(questionIndex / TOTAL_Q, 1);
   const showSummary = isComplete && !!summary && !isRenegotiate;
 
   return (
@@ -444,23 +442,6 @@ function CoachContent() {
         <span style={{ width: '40px' }} />
       </header>
 
-      {/* 진행률 행 — 질문 N/4 + 바 + % (08 스타일) */}
-      {!showSummary && (
-        <div style={progressRowStyle}>
-          <span style={progressLabelStyle}>
-            질문 <strong style={{ color: 'var(--accent)', fontWeight: 700 }}>{Math.min(questionIndex, TOTAL_Q)}</strong> / {TOTAL_Q}
-          </span>
-          <div style={progressBarTrackStyle}>
-            <div
-              style={{
-                ...progressBarFillNewStyle,
-                width: `${progressRatio * 100}%`,
-              }}
-            />
-          </div>
-          <span style={progressPctStyle}>{Math.round(progressRatio * 100)}%</span>
-        </div>
-      )}
 
       {/* 채팅 영역 또는 요약 화면 */}
       {showSummary ? (
@@ -700,54 +681,6 @@ const topbarTitleStyle: CSSProperties = {
   color: 'var(--ink)',
   textAlign: 'center',
   letterSpacing: '-.02em',
-};
-
-const topbarQStyle: CSSProperties = {
-  fontSize: '13px',
-  fontWeight: 700,
-  color: 'var(--ink-mute)',
-  textAlign: 'right',
-};
-
-// 진행률 행 (08 인터뷰 스타일)
-const progressRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '10px 20px 12px',
-  background: 'var(--surface)',
-  borderBottom: '1px solid var(--line)',
-  flexShrink: 0,
-};
-
-const progressLabelStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-muted)',
-  whiteSpace: 'nowrap',
-};
-
-const progressBarTrackStyle: CSSProperties = {
-  flex: 1,
-  height: '6px',
-  background: 'var(--line)',
-  borderRadius: '999px',
-  overflow: 'hidden',
-};
-
-const progressBarFillNewStyle: CSSProperties = {
-  height: '100%',
-  background: 'var(--accent)',
-  borderRadius: '999px',
-  transition: 'width .4s ease',
-};
-
-const progressPctStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-secondary)',
-  minWidth: '32px',
-  textAlign: 'right',
 };
 
 const chatScrollStyle: CSSProperties = {
