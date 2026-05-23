@@ -4,27 +4,28 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 
+// v2 자유 흐름 4-Phase 안내 (schema v0.9 / 커리어 인터뷰 v2)
 const INTERVIEW_CARDS = [
   {
-    icon: '💼',
-    title: '현재 상황 파악',
-    desc: '지금 직장 생활에서 만족스러운 점과 불만족스러운 점을 함께 돌아봐요.',
+    icon: '⏱',
+    title: '원하는 시간으로',
+    desc: '인터뷰 시작 시 짧게(15~25분), 보통(30~45분), 길게(50분+) 중에서 선택할 수 있어요.',
+  },
+  {
+    icon: '🗣️',
+    title: '자유로운 대화',
+    desc: '고정 질문 없이 자연스럽게 흘러가요. 지금 가장 큰 커리어 고민부터 함께 꺼내봐요.',
   },
   {
     icon: '🎯',
-    title: '미래 방향 탐색',
-    desc: '5년 후 어떤 모습이고 싶은지, 어떤 일을 하고 싶은지 이야기해주세요.',
+    title: '주제 합의',
+    desc: '코치와 함께 오늘 다룰 핵심 주제를 정한 다음, 그 자리에 머무르며 깊이 들여다봐요.',
   },
   {
-    icon: '🔥',
-    title: '동기·가치관 발견',
-    desc: '무엇이 나를 움직이게 하는지, 어떤 환경에서 최고의 나를 발휘하는지 찾아봐요.',
-  },
-  {
-    icon: '📊',
-    title: '커리어 방향 추천',
-    desc: '강점 + 답변을 종합해 5가지 방향을 제안해드려요.',
-    descHighlight: '5가지 방향',
+    icon: '💡',
+    title: '통찰 정리',
+    desc: '강점과 답변을 종합해 다음 단계 5가지 역량 방향을 제안해드려요.',
+    descHighlight: '5가지 역량 방향',
   },
 ];
 
@@ -105,7 +106,7 @@ export default function CareerIntroPage() {
               함께 정리해요.
             </p>
             <div className="inline-flex items-center gap-[6px] mt-5 px-4 py-2 bg-[var(--accent-light)] rounded-[var(--radius-full)] text-[13px] font-semibold text-[var(--accent)]">
-              ⏱ 약 8~12분 소요
+              ⏱ 약 15~50분 (인터뷰 시작 시 선택)
             </div>
           </div>
 
@@ -165,9 +166,9 @@ export default function CareerIntroPage() {
 
           {/* 안내 메시지 */}
           <div className="mt-5 px-4 py-[14px] bg-[#fef9e7] border border-[#fde68a] rounded-[var(--radius-md)] text-[12.5px] text-[var(--text-primary)] leading-[1.7]">
-            💡 <strong className="font-bold">강점 분석 결과(Top 5)</strong>를 참고하여 질문이 구성돼요.
+            💡 <strong className="font-bold">강점 Top 5</strong>가 코치의 컨텍스트가 돼요.
             <br />
-            📝 정답이 없는 질문이 많아요. 솔직하게 답해주세요.
+            📝 고정 질문 없이 자유롭게 흐름이 흘러가요. 솔직하게 답해주세요.
           </div>
 
           <div className="h-2" />
