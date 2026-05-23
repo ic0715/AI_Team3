@@ -178,11 +178,12 @@ function HomeContent() {
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
+          // schema v0.8 노트: action_completions에는 goal_id 컬럼 없음 (action_item_id 사용).
+          // 이번 주 범위로 user 필터 — 주 1개 액션 정책이라 결과는 모두 현재 주차 액션 것.
           supabase
             .from('action_completions')
             .select('completed_date')
             .eq('user_id', user.id)
-            .eq('goal_id', goal.id)
             .gte('completed_date', mondayISO)
             .lte('completed_date', sundayISO),
           supabase
@@ -243,7 +244,7 @@ function HomeContent() {
   // 낙관적 업데이트 후 롤백 안 함 — schema 미비 시에도 UI는 작동, DB 에러는 콘솔에만.
   const handleToggleDay = useCallback(
     async (date: Date) => {
-      if (!data) return;
+      if (!data || !data.currentAction) return;
       // 미래 날짜만 차단 (오늘·과거 모두 허용)
       const todayOnly = new Date(today);
       todayOnly.setHours(0, 0, 0, 0);
@@ -266,19 +267,22 @@ function HomeContent() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // schema 정합: action_completions는 (user_id, action_item_id, completed_date) UNIQUE.
+        // 현재 주차 action_item.id를 FK로 사용 (NOT NULL 제약).
+        const actionItemId = data.currentAction.id;
+
         if (wasCompleted) {
           const { error: delErr } = await supabase
             .from('action_completions')
             .delete()
             .eq('user_id', user.id)
-            .eq('goal_id', data.goal.id)
+            .eq('action_item_id', actionItemId)
             .eq('completed_date', dateISO);
           if (delErr) console.error('[11] action_completions DELETE error:', delErr);
         } else {
           const { error: insErr } = await supabase.from('action_completions').insert({
             user_id: user.id,
-            goal_id: data.goal.id,
-            week_number: data.goal.current_week,
+            action_item_id: actionItemId,
             completed_date: dateISO,
           });
           if (insErr) console.error('[11] action_completions INSERT error:', insErr);
