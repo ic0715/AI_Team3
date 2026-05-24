@@ -630,11 +630,17 @@ const MessageInput = memo(function MessageInput({
       <textarea
         ref={textareaRef}
         defaultValue=""
-        onInput={(e) => autoResize(e.currentTarget)}
+        onInput={(e) => {
+          // 🚨 IME 조합 중에는 절대 DOM 치수를 바꾸지 말 것.
+          // height 변경 = layout reflow = 진행 중인 한글 composition 강제 commit
+          // → "한 줄 넘어가는 순간 한글 깨짐" 의 직접 원인.
+          // 조합이 끝나면 onCompositionEnd에서 한 번에 보정.
+          if (!isComposingRef.current) autoResize(e.currentTarget);
+        }}
         onCompositionStart={() => { isComposingRef.current = true; }}
         onCompositionEnd={(e) => {
           isComposingRef.current = false;
-          // 한글 조합이 끝나는 순간 줄바꿈이 일어날 수 있어 한 번 더 보정
+          // 조합 끝난 직후 보정 — 줄바꿈으로 한 줄→두 줄 넘어간 경우 여기서 늘림
           autoResize(e.currentTarget);
         }}
         onKeyDown={(e) => {
