@@ -395,12 +395,38 @@ function CoachContent() {
   }, [messages, isSending]);
 
   // ── 메시지 전송 ───────────────────────────────────────────
-  // v1.7(2026-05-25): typing lag fix를 위해 input state를 자식 MessageInput으로 분리.
-  //   handleSend는 text 인자를 받는 형태로 변경. 부모는 input 변경 시마다 재렌더링되지
-  //   않으므로 한글 IME composition이 안 깨짐.
+  // v1.8(2026-05-24): typing lag fix 2차.
+  //   v1.7에서 MessageInput을 memo로 분리했으나, handleSend useCallback deps에
+  //   messages/questionIndex/isRenegotiate가 들어 있어서 매 메시지마다 새 함수
+  //   참조가 생성되고, 결과적으로 MessageInput의 memo cache가 무효화되어
+  //   자식이 재렌더링됨 → 한글 IME 조합이 5턴쯤부터 다시 깨짐.
+  //
+  //   이번엔 ref(latestRef)에 최신 상태를 저장하고, handleSend는 빈 deps로
+  //   생성해서 onSend prop의 참조가 컴포넌트 생애주기 동안 절대 바뀌지 않게
+  //   고정함. + MessageInput을 uncontrolled(useRef + defaultValue)로 전환.
+  const latestRef = useRef({
+    messages,
+    context,
+    userId,
+    questionIndex,
+    isRenegotiate,
+    isSending,
+  });
+  useEffect(() => {
+    latestRef.current = {
+      messages,
+      context,
+      userId,
+      questionIndex,
+      isRenegotiate,
+      isSending,
+    };
+  });
+
   const handleSend = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || isSending || !context || !userId) return;
+    const snap = latestRef.current;
+    if (!trimmed || snap.isSending || !snap.context || !snap.userId) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -409,12 +435,12 @@ function CoachContent() {
     };
     const inputCopy = trimmed;
     setIsSending(true);
-    const nextMessages = [...messages, userMessage];
+    const nextMessages = [...snap.messages, userMessage];
     setMessages(nextMessages);
 
     try {
       // 재협의 모드에서 확정어 감지 → 요약 재표시
-      if (isRenegotiate && isConfirmation(inputCopy)) {
+      if (snap.isRenegotiate && isConfirmation(inputCopy)) {
         await new Promise((r) => setTimeout(r, 900));
         setIsRenegotiate(false);
         setIsComplete(true);
@@ -425,9 +451,9 @@ function CoachContent() {
 
       const response = await sendCoachMessage({
         history: nextMessages,
-        context,
-        questionIndex,
-        isRenegotiate,
+        context: snap.context,
+        questionIndex: snap.questionIndex,
+        isRenegotiate: snap.isRenegotiate,
       });
 
       const coachMessage: Message = {
@@ -438,11 +464,15 @@ function CoachContent() {
       setMessages((prev) => [...prev, coachMessage]);
       setQuestionIndex(response.nextQuestionIndex);
 
-      if (response.isComplete && !isRenegotiate) {
+      if (response.isComplete && !snap.isRenegotiate) {
         // finalize → coaching_insights + action_items INSERT → 요약 화면 전환
         setIsFinalizing(true);
         try {
-          const result = await finalizeCoaching([...nextMessages, coachMessage], context, userId);
+          const result = await finalizeCoaching(
+            [...nextMessages, coachMessage],
+            snap.context,
+            snap.userId,
+          );
           setSummary(result);
           setIsComplete(true);
         } catch (e) {
@@ -465,7 +495,7 @@ function CoachContent() {
     } finally {
       setIsSending(false);
     }
-  }, [isSending, context, userId, messages, questionIndex, isRenegotiate]);
+  }, []); // 빈 deps — 함수 참조 영구 고정 → MessageInput memo 안정
 
   // ── 재협의 시작 ───────────────────────────────────────────
   const handleRenegotiate = useCallback(() => {
@@ -545,19 +575,27 @@ function CoachContent() {
 // ────────────────────────────────────────────────────────────
 
 /**
- * 메시지 입력창 (v1.7 — 2026-05-25 신설)
+ * 메시지 입력창 (v1.8 — 2026-05-24 uncontrolled 재작성)
  *
- * input state를 부모(CoachContent)에서 분리한 이유:
- *  - 부모는 messages 배열·AI fetch 상태 등 큰 state를 가짐
- *  - 매 keystroke마다 부모 전체가 재렌더링되면 한글 IME composition이
- *    깨져서 "한 글자씩 끊김" 증상 발생
- *  - input을 자식의 로컬 state로 두고 React.memo로 감싸면, 부모의 messages
- *    변경에 영향받지 않고 textarea만 가볍게 재렌더링
+ * v1.7(controlled + memo) 한계:
+ *  - 매 keystroke마다 setState → 자식 재렌더 발생
+ *  - 한글 IME는 매 조합 단계가 React 렌더링과 충돌하면 조합 상태가 깨짐
+ *  - 5턴 넘어가면 DOM이 커지면서 setState→render→reconcile 비용이 임계점 돌파
  *
- * 한글 IME 안전 처리:
- *  - onCompositionStart/End로 조합 중인지 추적
- *  - Enter로 전송할 때 composition 중이면 무시 (한글 조합 마지막 Enter가
- *    의도와 다르게 전송 트리거하는 것 방지)
+ * v1.8 전략 — textarea를 완전히 uncontrolled로:
+ *  - useRef로 DOM에 직접 접근, value/onChange 제거
+ *  - 입력 중에는 React state 업데이트가 0회 → 렌더링 사이클 미발생
+ *  - 브라우저 native input handling이 IME composition을 그대로 처리
+ *  - submit 시점에만 ref.current.value 읽고 비움
+ *
+ * Send 버튼 disabled 상태:
+ *  - 입력 내용 기반 live disabled는 포기 (state 필요해서)
+ *  - 전송 중(isSending)일 때만 disabled로 표시
+ *  - 빈 텍스트는 submit() 내부에서 가드
+ *
+ * 한글 IME composition Enter 처리:
+ *  - useRef로 isComposing 추적 (setState 안 쓰는 게 핵심)
+ *  - Enter 키 시 ref 값으로 분기
  */
 const MessageInput = memo(function MessageInput({
   onSend,
@@ -566,28 +604,29 @@ const MessageInput = memo(function MessageInput({
   onSend: (text: string) => void;
   isSending: boolean;
 }) {
-  const [input, setInput] = useState('');
-  const [isComposing, setIsComposing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false);
 
   const submit = () => {
-    const trimmed = input.trim();
+    const el = textareaRef.current;
+    if (!el) return;
+    const trimmed = el.value.trim();
     if (!trimmed || isSending) return;
     onSend(trimmed);
-    setInput('');
+    el.value = '';
+    // height auto-resize 사용 시 초기화하지만 현재는 rows=1 고정이라 불필요
   };
-
-  const canSubmit = !!input.trim() && !isSending;
 
   return (
     <div style={inputAreaStyle}>
       <textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onCompositionStart={() => setIsComposing(true)}
-        onCompositionEnd={() => setIsComposing(false)}
+        ref={textareaRef}
+        defaultValue=""
+        onCompositionStart={() => { isComposingRef.current = true; }}
+        onCompositionEnd={() => { isComposingRef.current = false; }}
         onKeyDown={(e) => {
           // 한글 조합 중 Enter 무시 (IME 안전)
-          if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+          if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
             e.preventDefault();
             submit();
           }
@@ -600,11 +639,11 @@ const MessageInput = memo(function MessageInput({
       <button
         type="button"
         onClick={submit}
-        disabled={!canSubmit}
+        disabled={isSending}
         style={{
           ...sendBtnStyle,
-          opacity: canSubmit ? 1 : 0.4,
-          cursor: canSubmit ? 'pointer' : 'not-allowed',
+          opacity: isSending ? 0.4 : 1,
+          cursor: isSending ? 'not-allowed' : 'pointer',
         }}
         aria-label="메시지 전송"
       >
