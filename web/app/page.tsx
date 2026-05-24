@@ -200,10 +200,13 @@ export default function LandingPage() {
               background: 'var(--bg)',
             }}
           >
-            {/* STEP 배지 + 제목 */}
-            <div style={{ marginBottom: '8px' }}>
+            {/* STEP 배지 + 제목 한 줄 */}
+            <div style={{
+              display: 'flex', alignItems: 'center',
+              gap: '10px', marginBottom: '8px',
+            }}>
               <div style={{
-                display: 'inline-block', marginBottom: '6px',
+                flexShrink: 0,
                 padding: '3px 10px', background: 'var(--accent-light)',
                 color: 'var(--accent)', borderRadius: '999px',
                 fontSize: '11px', fontWeight: 800, letterSpacing: '.06em',
