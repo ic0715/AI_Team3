@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import { useCallback, useEffect, useRef, useState, memo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
@@ -248,7 +248,7 @@ function CoachContent() {
   const [isComplete, setIsComplete] = useState(false);
   const [isRenegotiate, setIsRenegotiate] = useState(false);
 
-  const [input, setInput] = useState('');
+  // v1.7: input state는 자식 MessageInput 컴포넌트로 이동 (typing lag fix)
   const [isSending, setIsSending] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [summary, setSummary] = useState<CoachingResult | null>(null);
@@ -395,16 +395,19 @@ function CoachContent() {
   }, [messages, isSending]);
 
   // ── 메시지 전송 ───────────────────────────────────────────
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isSending || !context || !userId) return;
+  // v1.7(2026-05-25): typing lag fix를 위해 input state를 자식 MessageInput으로 분리.
+  //   handleSend는 text 인자를 받는 형태로 변경. 부모는 input 변경 시마다 재렌더링되지
+  //   않으므로 한글 IME composition이 안 깨짐.
+  const handleSend = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isSending || !context || !userId) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content: trimmed,
     };
-    const inputCopy = input.trim();
-    setInput('');
+    const inputCopy = trimmed;
     setIsSending(true);
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
@@ -462,7 +465,7 @@ function CoachContent() {
     } finally {
       setIsSending(false);
     }
-  }, [input, isSending, context, userId, messages, questionIndex, isRenegotiate]);
+  }, [isSending, context, userId, messages, questionIndex, isRenegotiate]);
 
   // ── 재협의 시작 ───────────────────────────────────────────
   const handleRenegotiate = useCallback(() => {
@@ -527,48 +530,9 @@ function CoachContent() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* 입력창 */}
+          {/* 입력창 — v1.7: 자식 컴포넌트로 분리 (한글 IME typing lag fix) */}
           {!isFinalizing && (
-            <div style={inputAreaStyle}>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="답변을 입력해주세요"
-                rows={1}
-                style={inputTextareaStyle}
-                aria-label="코치에게 답변 입력"
-              />
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!input.trim() || isSending}
-                style={{
-                  ...sendBtnStyle,
-                  opacity: !input.trim() || isSending ? 0.4 : 1,
-                  cursor: !input.trim() || isSending ? 'not-allowed' : 'pointer',
-                }}
-                aria-label="메시지 전송"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
-                </svg>
-              </button>
-            </div>
+            <MessageInput onSend={handleSend} isSending={isSending} />
           )}
         </>
       )}
@@ -579,6 +543,87 @@ function CoachContent() {
 // ────────────────────────────────────────────────────────────
 // 서브 컴포넌트
 // ────────────────────────────────────────────────────────────
+
+/**
+ * 메시지 입력창 (v1.7 — 2026-05-25 신설)
+ *
+ * input state를 부모(CoachContent)에서 분리한 이유:
+ *  - 부모는 messages 배열·AI fetch 상태 등 큰 state를 가짐
+ *  - 매 keystroke마다 부모 전체가 재렌더링되면 한글 IME composition이
+ *    깨져서 "한 글자씩 끊김" 증상 발생
+ *  - input을 자식의 로컬 state로 두고 React.memo로 감싸면, 부모의 messages
+ *    변경에 영향받지 않고 textarea만 가볍게 재렌더링
+ *
+ * 한글 IME 안전 처리:
+ *  - onCompositionStart/End로 조합 중인지 추적
+ *  - Enter로 전송할 때 composition 중이면 무시 (한글 조합 마지막 Enter가
+ *    의도와 다르게 전송 트리거하는 것 방지)
+ */
+const MessageInput = memo(function MessageInput({
+  onSend,
+  isSending,
+}: {
+  onSend: (text: string) => void;
+  isSending: boolean;
+}) {
+  const [input, setInput] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
+
+  const submit = () => {
+    const trimmed = input.trim();
+    if (!trimmed || isSending) return;
+    onSend(trimmed);
+    setInput('');
+  };
+
+  const canSubmit = !!input.trim() && !isSending;
+
+  return (
+    <div style={inputAreaStyle}>
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={() => setIsComposing(false)}
+        onKeyDown={(e) => {
+          // 한글 조합 중 Enter 무시 (IME 안전)
+          if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="답변을 입력해주세요"
+        rows={1}
+        style={inputTextareaStyle}
+        aria-label="코치에게 답변 입력"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!canSubmit}
+        style={{
+          ...sendBtnStyle,
+          opacity: canSubmit ? 1 : 0.4,
+          cursor: canSubmit ? 'pointer' : 'not-allowed',
+        }}
+        aria-label="메시지 전송"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
+        </svg>
+      </button>
+    </div>
+  );
+});
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user';
