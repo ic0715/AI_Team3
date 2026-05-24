@@ -9,21 +9,27 @@ interface ChatRequestBody {
   history?: Array<{ role: 'coach' | 'user'; content: string }>;
   messages?: Array<{ role: 'coach' | 'user'; content: string }>;
   context: ReflectChatContext;
-  questionIndex: number;     // 1~4 (페이지 UI 진행도 표시용)
-  isRenegotiate: boolean;
+  /** @deprecated v1.4: 고정 4-주제 제거로 의미 없음. 페이지 backward-compat 차원에서 받지만 서버 사용 X */
+  questionIndex?: number;
+  /** @deprecated v1.4: 재협의가 메인 흐름에 통합됨. 페이지 backward-compat 차원에서 받지만 서버 사용 X */
+  isRenegotiate?: boolean;
 }
 
 interface ChatResponse {
   content: string;
+  /** @deprecated v1.4: 항상 입력값 그대로 반환 (페이지가 UI 표시 안 함) */
   nextQuestionIndex: number;
   isComplete: boolean;
 }
 
-// 안전망: 메인 코칭 ~20턴, 재협의 ~10턴 넘으면 강제 종료
-const HARD_COMPLETE_MAIN = 20;
-const HARD_COMPLETE_RENEGOTIATE = 10;
+// v1.4: 턴 가드 재설계
+// - SOFT_CAP: 이 턴 수 넘으면 시스템 프롬프트에 "정리 단계로 부드럽게 유도" 힌트 주입.
+//   강제 종료 아님. 사용자 의도 존중.
+// - HARD_FAILSAFE: 진짜 무한 대화 방지용 안전판. 이 턴 넘으면 코치가 마무리 발화 의무.
+const SOFT_CAP = 30;
+const HARD_FAILSAFE = 50;
 
-// 06 §5.1 / 5.5 종료 키워드 — 클라이언트와 동일 감지
+// 06 §5.1 종료 키워드 — 클라이언트와 동일 감지 (v1.4: 단일 모드라 변형 통일)
 const ENDING_KEYWORDS = [
   '오늘 코칭은 여기서',
   '오늘은 여기까지',
@@ -35,15 +41,42 @@ function detectEnding(text: string): boolean {
   return ENDING_KEYWORDS.some((k) => text.includes(k));
 }
 
+/** SOFT_CAP 초과 시 시스템 프롬프트 끝에 추가할 부드러운 마무리 힌트 */
+function softWrapHint(userMsgCount: number): string {
+  if (userMsgCount < SOFT_CAP) return '';
+  if (userMsgCount >= HARD_FAILSAFE) {
+    return `
+
+---
+
+# ⏱️ HARD FAILSAFE (${userMsgCount}/${HARD_FAILSAFE}턴)
+
+대화가 매우 길어졌습니다. 지금까지 나눈 이야기에서 가장 명확한 다음 주 액션 1개를
+사용자에게 미러링하며 "오늘 코칭은 여기서 마무리하겠습니다" 클로징으로 반드시 종료하세요.
+`;
+  }
+  return `
+
+---
+
+# ⏱️ 정리 단계 부드러운 유도 (${userMsgCount}/${SOFT_CAP}턴)
+
+대화가 충분히 깊어졌어요. 새로운 주제를 추가로 열지 말고, 지금까지 나온 이야기를
+바탕으로 다음 주 액션 1개로 사용자가 스스로 수렴하도록 What/How 개방형 질문으로
+부드럽게 유도하세요. (강제 종료 아님 — 사용자가 더 탐색하고 싶다고 표현하면 따라가세요.)
+`;
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequestBody;
-    const { context, questionIndex, isRenegotiate } = body;
+    const { context, questionIndex = 1 } = body;
     const messages = body.history ?? body.messages ?? [];
 
     const userMsgCount = messages.filter((m) => m.role === 'user').length;
 
-    const system = buildChatSystemPrompt(context, isRenegotiate);
+    const baseSystem = buildChatSystemPrompt(context, false /* v1.4: isRenegotiate 무시 */);
+    const system = baseSystem + softWrapHint(userMsgCount);
 
     // 페이지의 Message.role ('coach' | 'user') → Anthropic ('assistant' | 'user')
     const history = messages.map((m) => ({
@@ -65,18 +98,14 @@ export async function POST(req: Request) {
     const text = extractText(message).trim();
 
     const llmSignaledEnd = detectEnding(text);
-    const threshold = isRenegotiate ? HARD_COMPLETE_RENEGOTIATE : HARD_COMPLETE_MAIN;
-    const overThreshold = userMsgCount >= threshold;
-    const isComplete = llmSignaledEnd || overThreshold;
+    const hardFailsafeHit = userMsgCount >= HARD_FAILSAFE;
+    const isComplete = llmSignaledEnd || hardFailsafeHit;
 
-    // questionIndex는 클라이언트가 화면 표시용으로 관리. 서버는 +1로 자연 진행만 도움.
-    const nextQuestionIndex = isComplete
-      ? Math.max(questionIndex, 5)
-      : Math.min(questionIndex + 1, 4);
-
+    // v1.4: questionIndex 는 페이지 backward-compat. 서버는 변경하지 않고 그대로 반환
+    // (페이지가 진행 UI 표시 안 함 — PR #87 에서 progress bar 제거됨).
     const response: ChatResponse = {
       content: text,
-      nextQuestionIndex,
+      nextQuestionIndex: questionIndex,
       isComplete,
     };
     return NextResponse.json(response);
