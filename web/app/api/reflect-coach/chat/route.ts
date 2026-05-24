@@ -79,18 +79,36 @@ export async function POST(req: Request) {
     const system = baseSystem + softWrapHint(userMsgCount);
 
     // 페이지의 Message.role ('coach' | 'user') → Anthropic ('assistant' | 'user')
-    const history = messages.map((m) => ({
-      role: m.role === 'coach' ? ('assistant' as const) : ('user' as const),
-      content: m.content,
-    }));
+    // + 히스토리 캐시 breakpoint: 현재 user 입력 직전 메시지에 cache_control을 달아
+    //   이전 누적 대화도 캐시 히트 시키기.
+    const history = messages.map((m, i) => {
+      const role = m.role === 'coach' ? ('assistant' as const) : ('user' as const);
+      if (i === messages.length - 2 && messages.length >= 2) {
+        return {
+          role,
+          content: [
+            {
+              type: 'text' as const,
+              text: m.content,
+              cache_control: { type: 'ephemeral' as const, ttl: '1h' as const },
+            },
+          ],
+        };
+      }
+      return { role, content: m.content };
+    });
 
     const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 500,           // 평시 2~3문장 + 🔴 정서 위기 redirect 멘트(자원 번호 포함) 여유
       temperature: 0.7,          // 06 v1.3: 자연스러운 대화체 변주
       system: [
-        // Prompt Caching: 정적 부분 캐시 (~90% 입력 토큰 절감)
-        { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
+        // Prompt Caching: 정적 부분 캐시 (~90% 입력 토큰 절감) — TTL 1h로 세션 재진입 캐시쓰기 방지
+        {
+          type: 'text',
+          text: system,
+          cache_control: { type: 'ephemeral', ttl: '1h' },
+        },
       ],
       messages: history,
     });
