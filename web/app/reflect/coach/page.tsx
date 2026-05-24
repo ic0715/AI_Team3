@@ -607,6 +607,14 @@ const MessageInput = memo(function MessageInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isComposingRef = useRef(false);
 
+  // v1.8.1: textarea 높이 자동 조절 (DOM 직접 조작, setState 없음 → IME 안전)
+  const MIN_H = 44;
+  const MAX_H = 120;
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = Math.min(Math.max(el.scrollHeight, MIN_H), MAX_H) + 'px';
+  };
+
   const submit = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -614,7 +622,7 @@ const MessageInput = memo(function MessageInput({
     if (!trimmed || isSending) return;
     onSend(trimmed);
     el.value = '';
-    // height auto-resize 사용 시 초기화하지만 현재는 rows=1 고정이라 불필요
+    el.style.height = MIN_H + 'px'; // 전송 후 한 줄 높이로 리셋
   };
 
   return (
@@ -622,8 +630,13 @@ const MessageInput = memo(function MessageInput({
       <textarea
         ref={textareaRef}
         defaultValue=""
+        onInput={(e) => autoResize(e.currentTarget)}
         onCompositionStart={() => { isComposingRef.current = true; }}
-        onCompositionEnd={() => { isComposingRef.current = false; }}
+        onCompositionEnd={(e) => {
+          isComposingRef.current = false;
+          // 한글 조합이 끝나는 순간 줄바꿈이 일어날 수 있어 한 번 더 보정
+          autoResize(e.currentTarget);
+        }}
         onKeyDown={(e) => {
           // 한글 조합 중 Enter 무시 (IME 안전)
           if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
