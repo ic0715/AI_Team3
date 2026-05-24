@@ -198,13 +198,17 @@ accent-tint 배경, accent 1.5px 보더, 18px radius.
 
 | 테이블 | 동작 | 시점 |
 | --- | --- | --- |
-| coaching_insights | INSERT | 코칭 완료 시 |
-| action_items | INSERT (3~5건, week_number=계산된 현재 주차+1) | 코칭 완료 시 |
+| coaching_insights | **UPSERT** (기존 같은 주차 row 있으면 UPDATE, 없으면 INSERT) | 코칭 완료 시 |
+| action_items | **UPSERT** (같은 (goal, week_number=nextWeek, is_custom=false) row 있으면 UPDATE, 없으면 INSERT) | 코칭 완료 시 |
 | action_items | UPDATE (재협의 revised=true 시) | 재협의 종료 시 |
 | coaching_insights | next_action_title UPDATE (재협의 revised=true 시) | 재협의 종료 시 |
 | goals | status='abandoned' UPDATE + 새 goals INSERT | suggest_change 분기에서 사용자가 역량 변경 선택 시 |
 
 > ⚠️ **주차 계산 정책 (v1.5 — 2026-05-24 변경)**: 주차는 항상 `goals.started_at` 기준으로 캘린더 날짜 계산 (`(today - started_at) / 7 + 1`, max=`total_weeks` 클램프). `goals.current_week` 컬럼 값을 더 이상 신뢰하지 않고 모든 페이지/13 코칭에서 매번 계산함. 따라서 **코칭 완료 시 `goals.current_week` UPDATE 안 함** (이전 v1.5 정책 폐기). 사용자가 같은 주에 코칭을 여러 번 해도 주차가 부풀려지지 않으며, 다음 주(`week_number = currentWeek + 1`) 액션이 자연스럽게 다음 주차로 인식됨.
+
+> ⚠️ **UPSERT 패턴 (v1.6 — 2026-05-25)**:
+> - **coaching_insights**: schema 제약 `(user_id, goal_id, week_number)` UNIQUE 때문에 같은 주차에 다시 코칭하면 23505 위반. → SELECT로 기존 row 확인 후 있으면 UPDATE, 없으면 INSERT.
+> - **action_items (다음 주차)**: 같은 `(user_id, goal_id, week_number=nextWeek, is_custom=false)` row가 있으면 UPDATE (id 유지 → action_completions FK 안전), 없으면 INSERT. 사용자가 마음 바뀌어 같은 주에 코칭을 다시 받으면 **기존 다음 주 액션을 새 내용으로 덮어씀** (중복 INSERT 방지). 결과적으로 한 주차에 AI 추천 액션은 1개로 유지됨.
 
 **`coaching_insights` INSERT 필드 (schema v0.8/v0.9 정합):**
 
@@ -292,3 +296,4 @@ strength_link:       이 액션과 연결된 강점명 (v0.8, 자유 텍스트)
 | v1.3 | 2026-05-21 | **[feature/12 구현 상태 명시]** **2.** 진입 조건 — feature/12 테스트 모드에서 weekly_retros 가드 임시 비활성화 (코드 주석 `테스트용 — production 복구 필요` 마커, 머지 전 복구 필요). **3.** AI 연동 참조 — MVP는 mock 시나리오(Q1~Q4 정적 + 정적 요약) 명시. 실제 Claude 연동은 `web/docs/HANDOFF_AI.md` (Phase 1.7) 인계 예정. 시그니처 유지하므로 함수 본문만 교체. **8.** 예외 처리 — mock 단계 한계 2건 추가: 확정어 단순 `.includes()` 매칭(`---ACTION_REVISED---` 구분자 미구현), 동일 week_number 재 INSERT idempotency 미구현. |
 | v1.4 | 2026-05-23 | **[schema v0.9 정합성 정렬]** **헤더 schema 버전** v0.7.2 → v0.9. **6.2 쓰기** — `coaching_insights` / `action_items` INSERT 필드 상세 명시. v0.8 신규 컬럼 명세 반영: (1) `coaching_insights.weekly_retro_id` (FK, 11 홈 타임라인 링크용) / (2) `coaching_insights.badge` (완료율 기반 이모지 🔥/👍/😊/🌱) / (3) `coaching_insights.comment` (완료율 기반 코멘트) / (4) `action_items.strength_link` (11 홈 "오늘의 액션" 카드 강점 표시용). INSERT 누락 시 11 홈 화면 표시 빈칸 발생 경고 추가. |
 | v1.5 | 2026-05-24 | **[주차 계산 정책 변경 — DB current_week 신뢰 폐지]** **6.2** 코칭 완료 시 `goals.current_week +1` UPDATE **제거**. 이전 v1.5 임시 정책(코칭=주차 +1)이 동일 주에 코칭 여러 번 시 주차 부풀림 버그 유발. 새 정책: **모든 페이지(11/12/13/15)가 `goals.started_at` 기준 캘린더 날짜로 주차 계산** (`(today - started_at) / 7 + 1`, max 12 클램프). `web/lib/utils/week.ts`의 `calculateCurrentWeek()` 함수가 단일 진실. `goals.current_week` 컬럼은 schema에 남지만 코드에서 더 이상 읽거나 쓰지 않음. action_items INSERT 시 `week_number = calculateCurrentWeek + 1`로 다음 주차 자연 반영. |
+| v1.6 | 2026-05-25 | **[UPSERT 패턴 — 같은 주차 중복 저장 방지]** **6.2** `coaching_insights`와 `action_items` (다음 주차) INSERT를 모두 UPSERT 패턴으로 변경. coaching_insights는 UNIQUE 위반(23505) 회피용, action_items는 사용자가 같은 주에 코칭 다시 받을 때 **다음 주 액션을 덮어쓰는 동작**(중복 row 방지) 보장. action_items.id를 유지하므로 action_completions FK 연결도 안전. 결과: 한 주차에 AI 추천 액션은 항상 1개로 유지됨. |

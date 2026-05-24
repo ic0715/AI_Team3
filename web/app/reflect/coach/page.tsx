@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import { useCallback, useEffect, useRef, useState, memo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
@@ -116,42 +116,101 @@ async function finalizeCoaching(
   // 2) v0.8: 완료율 기반 badge/comment (11 홈 타임라인 done 카드용)
   const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
 
-  // 3) coaching_insights INSERT — schema v0.8/v0.9
-  const { error: insightErr } = await supabase.from('coaching_insights').insert({
-    user_id: userId,
-    goal_id: context.goal.id,
-    weekly_retro_id: context.weeklyRetroId,
-    week_number: context.goal.current_week,
+  const TOTAL_WEEKS = 12;
+  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
+
+  // ───── 3) coaching_insights — UPSERT 패턴 ─────
+  // schema 제약: (user_id, goal_id, week_number) UNIQUE → 같은 주에 다시 코칭하면
+  //   UPDATE해야 함 (그냥 INSERT하면 23505 위반).
+  // ※ next_action_reason은 main의 AI 응답(ai.next_action_reason)을 우선 사용.
+  const insightPayload = {
+    weekly_retro_id: context.weeklyRetroId, // v0.8: 연결된 주차 회고 FK
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
     next_action_reason: ai.next_action_reason || result.patternInsight,
     strength_link: result.strengthLink,
-    badge,
-    comment,
-  });
-  if (insightErr) {
-    console.error('[13] coaching_insights INSERT:', insightErr);
+    badge,    // v0.8: 11 홈 타임라인 done 카드 이모지
+    comment,  // v0.8: 11 홈 타임라인 done 카드 코멘트
+  };
+
+  const { data: existingInsight, error: insightSelectErr } = await supabase
+    .from('coaching_insights')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', context.goal.id)
+    .eq('week_number', context.goal.current_week)
+    .maybeSingle();
+  if (insightSelectErr) {
+    console.error('[13] coaching_insights SELECT:', insightSelectErr);
   }
 
-  // 4) action_items INSERT (다음 주차)
-  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준 계산값 사용. 12주 클램프.
-  const TOTAL_WEEKS = 12;
-  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
-  const { error: actionErr } = await supabase.from('action_items').insert({
-    user_id: userId,
-    goal_id: context.goal.id,
-    week_number: nextWeek,
+  if (existingInsight) {
+    const { error: updErr } = await supabase
+      .from('coaching_insights')
+      .update(insightPayload)
+      .eq('id', existingInsight.id);
+    if (updErr) console.error('[13] coaching_insights UPDATE:', updErr);
+  } else {
+    const { error: insErr } = await supabase.from('coaching_insights').insert({
+      user_id: userId,
+      goal_id: context.goal.id,
+      week_number: context.goal.current_week,
+      ...insightPayload,
+    });
+    if (insErr) console.error('[13] coaching_insights INSERT:', insErr);
+  }
+
+  // ───── 4) action_items (다음 주차) — UPSERT 패턴 ─────
+  // 같은 (user_id, goal_id, week_number=nextWeek, is_custom=false) 행이 이미 있으면
+  // UPDATE (사용자가 마음 바뀌어 코칭 다시 받음 → 다음 주 액션 덮어쓰기).
+  // 없으면 INSERT (첫 코칭).
+  // ※ id를 유지하므로 action_completions FK 연결도 안전.
+  // ※ description은 main의 AI 응답(ai.next_action_reason)을 우선 사용.
+  const actionPayload = {
     title: result.nextActionTitle,
     description: ai.next_action_reason || result.patternInsight,
     tags: [],
     is_custom: false,
     source_seed_id: null,
-    strength_link: result.strengthLink,
-  });
-  if (actionErr) {
-    console.error('[13] action_items INSERT:', actionErr);
+    strength_link: result.strengthLink, // v0.8: top 강점명 (자유 텍스트)
+  };
+
+  // 가장 최근 created_at row를 UPDATE 대상으로 (11 home의 future fetch 정렬과 일치).
+  // 같은 주차에 중복 row가 이미 있는 경우 화면에 보이는 것과 동일한 row를 갱신해야
+  // 사용자에게 "업데이트됐다"가 즉시 인지됨.
+  const { data: existingAction, error: actionSelectErr } = await supabase
+    .from('action_items')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', context.goal.id)
+    .eq('week_number', nextWeek)
+    .eq('is_custom', false)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (actionSelectErr) {
+    console.error('[13] action_items SELECT:', actionSelectErr);
   }
+
+  if (existingAction) {
+    const { error: updErr } = await supabase
+      .from('action_items')
+      .update(actionPayload)
+      .eq('id', existingAction.id);
+    if (updErr) console.error('[13] action_items UPDATE:', updErr);
+  } else {
+    const { error: insErr } = await supabase.from('action_items').insert({
+      user_id: userId,
+      goal_id: context.goal.id,
+      week_number: nextWeek,
+      ...actionPayload,
+    });
+    if (insErr) console.error('[13] action_items INSERT:', insErr);
+  }
+
+  // v1.5: goals.current_week UPDATE 제거.
+  // 주차는 항상 started_at 기준 날짜 계산으로 결정되므로 DB값 변경 불필요.
 
   return result;
 }
@@ -189,7 +248,7 @@ function CoachContent() {
   const [isComplete, setIsComplete] = useState(false);
   const [isRenegotiate, setIsRenegotiate] = useState(false);
 
-  const [input, setInput] = useState('');
+  // v1.7: input state는 자식 MessageInput 컴포넌트로 이동 (typing lag fix)
   const [isSending, setIsSending] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [summary, setSummary] = useState<CoachingResult | null>(null);
@@ -336,16 +395,19 @@ function CoachContent() {
   }, [messages, isSending]);
 
   // ── 메시지 전송 ───────────────────────────────────────────
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isSending || !context || !userId) return;
+  // v1.7(2026-05-25): typing lag fix를 위해 input state를 자식 MessageInput으로 분리.
+  //   handleSend는 text 인자를 받는 형태로 변경. 부모는 input 변경 시마다 재렌더링되지
+  //   않으므로 한글 IME composition이 안 깨짐.
+  const handleSend = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isSending || !context || !userId) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content: trimmed,
     };
-    const inputCopy = input.trim();
-    setInput('');
+    const inputCopy = trimmed;
     setIsSending(true);
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
@@ -403,7 +465,7 @@ function CoachContent() {
     } finally {
       setIsSending(false);
     }
-  }, [input, isSending, context, userId, messages, questionIndex, isRenegotiate]);
+  }, [isSending, context, userId, messages, questionIndex, isRenegotiate]);
 
   // ── 재협의 시작 ───────────────────────────────────────────
   const handleRenegotiate = useCallback(() => {
@@ -468,48 +530,9 @@ function CoachContent() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* 입력창 */}
+          {/* 입력창 — v1.7: 자식 컴포넌트로 분리 (한글 IME typing lag fix) */}
           {!isFinalizing && (
-            <div style={inputAreaStyle}>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="답변을 입력해주세요"
-                rows={1}
-                style={inputTextareaStyle}
-                aria-label="코치에게 답변 입력"
-              />
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!input.trim() || isSending}
-                style={{
-                  ...sendBtnStyle,
-                  opacity: !input.trim() || isSending ? 0.4 : 1,
-                  cursor: !input.trim() || isSending ? 'not-allowed' : 'pointer',
-                }}
-                aria-label="메시지 전송"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
-                </svg>
-              </button>
-            </div>
+            <MessageInput onSend={handleSend} isSending={isSending} />
           )}
         </>
       )}
@@ -520,6 +543,87 @@ function CoachContent() {
 // ────────────────────────────────────────────────────────────
 // 서브 컴포넌트
 // ────────────────────────────────────────────────────────────
+
+/**
+ * 메시지 입력창 (v1.7 — 2026-05-25 신설)
+ *
+ * input state를 부모(CoachContent)에서 분리한 이유:
+ *  - 부모는 messages 배열·AI fetch 상태 등 큰 state를 가짐
+ *  - 매 keystroke마다 부모 전체가 재렌더링되면 한글 IME composition이
+ *    깨져서 "한 글자씩 끊김" 증상 발생
+ *  - input을 자식의 로컬 state로 두고 React.memo로 감싸면, 부모의 messages
+ *    변경에 영향받지 않고 textarea만 가볍게 재렌더링
+ *
+ * 한글 IME 안전 처리:
+ *  - onCompositionStart/End로 조합 중인지 추적
+ *  - Enter로 전송할 때 composition 중이면 무시 (한글 조합 마지막 Enter가
+ *    의도와 다르게 전송 트리거하는 것 방지)
+ */
+const MessageInput = memo(function MessageInput({
+  onSend,
+  isSending,
+}: {
+  onSend: (text: string) => void;
+  isSending: boolean;
+}) {
+  const [input, setInput] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
+
+  const submit = () => {
+    const trimmed = input.trim();
+    if (!trimmed || isSending) return;
+    onSend(trimmed);
+    setInput('');
+  };
+
+  const canSubmit = !!input.trim() && !isSending;
+
+  return (
+    <div style={inputAreaStyle}>
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={() => setIsComposing(false)}
+        onKeyDown={(e) => {
+          // 한글 조합 중 Enter 무시 (IME 안전)
+          if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="답변을 입력해주세요"
+        rows={1}
+        style={inputTextareaStyle}
+        aria-label="코치에게 답변 입력"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!canSubmit}
+        style={{
+          ...sendBtnStyle,
+          opacity: canSubmit ? 1 : 0.4,
+          cursor: canSubmit ? 'pointer' : 'not-allowed',
+        }}
+        aria-label="메시지 전송"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
+        </svg>
+      </button>
+    </div>
+  );
+});
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user';
