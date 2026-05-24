@@ -74,18 +74,6 @@ export default function CareerIntroPage() {
             <div className="w-11" />
           </div>
 
-          {/* Progress */}
-          <div className="px-[22px] pt-4 pb-2">
-            <div className="text-[11px] font-bold text-[var(--text-muted)] tracking-[0.06em] mb-2">
-              4 / 5 단계
-            </div>
-            <div className="h-[6px] bg-[var(--border)] rounded-[var(--radius-full)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--accent)] rounded-[var(--radius-full)] transition-[width] duration-[400ms]"
-                style={{ width: '80%' }}
-              />
-            </div>
-          </div>
 
           {/* Content */}
           <div className="px-[22px] pb-4">
