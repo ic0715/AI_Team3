@@ -8,19 +8,19 @@ import { supabase } from '@/lib/supabase/client';
 // ── 코칭 원칙 카드 데이터 (spec 01_landing.md 3.3 기준) ──────────
 const principles = [
   {
-    icon: '⭐',
-    title: '강점에서 시작해요',
-    text: '갤럽 클리프턴 스트렝스의 34테마 분류와 키워드를 참고했어요. CareerPT의 자체 AI 분석 기반 강점 추정이며, 갤럽 공식 진단은 아닙니다. 더 정확한 진단을 원하시면 갤럽 공식 검사를 추천드려요.',
+    step: 'STEP 1',
+    title: '강점 선택',
+    text: '갤럽 클리프턴 스트렝스 34테마 중 나의 Top 5 강점을 직접 선택해요. 이미 갤럽 리포트가 있다면 그 결과를, 없다면 스스로 느끼는 강점을 골라주세요.',
   },
   {
-    icon: '🗺️',
-    title: '방향을 함께 찾아요',
-    text: 'AI 코치가 먼저 결론을 내리지 않아요. 커리어 인터뷰를 통해 당신의 표현과 맥락에서 방향을 꺼내고, 5가지 선택지로 제안합니다.',
+    step: 'STEP 2',
+    title: 'AI 코치와 커리어 인터뷰',
+    text: 'AI 코치가 먼저 결론을 내리지 않아요. 지금의 상황, 고민, 방향에 대해 자유롭게 이야기하다 보면 5가지 역량 방향이 제안됩니다.',
   },
   {
-    icon: '🎯',
-    title: '첫 번째 액션까지',
-    text: '방향이 정해지면 지금 바로 시작할 수 있는 액션 아이템을 도출해요. 커리어, 성장, 역할, 목표에 집중합니다. 심리치료·법률·의료·재무 조언은 별도 전문가가 더 적합해요.',
+    step: 'STEP 3',
+    title: '목표와 첫 번째 액션 선택',
+    text: '제안된 방향 중 하나를 선택하고, 지금 바로 시작할 수 있는 액션 아이템을 고릅니다. 커리어, 성장, 역할, 목표에 집중해요.',
   },
 ];
 
@@ -200,21 +200,15 @@ export default function LandingPage() {
               background: 'var(--bg)',
             }}
           >
-            {/* 아이콘 + 제목 한 줄 */}
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              gap: '10px', marginBottom: '8px',
-            }}>
-              <div
-                aria-hidden="true"
-                style={{
-                  width: '34px', height: '34px', borderRadius: '50%',
-                  background: 'var(--surface)', border: '1px solid var(--accent-light)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '16px', flexShrink: 0,
-                }}
-              >
-                {p.icon}
+            {/* STEP 배지 + 제목 */}
+            <div style={{ marginBottom: '8px' }}>
+              <div style={{
+                display: 'inline-block', marginBottom: '6px',
+                padding: '3px 10px', background: 'var(--accent-light)',
+                color: 'var(--accent)', borderRadius: '999px',
+                fontSize: '11px', fontWeight: 800, letterSpacing: '.06em',
+              }}>
+                {p.step}
               </div>
               <h2 style={{
                 margin: 0, color: 'var(--text-primary)',
