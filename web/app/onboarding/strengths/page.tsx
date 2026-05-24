@@ -180,19 +180,11 @@ function StrengthsContent() {
           <span style={{ width: '44px' }} />
         </header>
 
-        {/* ── 프로그레스 바 ── */}
-        <div style={progressWrapStyle}>
-          <div style={progressLabelStyle}>2 / 5 단계</div>
-          <div style={progressBarStyle}>
-            <div style={{ ...progressFillStyle, width: '40%' }} />
-          </div>
-        </div>
-
         {/* ── 본문 ── */}
         <main style={mainStyle}>
         {/* 인트로 */}
         <div style={{ marginBottom: '28px' }}>
-          <div style={eyebrowStyle}>STEP 2</div>
+          <div style={eyebrowStyle}>STEP 1</div>
           <h1 style={titleStyle}>
             나의 강점 <strong>5가지</strong>를 골라주세요 💡
           </h1>
@@ -502,31 +494,6 @@ const pageTitleStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 
-const progressWrapStyle: React.CSSProperties = {
-  padding: '10px 20px 6px',
-  background: 'var(--surface)',
-  flexShrink: 0,
-};
-
-const progressLabelStyle: React.CSSProperties = {
-  fontSize: '12px',
-  color: 'var(--text-muted)',
-  marginBottom: '6px',
-};
-
-const progressBarStyle: React.CSSProperties = {
-  height: '4px',
-  background: 'var(--border)',
-  borderRadius: '999px',
-  overflow: 'hidden',
-};
-
-const progressFillStyle: React.CSSProperties = {
-  height: '100%',
-  background: 'var(--accent)',
-  borderRadius: '999px',
-  transition: 'width .4s ease',
-};
 
 const mainStyle: React.CSSProperties = {
   padding: '24px 20px',

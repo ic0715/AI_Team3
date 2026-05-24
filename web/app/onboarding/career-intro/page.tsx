@@ -74,18 +74,6 @@ export default function CareerIntroPage() {
             <div className="w-11" />
           </div>
 
-          {/* Progress */}
-          <div className="px-[22px] pt-4 pb-2">
-            <div className="text-[11px] font-bold text-[var(--text-muted)] tracking-[0.06em] mb-2">
-              4 / 5 단계
-            </div>
-            <div className="h-[6px] bg-[var(--border)] rounded-[var(--radius-full)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--accent)] rounded-[var(--radius-full)] transition-[width] duration-[400ms]"
-                style={{ width: '80%' }}
-              />
-            </div>
-          </div>
 
           {/* Content */}
           <div className="px-[22px] pb-4">
@@ -93,7 +81,7 @@ export default function CareerIntroPage() {
           <div className="flex flex-col items-center text-center px-[6px] pt-7">
             <div className="text-[72px] mb-6 leading-none">🗺️</div>
             <div className="text-xs font-bold text-[var(--accent)] tracking-[0.08em] mb-2">
-              STEP 4
+              STEP 2
             </div>
             <h1 className="text-2xl font-black text-[var(--text-primary)] leading-[1.35] mb-3 tracking-[-0.02em]">
               이제 커리어 방향을
