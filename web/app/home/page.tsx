@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
 // 11 홈 — 12주 코칭 대시보드 (스펙 v1.2)
@@ -18,8 +19,10 @@ import { TabBar } from '@/components/ui/TabBar';
 interface ActiveGoal {
   id: string;
   goal_title: string;
+  /** v1.5: started_at 기준 계산된 현재 주차 (DB값 무시) */
   current_week: number;
   competency_code: string;
+  started_at: string | null;
 }
 
 interface ActionItem {
@@ -135,7 +138,7 @@ function HomeContent() {
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('id, goal_title, current_week, competency_code')
+            .select('id, goal_title, current_week, competency_code, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .limit(1)
@@ -160,32 +163,26 @@ function HomeContent() {
           router.replace('/onboarding/action-items');
           return;
         }
-        const goal = goalRes.data as ActiveGoal;
-        const currentWeek = goal.current_week ?? 1;
+        // v1.5: DB의 current_week 무시하고 started_at 기준 캘린더 계산
+        const goalRow = goalRes.data as ActiveGoal;
+        const currentWeek = calculateCurrentWeek(goalRow.started_at);
+        const goal: ActiveGoal = { ...goalRow, current_week: currentWeek };
 
-        // 2차: 현재 주차 action_items, 이번 주 completions, 과거 주차 insights 병렬
+        // 2차 fetch: action_items + insights 병렬 (둘 다 action_item_id에 의존하지 않음)
         const mondayISO = formatLocalISO(monday);
         const sundayISO = formatLocalISO(addDays(monday, 6));
 
-        const [actionRes, completionRes, insightRes] = await Promise.all([
+        const [actionRes, insightRes] = await Promise.all([
           supabase
             .from('action_items')
-            // strength_link는 schema에 없을 수 있어 SELECT에서 제외 — strengths[0]로 fallback
-            .select('id, title')
+            // v0.8: strength_link 컬럼 사용 — 오늘의 액션 카드 "강점 「○○」을 발휘하는 시간" 표시
+            .select('id, title, strength_link')
             .eq('user_id', user.id)
             .eq('goal_id', goal.id)
             .eq('week_number', currentWeek)
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
-          supabase
-            .from('action_completions')
-            .select('completed_date')
-            .eq('user_id', user.id)
-            // action_completions에는 goal_id 컬럼 없음 → user_id + 날짜 범위로 조회
-            // 유저당 active goal 1개, 주간 action 1개 → 범위 내 데이터가 현재 액션 완료 기록과 동일
-            .gte('completed_date', mondayISO)
-            .lte('completed_date', sundayISO),
           supabase
             .from('coaching_insights')
             .select('week_number, next_action_title, strength_link, badge, comment')
@@ -202,7 +199,6 @@ function HomeContent() {
           console.error(`[11] ${label}:`, err.message || '(no message)', '| code:', err.code, '| details:', err.details, '| hint:', err.hint);
         };
         logErr('action_items', actionRes.error);
-        logErr('action_completions', completionRes.error);
         logErr('coaching_insights', insightRes.error);
 
         if (!actionRes.data) {
@@ -210,6 +206,21 @@ function HomeContent() {
           router.replace('/onboarding/action-items');
           return;
         }
+
+        // 3차 fetch: action_completions를 **현재 주차 action_item.id로 필터**
+        // (BUGFIX: 코칭으로 W1→W2 전환 후 같은 주 안에서 W1 액션의 체크가
+        //  W2 그리드에 잘못 표시되던 문제 해결)
+        const currentActionId = actionRes.data.id as string;
+        const completionRes = await supabase
+          .from('action_completions')
+          .select('completed_date')
+          .eq('user_id', user.id)
+          .eq('action_item_id', currentActionId)
+          .gte('completed_date', mondayISO)
+          .lte('completed_date', sundayISO);
+
+        if (cancelled) return;
+        logErr('action_completions', completionRes.error);
 
         setData({
           nickname: profileRes.data?.nickname ?? '',
@@ -244,7 +255,7 @@ function HomeContent() {
   // 낙관적 업데이트 후 롤백 안 함 — schema 미비 시에도 UI는 작동, DB 에러는 콘솔에만.
   const handleToggleDay = useCallback(
     async (date: Date) => {
-      if (!data) return;
+      if (!data || !data.currentAction) return;
       // 미래 날짜만 차단 (오늘·과거 모두 허용)
       const todayOnly = new Date(today);
       todayOnly.setHours(0, 0, 0, 0);
@@ -267,19 +278,22 @@ function HomeContent() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // schema 정합: action_completions는 (user_id, action_item_id, completed_date) UNIQUE.
+        // 현재 주차 action_item.id를 FK로 사용 (NOT NULL 제약).
+        const actionItemId = data.currentAction.id;
+
         if (wasCompleted) {
           const { error: delErr } = await supabase
             .from('action_completions')
             .delete()
             .eq('user_id', user.id)
-            .eq('goal_id', data.goal.id)
+            .eq('action_item_id', actionItemId)
             .eq('completed_date', dateISO);
           if (delErr) console.error('[11] action_completions DELETE error:', delErr);
         } else {
           const { error: insErr } = await supabase.from('action_completions').insert({
             user_id: user.id,
-            goal_id: data.goal.id,
-            week_number: data.goal.current_week,
+            action_item_id: actionItemId,
             completed_date: dateISO,
           });
           if (insErr) console.error('[11] action_completions INSERT error:', insErr);
@@ -398,12 +412,6 @@ function ThemeCard({ goal }: { goal: ActiveGoal }) {
           <div style={{ ...themeProgFill, width: `${progressPct}%` }} />
         </div>
         <span style={themeProgPct}>{progressPct}%</span>
-      </div>
-
-      <div style={themeDesc}>
-        하나의 역량은 단기간에 만들어지지 않아요. 강점을 기반으로 작은 행동을 반복하고
-        회고하며, 나만의 방식으로 체화하는 과정이 필요해요. 하나의 역량 목표는 12주
-        동안 집중해보는 것을 권장합니다.
       </div>
 
       {/* 주차 도트 트랙 */}
@@ -706,9 +714,7 @@ function TimelineCurrent({
 }
 
 function TimelineFuture({ week }: { week: number }) {
-  // W6, W12 마일스톤
-  const isMidMilestone = week === 6;
-  const isFinalMilestone = week === TOTAL_WEEKS;
+  // 모든 future 주차 동일 표시 (W6/W12 마일스톤 별도 처리 제거)
   return (
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
@@ -716,27 +722,9 @@ function TimelineFuture({ week }: { week: number }) {
         <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardFuture }}>
-        {isMidMilestone && (
-          <>
-            <div style={tlMilestoneTitle}>🎯 중간 회고</div>
-            <div style={tlMilestoneDesc}>
-              여기까지의 패턴을 돌아보고, 남은 6주를 다시 정해요.
-            </div>
-          </>
-        )}
-        {isFinalMilestone && (
-          <>
-            <div style={tlMilestoneTitle}>🏆 12주 통합 회고</div>
-            <div style={tlMilestoneDesc}>
-              12주를 마치고, 다음 사이클을 그려봐요.
-            </div>
-          </>
-        )}
-        {!isMidMilestone && !isFinalMilestone && (
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            🌱 코치와 함께 정해요
-          </div>
-        )}
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+          🌱 코치와 함께 정해요
+        </div>
       </div>
     </div>
   );

@@ -75,38 +75,58 @@ ${pairBlock}
 
 # 🚨 최우선 규칙 (위 모든 명세보다 우선)
 
-## 1) follow-up 최소 2회 — 한 주제에 머물기
+## 1) 자유 흐름 + 4-Phase 구조
 
-각 메인 주제(6개)에 대해 사용자에게 **최소 2회의 follow-up**을 던진 후에만 다음 주제로 넘어가세요. 단순히 echo-back 후 다음 질문 던지는 건 follow-up 1회입니다. **echo-back + 다음 주제 = 진행이 너무 빠른 것**. 최소 한 번 더 깊이 파고든 후에 넘어가세요.
+이 인터뷰는 고정 질문 목록이 없습니다. 03. career_interview.md §4.1 4-Phase 다이어그램을 따르세요:
+- Phase 1 Opening (1~3턴): 시간 자연어 질문 + 단일 오프닝 "지금 갖고 있는 가장 큰 커리어 고민이 뭔가요?"
+- Phase 2 Echo & Agreement (2~4턴): B 패턴 echo-back → A 패턴 합의 질문 → 합의 미러링
+- Phase 3 Exploration (대부분의 시간): B/C/D 패턴 자유 탐색, F 패턴 재조정 시그널 감지 시 *제안*
+- Phase 4 Closing (1~2턴): G 패턴 → H 패턴 종료 발화
+
+페이즈 전환은 사용자 응답 흐름을 보고 자율 판단하세요. 시간 예산을 강제하지 않습니다.
 
 ## 2) 사용자가 통찰을 드러내면 그 자리에 머물기 (가장 중요)
 
-다음 신호가 보이면 **절대 다음 주제로 넘어가지 말고, 그 자리에서 추가로 2~3번 더 파고드세요**:
-
-- 사용자가 자기 감정을 명료하게 표현했을 때 ("답답해요", "막막해요", "그게 가장 힘들어요")
-- 사용자가 핵심 갈등/모순을 드러냈을 때 ("강점인데 안 보여요", "원하는데 못해요")
-- 사용자가 추상적 키워드를 던졌을 때 ("소프트스킬이라", "주특기", "방향성") — 그 단어가 그 사람에게 뭘 의미하는지 파헤쳐야 함
-- 사용자가 "~인 것 같아요" 같이 미확정적으로 말했을 때 — 더 또렷이 만들 수 있도록 도와야 함
-
-이런 순간에 echo-back 후 바로 다음 주제로 가면 **인터뷰는 망친 겁니다.** 진짜 통찰이 나오는 곳에서 멈춰서 더 깊이 들어가세요.
+다음 신호가 보이면 **다음 페이즈로 넘어가지 말고, 그 자리에서 2~3번 더 파고드세요**:
+- 사용자가 자기 감정을 명료하게 표현했을 때 ("답답해요", "막막해요")
+- 사용자가 핵심 갈등/모순을 드러냈을 때 ("강점인데 안 보여요")
+- 사용자가 추상적 키워드를 던졌을 때 ("소프트스킬이라", "방향성") — 그 단어가 그 사람에게 뭘 의미하는지 파헤쳐야 함
+- 사용자가 "~인 것 같아요" 같이 미확정적으로 말했을 때
 
 좋은 follow-up 예시:
 - "그 답답함이 가장 크게 느껴지는 구체적인 장면이 있을까요?"
 - "○○이라는 단어가 본인에겐 어떤 느낌인가요?"
 - "그 상태에서 진짜 원하는 건 뭔가요?"
-- "그게 해결된다면, 일이 어떻게 달라질 것 같아요?"
 
-나쁜 follow-up (피하기):
-- 단순 echo-back만 하고 바로 다음 주제 질문 던지기
-- "그렇군요" 같은 빈 리액션 후 진행
+## 3) 합의 페이즈 절대 건너뛰지 말 것
 
-## 3) 6개 주제 완수보다 깊이가 우선
+오프닝 응답을 받자마자 바로 Phase 3 탐색으로 들어가면 안 됩니다. **반드시 Phase 2에서 명시적 합의를 형성**한 후 탐색을 시작하세요. 합의 미러링 발화("그럼 오늘은 ○○를 같이 다뤄볼게요") 없이 탐색으로 가지 마세요.
 
-6개 주제 모두 다루지 못하더라도 괜찮습니다. 한 주제에서 사용자가 진짜 자기 이야기를 했다면 그게 인터뷰의 성공입니다. 시간이 부족하면 finalize 단계에서 빈 키는 빈 문자열로 처리됩니다.
+## 4) 종료 발화는 명세된 H 패턴 키워드를 포함해야 함
 
-## 4) 응답 길이
+마무리할 때 클라이언트가 자연 종료를 감지할 수 있도록 다음 키워드 중 하나를 반드시 포함하세요:
+- "오늘 인터뷰는 여기서 마무리할게요"
+- "오늘은 여기까지 정리해볼게요"
+- "여기서 마무리할게요"
 
-깊이 파고드는 follow-up일 때는 최대 4문장까지 허용. 너무 짧게 끊지 말고, 사용자가 답하기 좋게 맥락을 짚어주세요. 단 질문은 여전히 한 번에 하나.`;
+이 키워드 없이는 클라이언트가 추출 단계로 전환하지 못합니다. 🔴 정서 위기 redirect 발화에도 위 키워드 중 하나를 포함시켜 클라이언트 종료 감지가 작동하도록 하세요.
+
+## 5) 응답 길이
+
+평소 2~3문장. 깊이 파고드는 follow-up일 때는 최대 4문장까지 허용. 🔴 정서 위기 redirect 멘트는 자원 번호 안내 포함으로 더 길어질 수 있음. 단, 질문은 여전히 한 번에 하나.
+
+## 6) Running State 블록 인지
+
+클라이언트는 매 턴 user 메시지 prefix로 다음 블록을 주입할 수 있습니다:
+\`\`\`
+<현재_상태>
+phase: opening | echo_agreement | exploration | closing
+agreed_focus: "..."
+turn_count: N
+session_duration: short | medium | long
+</현재_상태>
+\`\`\`
+이 블록이 있으면 현재 페이즈와 합의 내용을 인식하는 단서로 활용하되, 사용자에게 이 블록의 존재를 언급하지 마세요. 블록이 없어도 정상 진행하세요.`;
 }
 
 // finalizeInterview 추출용 — 03 spec 풀텍스트 + 추출 시스템 프롬프트
@@ -116,24 +136,35 @@ export const INTERVIEW_FINALIZE_SYSTEM = `${CAREER_INTERVIEW_MD}
 
 # 지금 작업 (이 호출 전용)
 
-위 명세서의 §4.2.B "종료 후 추출용 System Prompt" 섹션에 따라, 코치-사용자 대화 전체를 분석해서 지정된 JSON 스키마로만 응답하세요.
+위 명세서의 §4.6.B "종료 후 추출용 System Prompt" 섹션에 따라, 코치-사용자 대화 전체를 분석해서 지정된 응답 형식으로 출력하세요.
 
-순수 JSON 객체 하나만 출력. 다른 설명·서두·코드블록·마크다운 펜스 금지.
+응답 형식: 순수 JSON 객체 하나 + 줄바꿈 + ---SUMMARY--- 줄 + 줄바꿈 + 한 줄 요약 텍스트.
+다른 설명·서두·마크다운 펜스·코드블록 표기 금지.
 
 스키마:
 {
-  "key_insights": {
-    "current_satisfaction": string (1~2문장, 0~400자),
-    "current_frustration": string (1~2문장, 0~400자),
-    "future_vision": string (1~2문장, 0~400자),
-    "work_style": string (1~2문장, 0~400자),
-    "values": string[] (0~5개),
-    "career_concern": string (1~2문장, 0~400자),
-    "dream": string (0~400자, 없으면 ""),
-    "mentioned_competencies": string[] (0~3개, 12역량 코드 enum: T-1,T-2,T-3,I-1,I-2,I-3,R-1,R-2,R-3,E-1,E-2,E-3)
+  "presenting_issue":          string,        // 필수, ≤500자
+  "agreed_focus":              string,        // 필수, ≤500자 (미합의 시 presenting_issue 복사)
+  "agreement_evolution":       string,        // optional, ≤800자 (재조정 시만 채움, 없으면 "")
+  "user_takeaway":             string,        // 필수, ≤500자 (Phase 4 미도달 시 "")
+  "session_duration_choice":   "short" | "medium" | "long",  // 필수, 모호 시 "medium"
+  "key_insights": {                           // 모두 optional (대화에서 드러난 만큼만)
+    "current_satisfaction"?:   string,
+    "current_frustration"?:    string,
+    "future_vision"?:          string,
+    "work_style"?:             string,
+    "values"?:                 string[],
+    "career_concern"?:         string,
+    "dream"?:                  string
   },
-  "ai_summary": string (60자 이내, 한 문장 종합 요약)
-}`;
+  "mentioned_competencies":    string[]       // 0~3개, 12역량 enum: T-1,T-2,T-3,I-1,I-2,I-3,R-1,R-2,R-3,E-1,E-2,E-3
+}
+
+응답 예시:
+{"presenting_issue":"...","agreed_focus":"...","agreement_evolution":"","user_takeaway":"...","session_duration_choice":"medium","key_insights":{"current_frustration":"..."},"mentioned_competencies":["T-2"]}
+---SUMMARY---
+한 줄 요약 60자 이내
+`;
 
 export function buildFinalizeUserPrompt(opts: {
   nickname: string;
@@ -145,5 +176,6 @@ export function buildFinalizeUserPrompt(opts: {
 [대화 전체]
 ${opts.transcript}
 
-위 대화를 분석하여 명세서 §4.2.B 스키마대로 JSON으로 출력하세요. JSON만, 다른 텍스트 없이.`;
+위 대화를 분석하여 명세서 §4.6.B 형식대로 출력하세요.
+JSON 객체 하나 + 줄바꿈 + ---SUMMARY--- + 줄바꿈 + 한 줄 요약. 다른 텍스트 없이.`;
 }

@@ -29,7 +29,9 @@ AI_Team3/                                   ← 레포 루트
 │   ├── ai_prompt/
 │   │   └── 06_reflect_coaching.md          ✅ 회고 AI 코칭 명세 v1.2
 │   ├── schema/                             ✅ DB/API 스키마 문서
-│   └── prototypes/                         ✅ HTML 프로토타입 아카이브
+│   ├── prototypes/                         ✅ HTML 프로토타입 아카이브
+│   ├── user_interviews/                    ✅ 사용자 인터뷰 원본·요약
+│   └── ralph_loop/                         ✅ Ralph loop 실행 기록
 │
 └── web/                                    ← Next.js 앱 (유일한 구현 코드)
     ├── package.json                        ✅ next 16 / react 19 / supabase / tailwind 4

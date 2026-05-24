@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { STRENGTHS_BY_DOMAIN, type Strength, type Domain } from '@/lib/constants/strengths';
 
@@ -44,6 +44,9 @@ export default function StrengthsPage() {
 // ── 메인 컨텐츠 ───────────────────────────────────────────────
 function StrengthsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // ?from=profile 진입: 저장 후 프로필로 복귀 (강점만 수정하는 흐름)
+  const fromProfile = searchParams.get('from') === 'profile';
   const [selected, setSelected] = useState<SelectedStrength[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +144,12 @@ function StrengthsContent() {
         selected.map((s) => ({ id: s.id, name: s.name, nameEn: s.nameEn, domain: s.domain }))
       ));
 
-      router.push('/onboarding/career-intro');
+      // 진입 경로별 분기: ?from=profile이면 프로필로 복귀, 아니면 정상 온보딩 흐름
+      if (fromProfile) {
+        router.push('/profile');
+      } else {
+        router.push('/onboarding/career-intro');
+      }
     } catch (err) {
       console.error(err);
       setError('저장에 실패했어요. 다시 시도해주세요.');
@@ -158,13 +166,17 @@ function StrengthsContent() {
       {/* ── 상단 바 ── */}
       <header style={headerStyle}>
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              // ?from=profile 흐름이면 프로필로 명시 복귀 (history.back 대신)
+              if (fromProfile) router.push('/profile');
+              else router.back();
+            }}
             aria-label="뒤로 가기"
             style={backBtnStyle}
           >
             ←
           </button>
-          <span style={pageTitleStyle}>강점 선택</span>
+          <span style={pageTitleStyle}>{fromProfile ? '강점 수정' : '강점 선택'}</span>
           <span style={{ width: '44px' }} />
         </header>
 
@@ -415,7 +427,7 @@ function StrengthsContent() {
             onMouseDown={(e) => { if (canSubmit) e.currentTarget.style.transform = 'scale(0.99)'; }}
             onMouseUp={(e) => { if (canSubmit) e.currentTarget.style.transform = 'scale(1)'; }}
           >
-            {saving ? '저장 중...' : '다음으로 →'}
+            {saving ? '저장 중...' : fromProfile ? '강점 수정 저장' : '다음으로 →'}
           </button>
         </div>
       </footer>

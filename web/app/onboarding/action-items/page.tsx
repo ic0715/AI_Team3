@@ -308,6 +308,10 @@ function ActionItemsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
+      // v0.8: action_items.strength_link — 11 홈 "오늘의 액션" 카드의 강점 표시용
+      // Top 1 강점 name_ko를 자유 텍스트로 저장 (없으면 null)
+      const strengthLink = aiContext?.strengths?.[0]?.name_ko ?? null;
+
       let payload: {
         user_id: string;
         goal_id: string;
@@ -317,6 +321,7 @@ function ActionItemsContent() {
         tags: string[];
         is_custom: boolean;
         source_seed_id: string | null;
+        strength_link: string | null;
       };
 
       if (selectedId === CUSTOM_SELECTED_ID) {
@@ -330,6 +335,7 @@ function ActionItemsContent() {
           tags: [],
           is_custom: true,
           source_seed_id: null,
+          strength_link: strengthLink,
         };
       } else {
         const seed = seeds.find((s) => s.id === selectedId);
@@ -343,6 +349,7 @@ function ActionItemsContent() {
           tags: seed.tags,
           is_custom: false,
           source_seed_id: seed.sourceSeedId,
+          strength_link: strengthLink,
         };
       }
 

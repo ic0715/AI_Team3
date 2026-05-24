@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { TabBar } from '@/components/ui/TabBar';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
 // 14 프로필 (스펙 v1.2)
@@ -29,7 +30,9 @@ interface Strength {
 interface ActiveGoal {
   id: string;
   goal_title: string;
+  /** v1.5: started_at 기준 계산된 현재 주차 */
   current_week: number;
+  started_at: string | null;
 }
 
 // 03 페이지와 동일한 옵션 set (DB-level values)
@@ -113,7 +116,8 @@ function ProfileContent() {
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('id, goal_title, current_week')
+            // v1.5: started_at 포함 — 주차 계산에 사용
+            .select('id, goal_title, current_week, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .limit(1)
@@ -138,7 +142,12 @@ function ProfileContent() {
         setEditCareerLevel(p.careerLevel);
 
         setStrengths((strengthRes.data?.strengths as Strength[] | undefined) ?? []);
-        setGoal((goalRes.data as ActiveGoal | undefined) ?? null);
+        // v1.5: DB의 current_week 무시하고 started_at 기준 계산
+        const goalRow = goalRes.data as ActiveGoal | undefined;
+        const goalWithCalcWeek: ActiveGoal | null = goalRow
+          ? { ...goalRow, current_week: calculateCurrentWeek(goalRow.started_at) }
+          : null;
+        setGoal(goalWithCalcWeek);
         setLoading(false);
       } catch (e) {
         console.error(e);
@@ -256,8 +265,6 @@ function ProfileContent() {
   if (loading) return <LoadingScreen text="프로필을 불러오는 중..." />;
   if (!profile) return <LoadingScreen text={error ?? '프로필을 찾을 수 없어요.'} />;
 
-  const avatar = profile.nickname ? profile.nickname[0] : '👤';
-
   return (
     <div style={wrapStyle}>
       {/* 상단 바 */}
@@ -270,11 +277,8 @@ function ProfileContent() {
       </header>
 
       <main style={screenStyle}>
-        {/* 히어로 카드 */}
+        {/* 히어로 카드 (아바타 영역 제거 — v1.4) */}
         <section style={heroCardStyle}>
-          <div style={avatarStyle} aria-hidden="true">
-            {avatar}
-          </div>
           <div style={heroNameStyle}>{profile.nickname || '닉네임 미설정'}</div>
           <div style={heroEmailStyle}>{profile.email}</div>
           <div style={heroBadgeRowStyle}>
@@ -293,7 +297,7 @@ function ProfileContent() {
         {/* 강점 Top 5 섹션 */}
         <section style={sectionCardStyle}>
           <div style={sectionTitleStyle}>⭐ 내 강점 Top 5</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '0 16px 16px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '0 16px 14px' }}>
             {strengths.length === 0 ? (
               <span style={{ fontSize: '13px', color: 'var(--ink-mute)' }}>
                 아직 분석된 강점이 없어요
@@ -306,6 +310,18 @@ function ProfileContent() {
               ))
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => router.push('/onboarding/strengths?from=profile')}
+            style={menuItemStyle}
+          >
+            <span style={menuIconStyle}>✏️</span>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={menuTitleStyle}>강점 수정</div>
+              <div style={menuSubStyle}>다른 강점 5개로 다시 선택할 수 있어요</div>
+            </div>
+            <span style={{ color: 'var(--ink-mute)' }}>›</span>
+          </button>
         </section>
 
         {/* 커리어 방향 섹션 */}
@@ -650,20 +666,6 @@ const heroCardStyle: CSSProperties = {
   textAlign: 'center',
   marginBottom: '16px',
   boxShadow: '0 6px 20px -8px rgba(45,91,255,.4)',
-};
-
-const avatarStyle: CSSProperties = {
-  width: '76px',
-  height: '76px',
-  borderRadius: '50%',
-  background: 'rgba(255,255,255,.2)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '36px',
-  fontWeight: 800,
-  color: '#fff',
-  margin: '0 auto 12px',
 };
 
 const heroNameStyle: CSSProperties = {

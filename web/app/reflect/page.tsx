@@ -6,24 +6,30 @@ import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
-// 12 회고 — 데일리 메모 / 위클리 회고 (스펙 v1.2)
+// 12 회고 — 단일 회고 화면 (스펙 v1.5)
 //
-// 평일(월~금) → 데일리 모드 (daily_memos UPSERT)
-// 주말(토~일) → 위클리 모드 (weekly_retros INSERT + AI 코치 CTA 카드 노출)
+// 매일 동일한 화면. 평일/주말 분기 없음.
+// 구성: 데일리 메모(다중 누적, schema v0.8) + AI 코치 CTA 카드 (항상 노출)
+// v1.5: 주간 회고 입력 영역 제거. weekly_retros 저장 없이도
+//        AI 코치와 다음 주 액션 정하기 진입 가능.
 // ────────────────────────────────────────────────────────────
 
 interface ActiveGoal {
   id: string;
+  /** v1.5: started_at 기준 계산된 현재 주차 */
   current_week: number;
+  started_at: string | null;
 }
 
+// 데일리 메모 — schema v0.8 다중 누적 정책 (UNIQUE 제거)
 interface DailyMemo {
   id?: string;
-  memo_date: string; // YYYY-MM-DD
+  memo_date: string;        // YYYY-MM-DD
   content: string;
-  created_at?: string; // 누적 정렬용
+  created_at?: string;       // 시간 정렬용
 }
 
 const WEEKDAY_KO_FULL = ['일', '월', '화', '수', '목', '금', '토'];
@@ -54,17 +60,6 @@ function addDays(date: Date, n: number): Date {
   return d;
 }
 
-function isWeekend(date: Date): boolean {
-  const d = date.getDay();
-  return d === 0 || d === 6;
-}
-
-// 메모 정렬용: 월~일 순서로
-function dayOrderKey(dateISO: string): number {
-  const d = new Date(dateISO).getDay();
-  return d === 0 ? 7 : d; // 일=7로 끝에
-}
-
 // ────────────────────────────────────────────────────────────
 // 페이지 export
 // ────────────────────────────────────────────────────────────
@@ -83,22 +78,19 @@ function ReflectContent() {
 
   const [goal, setGoal] = useState<ActiveGoal | null>(null);
   const [actionTitle, setActionTitle] = useState<string>('');
-  const [memos, setMemos] = useState<DailyMemo[]>([]);
   const [doneCountWeek, setDoneCountWeek] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 데일리 모드 상태
+  // 데일리 메모 (v1.4 — 매일 다중 누적 + 리스트 표시)
+  const [memos, setMemos] = useState<DailyMemo[]>([]);
   const [memoText, setMemoText] = useState('');
   const [savingMemo, setSavingMemo] = useState(false);
 
-  // 위클리 모드 상태
-  const [retroText, setRetroText] = useState('');
-  const [savingRetro, setSavingRetro] = useState(false);
-  const [retroSaved, setRetroSaved] = useState(false);
+  // v1.5: 주간 회고 입력 영역 제거 — weekly_retros 저장 없이도
+  // AI 코치 CTA를 항상 노출. weekly_retros 관련 state/handler 모두 삭제.
 
   const today = new Date();
-  const isWeeklyMode = isWeekend(today);
   const monday = startOfWeekMonday(today);
   const sundayISO = formatLocalISO(addDays(monday, 6));
   const mondayISO = formatLocalISO(monday);
@@ -116,7 +108,8 @@ function ReflectContent() {
 
         const goalRes = await supabase
           .from('goals')
-          .select('id, current_week')
+          // v1.5: started_at 포함 — 주차 계산에 사용
+          .select('id, current_week, started_at')
           .eq('user_id', user.id)
           .eq('status', 'active')
           .limit(1)
@@ -128,19 +121,25 @@ function ReflectContent() {
           router.replace('/onboarding/action-items');
           return;
         }
-        const g = goalRes.data as ActiveGoal;
+        // v1.5: DB의 current_week 무시하고 started_at 기준 계산
+        const goalRow = goalRes.data as ActiveGoal;
+        const g: ActiveGoal = { ...goalRow, current_week: calculateCurrentWeek(goalRow.started_at) };
         setGoal(g);
 
-        const [actionRes, memoRes, completionRes] = await Promise.all([
+        // 2차 fetch: action_items + memos 병렬 (둘 다 action_item_id에 의존하지 않음)
+        const [actionRes, memoRes] = await Promise.all([
           supabase
             .from('action_items')
-            .select('title')
+            // id 포함 — action_completions 조회 FK로 사용
+            .select('id, title')
             .eq('user_id', user.id)
             .eq('goal_id', g.id)
             .eq('week_number', g.current_week)
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
+          // 이번 주 데일리 메모 (v1.4 — 다중 누적, schema v0.8)
+          // 정렬: memo_date 오름차순, 동일 날 created_at 오름차순 (시간 순)
           supabase
             .from('daily_memos')
             .select('id, memo_date, content, created_at')
@@ -148,37 +147,41 @@ function ReflectContent() {
             .eq('goal_id', g.id)
             .gte('memo_date', mondayISO)
             .lte('memo_date', sundayISO)
+            .order('memo_date', { ascending: true })
             .order('created_at', { ascending: true }),
-          supabase
-            .from('action_completions')
-            .select('completed_date')
-            .eq('user_id', user.id)
-            .eq('goal_id', g.id)
-            .gte('completed_date', mondayISO)
-            .lte('completed_date', sundayISO),
         ]);
 
         if (cancelled) return;
 
         if (actionRes.error) console.error('[12] action_items:', actionRes.error);
         if (memoRes.error) console.error('[12] daily_memos:', memoRes.error);
-        if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
 
         setActionTitle(actionRes.data?.title ?? '액션이 설정되지 않았어요');
+        setMemos((memoRes.data ?? []) as DailyMemo[]);
 
-        // 메모 정렬: 요일 순(월→일) 우선, 같은 날은 created_at 오름차순
-        const memoList = (memoRes.data ?? []) as DailyMemo[];
-        memoList.sort((a, b) => {
-          const dayDiff = dayOrderKey(a.memo_date) - dayOrderKey(b.memo_date);
-          if (dayDiff !== 0) return dayDiff;
-          return (a.created_at ?? '').localeCompare(b.created_at ?? '');
-        });
-        setMemos(memoList);
+        // 3차 fetch: action_completions를 **현재 주차 action_item.id로 필터**
+        // (BUGFIX: 코칭으로 W1→W2 전환 후 같은 주 안의 W1 체크가 잘못 집계되던 문제 해결)
+        const currentActionId = actionRes.data?.id as string | undefined;
+        if (currentActionId) {
+          const completionRes = await supabase
+            .from('action_completions')
+            .select('completed_date')
+            .eq('user_id', user.id)
+            .eq('action_item_id', currentActionId)
+            .gte('completed_date', mondayISO)
+            .lte('completed_date', sundayISO);
 
-        // 매번 빈 textarea로 시작 (누적 모드 — 프리필 제거)
-        setMemoText('');
+          if (cancelled) return;
+          if (completionRes.error) console.error('[12] action_completions:', completionRes.error);
+          setDoneCountWeek((completionRes.data ?? []).length);
+        } else {
+          // 현재 주차 action_item 없음 → 카운트 0
+          setDoneCountWeek(0);
+        }
 
-        setDoneCountWeek((completionRes.data ?? []).length);
+        // v1.5: weekly_retros 로드 제거 — 회고 입력 영역 자체가 없어졌으므로
+        // 기존 회고 프리필 / retroSaved 동기화 로직 모두 불필요
+
         setLoading(false);
       } catch (e) {
         console.error(e);
@@ -194,21 +197,19 @@ function ReflectContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, router]);
 
-  // ── 데일리 메모 저장 (누적) ───────────────────────────────
+  // ── 데일리 메모 저장 (v1.4 — 다중 누적, schema v0.8) ──────
   const handleSaveMemo = useCallback(async () => {
     if (!goal || savingMemo) return;
     const trimmed = memoText.trim();
     if (!trimmed) return;
 
     setSavingMemo(true);
+    setError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
       const todayISO = formatLocalISO(today);
-      const nowISO = new Date().toISOString();
-
-      // INSERT — 같은 날에도 여러 메모 누적
       const { data: inserted, error: insErr } = await supabase
         .from('daily_memos')
         .insert({
@@ -222,7 +223,8 @@ function ReflectContent() {
         .maybeSingle();
       if (insErr) throw insErr;
 
-      // 로컬 상태에 새 메모 append
+      // 로컬 리스트에 즉시 append (낙관적 + 응답 데이터로 정확화)
+      const nowISO = new Date().toISOString();
       const newMemo: DailyMemo = inserted ?? {
         memo_date: todayISO,
         content: trimmed,
@@ -231,8 +233,8 @@ function ReflectContent() {
       setMemos((prev) => {
         const next = [...prev, newMemo];
         next.sort((a, b) => {
-          const dayDiff = dayOrderKey(a.memo_date) - dayOrderKey(b.memo_date);
-          if (dayDiff !== 0) return dayDiff;
+          const dateDiff = a.memo_date.localeCompare(b.memo_date);
+          if (dateDiff !== 0) return dateDiff;
           return (a.created_at ?? '').localeCompare(b.created_at ?? '');
         });
         return next;
@@ -240,47 +242,16 @@ function ReflectContent() {
       setMemoText('');
     } catch (e) {
       console.error('[12] save memo:', e);
-      setError('메모 저장에 실패했어요. 다시 시도해주세요.');
+      const err = e as { message?: string };
+      const detail = err?.message ? ` (${err.message})` : '';
+      setError(`메모 저장에 실패했어요. 다시 시도해주세요.${detail}`);
     } finally {
       setSavingMemo(false);
     }
   }, [goal, memoText, savingMemo, today]);
 
-  // ── 위클리 회고 저장 ──────────────────────────────────────
-  const handleSaveRetro = useCallback(async () => {
-    if (!goal || savingRetro) return;
-    const trimmed = retroText.trim();
-    if (!trimmed) return;
-
-    setSavingRetro(true);
-    setError(null);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요해요.');
-
-      const todayISO = formatLocalISO(today);
-      const { error: insErr } = await supabase
-        .from('weekly_retros')
-        .insert({
-          user_id: user.id,
-          goal_id: goal.id,
-          week_number: goal.current_week,
-          retro_date: todayISO,
-          summary_one_line: trimmed,
-          completion_count: doneCountWeek,
-          target_count: 7,
-        });
-      if (insErr) throw insErr;
-
-      // 저장 완료 표시 + CTA 노출
-      setRetroSaved(true);
-    } catch (e) {
-      console.error('[12] save retro:', e);
-      setError('회고 저장에 실패했어요. 다시 시도해주세요.');
-    } finally {
-      setSavingRetro(false);
-    }
-  }, [goal, retroText, savingRetro, today, doneCountWeek]);
+  // v1.5: handleSaveRetro 제거 — 주간 회고 입력 영역 자체가 없어짐.
+  // weekly_retros INSERT 없이도 AI 코치 CTA 진입 가능 (13 페이지의 weekly_retros 의존성은 nullable로 처리됨).
 
   // ── 렌더 분기 ─────────────────────────────────────────────
   if (!ready || loading) return <LoadingScreen text="회고를 준비하고 있어요..." />;
@@ -298,33 +269,19 @@ function ReflectContent() {
       </header>
 
       <main style={screenStyle}>
-        {isWeeklyMode ? (
-          <WeeklyMode
-            goal={goal}
-            actionTitle={actionTitle}
-            memos={memos}
-            doneCountWeek={doneCountWeek}
-            retroText={retroText}
-            setRetroText={setRetroText}
-            savingRetro={savingRetro}
-            retroSaved={retroSaved}
-            onSaveRetro={handleSaveRetro}
-            onGoCoach={() => router.push('/reflect/coach')}
-            today={today}
-            error={error}
-          />
-        ) : (
-          <DailyMode
-            actionTitle={actionTitle}
-            memos={memos}
-            memoText={memoText}
-            setMemoText={setMemoText}
-            savingMemo={savingMemo}
-            onSaveMemo={handleSaveMemo}
-            today={today}
-            error={error}
-          />
-        )}
+        <ReflectScreen
+          goal={goal}
+          actionTitle={actionTitle}
+          doneCountWeek={doneCountWeek}
+          memos={memos}
+          memoText={memoText}
+          setMemoText={setMemoText}
+          savingMemo={savingMemo}
+          onSaveMemo={handleSaveMemo}
+          onGoCoach={() => router.push('/reflect/coach')}
+          today={today}
+          error={error}
+        />
       </main>
 
       <TabBar active="reflect" />
@@ -333,61 +290,76 @@ function ReflectContent() {
 }
 
 // ────────────────────────────────────────────────────────────
-// 데일리 모드 (평일)
+// 회고 단일 화면 (v1.5 — 데일리 메모(다중) + AI 코치 CTA 항상 노출)
+// 주간 회고 입력 영역 제거됨 (v1.4 → v1.5).
 // ────────────────────────────────────────────────────────────
 
-function DailyMode({
+function ReflectScreen({
+  goal,
   actionTitle,
+  doneCountWeek,
   memos,
   memoText,
   setMemoText,
   savingMemo,
   onSaveMemo,
+  onGoCoach,
   today,
   error,
 }: {
+  goal: ActiveGoal;
   actionTitle: string;
+  doneCountWeek: number;
   memos: DailyMemo[];
   memoText: string;
   setMemoText: (v: string) => void;
   savingMemo: boolean;
   onSaveMemo: () => void;
+  onGoCoach: () => void;
   today: Date;
   error: string | null;
 }) {
   return (
     <div>
       <div style={subtitleStyle}>
-        매일의 메모 · {WEEKDAY_KO_FULL[today.getDay()]}요일
+        Week {goal.current_week} 회고 · {WEEKDAY_KO_FULL[today.getDay()]}요일
       </div>
       <h1 style={titleStyle}>
-        오늘은 <em style={emAccent}>어땠어요?</em> 🌱
+        한 주를 <em style={emAccent}>돌아봐요</em> 🌙
       </h1>
 
-      {/* 안내 문구 카드 */}
+      {/* 안내 문구 */}
       <div style={noticeCardStyle}>
-        <div style={noticeHeaderStyle}>💡 오늘 기록이 주말 회고의 재료가 돼요</div>
+        <div style={noticeHeaderStyle}>
+          💡 오늘의 느낌을 짧게 기록하고, 다음 주는 AI 코치와 함께 정해요
+        </div>
         <div style={noticeBodyStyle}>
-          오늘 액션을 실행하면서 어떤 느낌이었는지 짧게 기록해두세요. 잘 됐든 안
-          됐든, 솔직한 한 줄이면 충분해요.
+          오늘 액션을 실행하면서 느낀 점을 메모로 남겨두세요. 한 주를 마무리할
+          때쯤 AI 코치와 다음 주 액션을 정해보세요.
         </div>
       </div>
 
-      {/* 이번 주 액션 표시 */}
-      <div style={actionBoxStyle}>
+      {/* 이번 주 액션 요약 카드 */}
+      <div style={weeklyActionCardStyle}>
         <div style={actionLabelStyle}>이번 주 액션</div>
-        <div style={actionTextStyle}>{actionTitle}</div>
+        <div style={{ fontSize: '17px', fontWeight: 500, marginBottom: '10px', lineHeight: 1.4 }}>
+          {actionTitle}
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <span style={statChipBg}>목표 7회</span>
+          <span style={statChipAccent}>실제 {doneCountWeek}회</span>
+        </div>
       </div>
 
-      {/* 메모 입력 */}
+      {/* 데일리 메모 입력 (다중 누적) */}
       <div style={{ marginBottom: '6px' }}>
         <label style={formLabelStyle}>오늘의 메모</label>
         <textarea
           value={memoText}
           onChange={(e) => setMemoText(e.target.value)}
           placeholder="예: 오늘은 30분 읽고 3줄 메모 남김."
-          rows={4}
-          style={textareaStyle}
+          rows={3}
+          style={{ ...textareaStyle, minHeight: '80px' }}
         />
       </div>
 
@@ -404,26 +376,57 @@ function DailyMode({
         {savingMemo ? '저장 중...' : '메모 저장'}
       </button>
 
+      {/* 이번 주 메모 리스트 (1개 이상일 때만) */}
+      {memos.length > 0 && (
+        <div style={{ marginTop: '28px' }}>
+          <div style={memoSectionTitleStyle}>이번 주 메모 · {memos.length}개</div>
+          <div>
+            {memos.map((m, idx) => (
+              <MemoRow key={m.id ?? `${m.memo_date}-${idx}`} memo={m} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {error && (
         <div role="alert" style={errorAlertStyle}>
           {error}
         </div>
       )}
 
-      {/* 이번 주 메모 리스트 */}
-      {memos.length > 0 && (
-        <div style={{ marginTop: '28px' }}>
-          <div style={memoSectionTitleStyle}>이번 주 메모 · {memos.length}개</div>
-          <div>
-            {memos.map((m) => (
-              <MemoRow key={m.memo_date} memo={m} />
-            ))}
+      {/* AI 코치 CTA 카드 (v1.5 — 회고 저장 조건 제거, 항상 노출) */}
+      <div style={{ marginTop: '28px' }}>
+        <div style={dividerLineStyle} aria-hidden="true" />
+        <div style={ctaLabelStyle}>다음 주 준비</div>
+        <button
+          type="button"
+          onClick={onGoCoach}
+          style={coachCtaCardStyle}
+          aria-label="AI 코치와 다음 주 액션 정하기"
+        >
+          <div style={coachIconStyle}>🤖</div>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--ink)' }}>
+              AI 코치와 다음 주 액션 정하기
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
+              이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요. (주말 시행 권장)
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={tagAccentTintStyle}>✦ 강점 기반 추천</span>
+              <span style={tagBgSoftStyle}>약 3–5분 소요</span>
+            </div>
           </div>
-        </div>
-      )}
+          <span style={{ fontSize: '20px', color: 'var(--accent)' }}>›</span>
+        </button>
+      </div>
     </div>
   );
 }
+
+// ────────────────────────────────────────────────────────────
+// 메모 row (이번 주 메모 리스트 아이템)
+// ────────────────────────────────────────────────────────────
 
 function MemoRow({ memo }: { memo: DailyMemo }) {
   const date = new Date(memo.memo_date);
@@ -445,169 +448,6 @@ function MemoRow({ memo }: { memo: DailyMemo }) {
         )}
       </div>
       <div style={memoContentStyle}>{memo.content}</div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
-// 위클리 모드 (주말)
-// ────────────────────────────────────────────────────────────
-
-function WeeklyMode({
-  goal,
-  actionTitle,
-  memos,
-  doneCountWeek,
-  retroText,
-  setRetroText,
-  savingRetro,
-  retroSaved,
-  onSaveRetro,
-  onGoCoach,
-  today,
-  error,
-}: {
-  goal: ActiveGoal;
-  actionTitle: string;
-  memos: DailyMemo[];
-  doneCountWeek: number;
-  retroText: string;
-  setRetroText: (v: string) => void;
-  savingRetro: boolean;
-  retroSaved: boolean;
-  onSaveRetro: () => void;
-  onGoCoach: () => void;
-  today: Date;
-  error: string | null;
-}) {
-  return (
-    <div>
-      <div style={subtitleStyle}>
-        Week {goal.current_week} 위클리 회고 · {WEEKDAY_KO_FULL[today.getDay()]}요일
-      </div>
-      <h1 style={titleStyle}>
-        한 주를 <em style={emAccent}>마감해요</em> 🌙
-      </h1>
-
-      {/* 안내 문구 */}
-      <div style={noticeCardStyle}>
-        <div style={noticeHeaderStyle}>
-          💡 이번 주를 돌아보고, 다음 주 액션도 함께 정해요
-        </div>
-        <div style={noticeBodyStyle}>
-          잘 됐든 안 됐든, 그 이유를 들여다보는 것이 다음 주를 바꿔요. 평일 메모를
-          참고해서 한 주를 솔직하게 돌아보고, 다음 주에 이어갈 액션까지 정해보세요.
-        </div>
-      </div>
-
-      {/* 이번 주 평일 메모 요약 */}
-      <div style={weeklyMemoSummaryStyle}>
-        <div style={weeklyMemoLabelStyle}>✏️ 이번 주 메모</div>
-        {memos.length === 0 ? (
-          <div style={{ fontSize: '13px', color: 'var(--ink-mute)', lineHeight: 1.55 }}>
-            평일 메모가 없어요. 데일리 회고 탭에서 기록해보세요.
-          </div>
-        ) : (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {memos.map((m) => (
-                <WeeklyMemoRow key={m.memo_date} memo={m} />
-              ))}
-            </div>
-            <div style={weeklyMemoCountStyle}>총 {memos.length}개의 메모</div>
-          </>
-        )}
-      </div>
-
-      {/* 이번 주 액션 요약 카드 */}
-      <div style={weeklyActionCardStyle}>
-        <div style={actionLabelStyle}>이번 주 액션</div>
-        <div style={{ fontSize: '17px', fontWeight: 500, marginBottom: '10px', lineHeight: 1.4 }}>
-          {actionTitle}
-        </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <span style={statChipBg}>목표 7회</span>
-          <span style={statChipAccent}>실제 {doneCountWeek}회</span>
-        </div>
-      </div>
-
-      {/* 위클리 회고 입력 */}
-      <div style={{ marginBottom: '6px' }}>
-        <label style={formLabelStyle}>한 주를 한 줄로 표현하면</label>
-        <textarea
-          value={retroText}
-          onChange={(e) => setRetroText(e.target.value)}
-          placeholder="예: 야근이 많아서 1번밖에 못했어요."
-          rows={3}
-          style={{ ...textareaStyle, minHeight: '80px' }}
-          disabled={retroSaved}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={onSaveRetro}
-        disabled={savingRetro || !retroText.trim() || retroSaved}
-        style={{
-          ...accentBtnStyle,
-          opacity: savingRetro || !retroText.trim() || retroSaved ? 0.6 : 1,
-          cursor:
-            savingRetro || !retroText.trim() || retroSaved ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {retroSaved ? '✓ 저장 완료' : savingRetro ? '저장 중...' : '회고 저장하기'}
-      </button>
-
-      <div style={retroNoticeStyle}>
-        위클리 회고를 저장하면, 다음 주 액션을 AI 코치와 함께 정해볼 수 있어요.
-      </div>
-
-      {error && (
-        <div role="alert" style={errorAlertStyle}>
-          {error}
-        </div>
-      )}
-
-      {/* AI 코치 CTA 카드 (회고 저장 후 노출) */}
-      {retroSaved && (
-        <div style={{ marginTop: '20px' }}>
-          <div style={dividerLineStyle} aria-hidden="true" />
-          <div style={ctaLabelStyle}>다음 주 준비</div>
-          <button
-            type="button"
-            onClick={onGoCoach}
-            style={coachCtaCardStyle}
-            aria-label="AI 코치와 다음 주 액션 정하기"
-          >
-            <div style={coachIconStyle}>🤖</div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--ink)' }}>
-                AI 코치와 다음 주 액션 정하기
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
-                이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요.
-              </div>
-              <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={tagAccentTintStyle}>✦ 강점 기반 추천</span>
-                <span style={tagBgSoftStyle}>약 3–5분 소요</span>
-              </div>
-            </div>
-            <span style={{ fontSize: '20px', color: 'var(--accent)' }}>›</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WeeklyMemoRow({ memo }: { memo: DailyMemo }) {
-  const d = new Date(memo.memo_date);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-      <span style={weeklyMemoDayChipStyle}>{WEEKDAY_KO_FULL[d.getDay()]}</span>
-      <span style={{ fontSize: '13px', color: 'var(--ink)', lineHeight: 1.55, flex: 1 }}>
-        {memo.content}
-      </span>
     </div>
   );
 }
@@ -723,14 +563,6 @@ const noticeBodyStyle: CSSProperties = {
   lineHeight: 1.6,
 };
 
-const actionBoxStyle: CSSProperties = {
-  background: 'var(--bg-soft)',
-  border: '1px dashed var(--line-strong)',
-  borderRadius: '18px',
-  padding: '16px 18px',
-  marginBottom: '18px',
-};
-
 const actionLabelStyle: CSSProperties = {
   fontSize: '11px',
   letterSpacing: '.1em',
@@ -738,13 +570,6 @@ const actionLabelStyle: CSSProperties = {
   textTransform: 'uppercase',
   marginBottom: '6px',
   fontWeight: 500,
-};
-
-const actionTextStyle: CSSProperties = {
-  fontSize: '16px',
-  fontWeight: 500,
-  lineHeight: 1.4,
-  color: 'var(--ink)',
 };
 
 const formLabelStyle: CSSProperties = {
@@ -785,30 +610,7 @@ const inkBtnStyle: CSSProperties = {
   transition: 'opacity .15s',
 };
 
-const accentBtnStyle: CSSProperties = {
-  width: '100%',
-  padding: '14px',
-  background: 'var(--accent)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: '12px',
-  fontSize: '15px',
-  fontWeight: 700,
-  fontFamily: 'inherit',
-  transition: 'opacity .15s',
-  boxShadow: '0 4px 14px -4px rgba(45,91,255,.3)',
-};
-
-const errorAlertStyle: CSSProperties = {
-  marginTop: '12px',
-  padding: '10px 14px',
-  background: '#FEF2F2',
-  border: '1.5px solid #FECACA',
-  borderRadius: '10px',
-  fontSize: '13px',
-  color: 'var(--danger)',
-};
-
+// 데일리 메모 리스트 스타일 (v1.4)
 const memoSectionTitleStyle: CSSProperties = {
   fontSize: '13px',
   fontWeight: 700,
@@ -818,7 +620,7 @@ const memoSectionTitleStyle: CSSProperties = {
 
 const memoRowStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '36px 1fr',
+  gridTemplateColumns: '40px 1fr',
   gap: '12px',
   padding: '12px 0',
   borderBottom: '1px solid var(--line)',
@@ -833,7 +635,7 @@ const memoDayColStyle: CSSProperties = {
 const memoDayLabelStyle: CSSProperties = {
   fontSize: '13px',
   fontWeight: 700,
-  color: 'var(--accent-deep)',
+  color: 'var(--accent)',
 };
 
 const memoDateStyle: CSSProperties = {
@@ -849,41 +651,14 @@ const memoContentStyle: CSSProperties = {
   whiteSpace: 'pre-wrap',
 };
 
-const weeklyMemoSummaryStyle: CSSProperties = {
-  background: 'var(--bg-soft)',
-  border: '1px solid var(--line)',
-  borderRadius: '14px',
-  padding: '14px 16px',
-  marginBottom: '14px',
-};
-
-const weeklyMemoLabelStyle: CSSProperties = {
-  fontSize: '11px',
-  letterSpacing: '.08em',
-  color: 'var(--ink-mute)',
-  textTransform: 'uppercase',
-  marginBottom: '10px',
-  fontWeight: 700,
-};
-
-const weeklyMemoDayChipStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  background: 'var(--accent-light)',
-  color: 'var(--accent)',
-  fontSize: '11px',
-  fontWeight: 700,
-  padding: '2px 8px',
-  borderRadius: '999px',
-  flexShrink: 0,
-  marginTop: '2px',
-};
-
-const weeklyMemoCountStyle: CSSProperties = {
-  marginTop: '10px',
-  fontSize: '11px',
-  color: 'var(--ink-mute)',
-  textAlign: 'right',
+const errorAlertStyle: CSSProperties = {
+  marginTop: '12px',
+  padding: '10px 14px',
+  background: '#FEF2F2',
+  border: '1.5px solid #FECACA',
+  borderRadius: '10px',
+  fontSize: '13px',
+  color: 'var(--danger)',
 };
 
 const weeklyActionCardStyle: CSSProperties = {
@@ -910,14 +685,6 @@ const statChipAccent: CSSProperties = {
   background: 'var(--accent-tint)',
   color: 'var(--accent)',
   borderRadius: '999px',
-};
-
-const retroNoticeStyle: CSSProperties = {
-  marginTop: '10px',
-  fontSize: '12px',
-  color: 'var(--ink-mute)',
-  textAlign: 'center',
-  lineHeight: 1.55,
 };
 
 const dividerLineStyle: CSSProperties = {

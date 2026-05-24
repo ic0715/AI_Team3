@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
 // 13 회고 AI 코칭 — 채팅 + 다음 주 액션 정하기 (스펙 v1.1)
@@ -14,13 +15,13 @@ import { supabase } from '@/lib/supabase/client';
 // ────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-// 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
+// 🤖 AI 연동 (06 v1.3)
 //
-// 현재: mock 구현 (Q1~Q4 시나리오 순차 응답 + 정적 요약)
-// 교체: sendCoachMessage / finalizeCoaching 함수 본문을 Claude API 호출로 변경
+// sendCoachMessage    → POST /api/reflect-coach/chat
+// finalizeCoaching    → POST /api/reflect-coach/finalize (AI 추출만) + 클라이언트가 DB INSERT
 //
-// 자세한 명세는 docs/HANDOFF_AI.md (Phase 1.7) 참조 — 추가 예정.
-// 본 화면의 AI 동작은 docs/ai_prompt/06_reflect_coaching.md 를 구현 기준으로 따름.
+// 구현 기준: docs/ai_prompt/06_reflect_coaching.md
+// 품질 기법: Prompt Caching + Temperature 분리 (대화 0.7 / 추출 0) + 🔴 가드레일
 // ─────────────────────────────────────────────────────────────
 
 interface Message {
@@ -34,7 +35,17 @@ interface CoachContext {
   goal: { id: string; goal_title: string; current_week: number; competency_code: string };
   topStrength: string | null;
   weeklyRetro: string;
+  weeklyRetroId: string | null; // v0.8: coaching_insights.weekly_retro_id (FK)
   doneCountWeek: number;
+}
+
+// v0.8: 11 홈 12주 타임라인 done 카드의 badge/comment 산출 (완료율 기반)
+// 스펙 _post_mvp_v2/11_home.md §6 참조
+function computeBadgeAndComment(doneCount: number): { badge: string; comment: string } {
+  if (doneCount >= 7) return { badge: '🔥', comment: '완벽한 한 주!' };
+  if (doneCount >= 5) return { badge: '👍', comment: '꾸준함이 쌓이고 있어요' };
+  if (doneCount >= 3) return { badge: '😊', comment: '절반을 해냈어요' };
+  return { badge: '🌱', comment: '다음 주를 기대해요' };
 }
 
 interface CoachMessageParams {
@@ -57,95 +68,86 @@ interface CoachingResult {
   strengthLink: string;
 }
 
-// ── 🤖 mock — 코치 메시지 (Q1~Q4 시나리오) ─────────────────────
+// ── 🤖 코치 메시지 — POST /api/reflect-coach/chat ───────────────
 async function sendCoachMessage(params: CoachMessageParams): Promise<CoachMessageResult> {
-  const { questionIndex, isRenegotiate, context } = params;
-  await new Promise((r) => setTimeout(r, 900));
-
-  if (isRenegotiate) {
-    return {
-      content: '어떤 액션이 더 잘 맞을 것 같아요? 자유롭게 말씀해주세요.',
-      nextQuestionIndex: questionIndex,
-      isComplete: false,
-    };
+  const res = await fetch('/api/reflect-coach/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`reflect-coach/chat ${res.status}: ${errBody}`);
   }
-
-  // Q2: 강점 언급 / Q3: 다음 주 방향 / Q4: 액션 제안 + 확정
-  const strength = context.topStrength ?? '집중';
-  const nextIndex = questionIndex + 1;
-
-  const QUESTIONS: Record<number, string> = {
-    2: `이번 주 회고를 보니 ${context.doneCountWeek}/7로 진행하셨네요. 그 중 가장 인상 깊었던 한 가지는 뭐였어요?`,
-    3: `그 부분에서 강점 「${strength}」이(가) 작동한 것 같아요. 다음 주에는 어떤 방향으로 이어가고 싶으세요?`,
-    4: `좋아요. 그 방향이라면 "${context.goal.goal_title}" 흐름에서 한 단계 더 깊게 가볼 수 있어요. 다음 주에 ${nextIndex - 3}회 정도 실행 가능한 작은 액션 하나를 떠올려볼까요? 이 액션으로 다음 주 시작해볼까요?`,
-  };
-
-  if (questionIndex >= 4) {
-    return {
-      content: '좋아요, 그 액션으로 다음 주 정리할게요. 잠시만 기다려주세요...',
-      nextQuestionIndex: 5,
-      isComplete: true,
-    };
-  }
-
-  return {
-    content: QUESTIONS[nextIndex] ?? '이야기 잘 들었어요.',
-    nextQuestionIndex: nextIndex,
-    isComplete: false,
-  };
+  return res.json();
 }
 
-// ── 🤖 mock — 종료 시 coaching_insights + action_items INSERT ──
+// ── 🤖 종료 시: AI 추출 (서버) + coaching_insights/action_items INSERT (클라이언트) ──
 async function finalizeCoaching(
   history: Message[],
   context: CoachContext,
   userId: string,
 ): Promise<CoachingResult> {
-  await new Promise((r) => setTimeout(r, 1500));
-
-  // 사용자가 마지막에 말한 내용을 next_action_title로 활용 (mock 단순화)
-  const lastUserMsg = [...history].reverse().find((m) => m.role === 'user');
-  const nextActionTitle =
-    lastUserMsg?.content?.slice(0, 50) ??
-    `${context.goal.goal_title} — 다음 주 첫 실행`;
-
-  const result: CoachingResult = {
-    topic: context.goal.goal_title,
-    patternInsight:
-      context.doneCountWeek >= 5
-        ? '꾸준함이 쌓이고 있어요. 다음 주는 깊이를 한 단계 더 시도해봐도 좋아요.'
-        : context.doneCountWeek >= 2
-          ? '실행과 회피의 패턴이 보여요. 다음 주는 트리거를 명확히 정해두면 좋겠어요.'
-          : '실행이 어려웠던 한 주였네요. 다음 주는 더 작은 단위로 시작해볼까요?',
-    nextActionTitle,
-    strengthLink: context.topStrength ?? '집중',
+  // 1) AI 추출 (06 §5.2)
+  const res = await fetch('/api/reflect-coach/finalize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: history, context }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`reflect-coach/finalize ${res.status}: ${errBody}`);
+  }
+  const ai = (await res.json()) as {
+    topic: string;
+    pattern_insight: string;
+    next_action_title: string;
+    next_action_reason: string;
+    strength_link: string;
   };
 
-  // coaching_insights INSERT
+  const result: CoachingResult = {
+    topic: ai.topic,
+    patternInsight: ai.pattern_insight || `${context.goal.goal_title} — 이번 주 코칭 정리`,
+    nextActionTitle: ai.next_action_title,
+    strengthLink: ai.strength_link || (context.topStrength ?? ''),
+  };
+
+  // 2) v0.8: 완료율 기반 badge/comment (11 홈 타임라인 done 카드용)
+  const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
+
+  // 3) coaching_insights INSERT — schema v0.8/v0.9
   const { error: insightErr } = await supabase.from('coaching_insights').insert({
     user_id: userId,
     goal_id: context.goal.id,
+    weekly_retro_id: context.weeklyRetroId,
     week_number: context.goal.current_week,
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
+    next_action_reason: ai.next_action_reason || result.patternInsight,
     strength_link: result.strengthLink,
+    badge,
+    comment,
   });
   if (insightErr) {
     console.error('[13] coaching_insights INSERT:', insightErr);
   }
 
-  // action_items INSERT (다음 주차)
-  // strength_link는 schema 없을 수 있어 INSERT에서 제외
+  // 4) action_items INSERT (다음 주차)
+  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준 계산값 사용. 12주 클램프.
+  const TOTAL_WEEKS = 12;
+  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
   const { error: actionErr } = await supabase.from('action_items').insert({
     user_id: userId,
     goal_id: context.goal.id,
-    week_number: context.goal.current_week + 1,
+    week_number: nextWeek,
     title: result.nextActionTitle,
-    description: result.patternInsight,
+    description: ai.next_action_reason || result.patternInsight,
     tags: [],
     is_custom: false,
     source_seed_id: null,
+    strength_link: result.strengthLink,
   });
   if (actionErr) {
     console.error('[13] action_items INSERT:', actionErr);
@@ -155,7 +157,6 @@ async function finalizeCoaching(
 }
 // ─────────────────────────────────────────────────────────────
 
-const TOTAL_Q = 4;
 const CONFIRM_WORDS = ['확정', '좋아요', '네', '응', '맞아', 'OK', 'ok', '괜찮', '이걸로'];
 
 function isConfirmation(text: string): boolean {
@@ -210,7 +211,7 @@ function CoachContent() {
         if (cancelled) return;
         setUserId(user.id);
 
-        // active goal + this week's weekly_retros 필수
+        // 1차: profile + goal(+started_at) + strengths
         const [profileRes, goalRes, strengthRes] = await Promise.all([
           supabase
             .from('profiles')
@@ -219,7 +220,8 @@ function CoachContent() {
             .maybeSingle(),
           supabase
             .from('goals')
-            .select('id, goal_title, current_week, competency_code')
+            // v1.5: started_at 포함 — 주차 계산에 사용
+            .select('id, goal_title, current_week, competency_code, started_at')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .limit(1)
@@ -239,25 +241,37 @@ function CoachContent() {
           return;
         }
 
-        const goal = goalRes.data as CoachContext['goal'];
+        const goalRow = goalRes.data as { id: string; goal_title: string; current_week: number; competency_code: string; started_at: string | null };
+        // v1.5: started_at 기준 캘린더 날짜로 주차 계산 (DB의 current_week 무시)
+        const calculatedWeek = calculateCurrentWeek(goalRow.started_at);
+        const goal: CoachContext['goal'] = {
+          id: goalRow.id,
+          goal_title: goalRow.goal_title,
+          current_week: calculatedWeek,
+          competency_code: goalRow.competency_code,
+        };
 
-        // weekly_retros for this week + action_completions 병렬
-        const [retroRes, completionRes] = await Promise.all([
+        // 2차: 현재 주차 action_item + weekly_retros 병렬
+        const [actionItemRes, retroRes] = await Promise.all([
           supabase
-            .from('weekly_retros')
-            .select('summary_one_line, completion_count, target_count')
+            .from('action_items')
+            .select('id')
             .eq('user_id', user.id)
             .eq('goal_id', goal.id)
-            .eq('week_number', goal.current_week)
-            .order('retro_date', { ascending: false })
+            .eq('week_number', calculatedWeek)
+            .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle(),
           supabase
-            .from('action_completions')
-            .select('completed_date')
+            .from('weekly_retros')
+            // v0.8: id 포함 — coaching_insights.weekly_retro_id (FK) 저장용
+            .select('id, summary_one_line, completion_count, target_count')
             .eq('user_id', user.id)
             .eq('goal_id', goal.id)
-            .eq('week_number', goal.current_week),
+            .eq('week_number', calculatedWeek)
+            .order('retro_date', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
         if (cancelled) return;
@@ -269,15 +283,28 @@ function CoachContent() {
         //   return;
         // }
 
+        // 3차: action_completions를 action_item_id로 필터 (이번 주 완료 카운트)
+        let doneFromCompletions = 0;
+        if (actionItemRes.data?.id) {
+          const completionRes = await supabase
+            .from('action_completions')
+            .select('completed_date')
+            .eq('user_id', user.id)
+            .eq('action_item_id', actionItemRes.data.id as string);
+          if (cancelled) return;
+          doneFromCompletions = (completionRes.data ?? []).length;
+        }
+
         const strengths = (strengthRes.data?.strengths as Array<{ name_ko: string }> | undefined) ?? [];
         const ctx: CoachContext = {
           nickname: profileRes.data?.nickname ?? '친구',
           goal,
           topStrength: strengths[0]?.name_ko ?? null,
           weeklyRetro: retroRes.data?.summary_one_line ?? '',
+          weeklyRetroId: (retroRes.data?.id as string | undefined) ?? null,
           doneCountWeek:
             (retroRes.data?.completion_count as number | undefined) ??
-            (completionRes.data?.length ?? 0),
+            doneFromCompletions,
         };
         setContext(ctx);
 
@@ -286,7 +313,7 @@ function CoachContent() {
         const openingMessage: Message = {
           id: crypto.randomUUID(),
           role: 'coach',
-          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${ctx.goal.current_week} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
+          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${calculatedWeek} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
         };
         setMessages([openingMessage]);
         setLoadingContext(false);
@@ -397,7 +424,6 @@ function CoachContent() {
   if (loadingContext) return <LoadingScreen text="코치를 준비하고 있어요..." />;
   if (!context) return <LoadingScreen text={contextError ?? '컨텍스트가 없어요.'} />;
 
-  const progressRatio = Math.min(questionIndex / TOTAL_Q, 1);
   const showSummary = isComplete && !!summary && !isRenegotiate;
 
   return (
@@ -416,23 +442,6 @@ function CoachContent() {
         <span style={{ width: '40px' }} />
       </header>
 
-      {/* 진행률 행 — 질문 N/4 + 바 + % (08 스타일) */}
-      {!showSummary && (
-        <div style={progressRowStyle}>
-          <span style={progressLabelStyle}>
-            질문 <strong style={{ color: 'var(--accent)', fontWeight: 700 }}>{Math.min(questionIndex, TOTAL_Q)}</strong> / {TOTAL_Q}
-          </span>
-          <div style={progressBarTrackStyle}>
-            <div
-              style={{
-                ...progressBarFillNewStyle,
-                width: `${progressRatio * 100}%`,
-              }}
-            />
-          </div>
-          <span style={progressPctStyle}>{Math.round(progressRatio * 100)}%</span>
-        </div>
-      )}
 
       {/* 채팅 영역 또는 요약 화면 */}
       {showSummary ? (
@@ -672,54 +681,6 @@ const topbarTitleStyle: CSSProperties = {
   color: 'var(--ink)',
   textAlign: 'center',
   letterSpacing: '-.02em',
-};
-
-const topbarQStyle: CSSProperties = {
-  fontSize: '13px',
-  fontWeight: 700,
-  color: 'var(--ink-mute)',
-  textAlign: 'right',
-};
-
-// 진행률 행 (08 인터뷰 스타일)
-const progressRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '10px 20px 12px',
-  background: 'var(--surface)',
-  borderBottom: '1px solid var(--line)',
-  flexShrink: 0,
-};
-
-const progressLabelStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-muted)',
-  whiteSpace: 'nowrap',
-};
-
-const progressBarTrackStyle: CSSProperties = {
-  flex: 1,
-  height: '6px',
-  background: 'var(--line)',
-  borderRadius: '999px',
-  overflow: 'hidden',
-};
-
-const progressBarFillNewStyle: CSSProperties = {
-  height: '100%',
-  background: 'var(--accent)',
-  borderRadius: '999px',
-  transition: 'width .4s ease',
-};
-
-const progressPctStyle: CSSProperties = {
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-secondary)',
-  minWidth: '32px',
-  textAlign: 'right',
 };
 
 const chatScrollStyle: CSSProperties = {

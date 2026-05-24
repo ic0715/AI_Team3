@@ -3,38 +3,31 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import type { CareerInterviewKeyInsights, SessionDurationChoice } from '@/lib/types/database';
+import {
+  buildRunningStatePrefix,
+  classifySessionDuration,
+  detectCoachClosing,
+  detectCrisisRed,
+  detectUserExit,
+  inferPhase,
+  type Phase,
+  type SessionDurationLabel,
+} from '@/lib/constants/career-interview';
 
 // ─────────────────────────────────────────────────────────────
-// 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
-//
-// 현재: mock 구현 (하드코딩된 Q1~Q6 순서대로 응답)
-// 교체: sendMessageToAI 함수를 실제 Claude API 호출로 변경
-//
-// 함수 시그니처:
-//   sendMessageToAI(params: AIChatParams) => Promise<AIResponse>
-//
-// AIChatParams:
-//   - messages: 지금까지의 대화 히스토리 (role: 'user'|'assistant', content: string)
-//   - context: 사용자 컨텍스트 (프로필 + 강점)
-//   - coreQuestionIndex: 현재 코어 질문 몇 번째인지 (0~5, 6이면 완료)
-//   - isExtraMode: 인터뷰 더하기 모드 여부
-//
-// AIResponse:
-//   - content: AI 응답 텍스트
-//   - nextCoreQuestionIndex: 다음 코어 질문 인덱스 (follow-up이면 그대로 유지)
-//   - isInterviewComplete: 인터뷰 완료 여부 (코어 6개 모두 완료 시 true)
-//
-// finalizeInterview 함수:
-//   인터뷰 완료 후 DB에 저장하는 함수
-//   messages + context → key_insights JSONB + ai_summary text 추출
-//   현재: mock 구현 (빈 객체 저장)
-//   교체: 실제 Claude API 호출로 변경
+// AI 연동 인터페이스 (v2 자유 흐름)
+//   sendMessageToAI: /api/career-interview/chat 호출, messages+context 전송
+//   finalizeInterview: /api/career-interview/finalize 호출 후 DB INSERT
 // ─────────────────────────────────────────────────────────────
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
+  /** AI 전송용 본문. user 메시지는 `<현재_상태>` 블록 prefix가 붙어 있음 */
   content: string;
+  /** UI 렌더링용 본문 (prefix 없는 원본). 없으면 content 그대로 표시 */
+  displayContent?: string;
   timestamp: Date;
 }
 
@@ -49,25 +42,12 @@ export interface UserContext {
 interface AIChatParams {
   messages: Message[];
   context: UserContext;
-  coreQuestionIndex: number;
-  isExtraMode: boolean;
 }
 
 interface AIResponse {
   content: string;
-  nextCoreQuestionIndex: number;
   isInterviewComplete: boolean;
 }
-
-// 코어 질문 6개 (스펙 3.2)
-const CORE_QUESTIONS = [
-  '지금 직장 생활에서 만족스러운 점과 그렇지 않은 점은?',
-  '5년 후, 어떤 모습이 되어 있길 바라나요?',
-  '일할 때 어떤 가치관을 중요하게 여기나요?',
-  '어떤 환경에서 가장 좋은 성과를 내는 편인가요?',
-  '', // Q5는 강점 이름이 들어가야 해서 런타임에 생성
-  '시간/돈 제약이 없다면, 1년 동안 무엇을 시도해 보고 싶나요?',
-];
 
 // ── 🤖 AI 연동 함수 (Claude API) ────────────────────────────
 async function sendMessageToAI(params: AIChatParams): Promise<AIResponse> {
@@ -75,8 +55,6 @@ async function sendMessageToAI(params: AIChatParams): Promise<AIResponse> {
   const payload = {
     messages: params.messages.map((m) => ({ role: m.role, content: m.content })),
     context: params.context,
-    coreQuestionIndex: params.coreQuestionIndex,
-    isExtraMode: params.isExtraMode,
   };
 
   const res = await fetch('/api/career-interview/chat', {
@@ -92,11 +70,17 @@ async function sendMessageToAI(params: AIChatParams): Promise<AIResponse> {
 }
 
 // ── 🤖 인터뷰 완료 후 분석 + DB 저장 (Claude API) ───────────
+interface FinalizeResult {
+  extraction: CareerInterviewKeyInsights;
+  session_duration_choice: SessionDurationChoice;
+  ai_summary: string;
+}
+
 async function finalizeInterview(
   messages: Message[],
   context: UserContext,
   userId: string
-): Promise<{ key_insights: object; ai_summary: string }> {
+): Promise<FinalizeResult> {
   // 1) 서버 라우트에서 Claude로 인사이트 추출
   const res = await fetch('/api/career-interview/finalize', {
     method: 'POST',
@@ -110,14 +94,15 @@ async function finalizeInterview(
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? 'AI finalize failed');
   }
-  const result = (await res.json()) as { key_insights: object; ai_summary: string };
+  const result = (await res.json()) as FinalizeResult;
 
   // 2) 클라이언트(인증된 supabase)로 DB INSERT — RLS 통과
   const { error } = await supabase
     .from('career_interview_results')
     .insert({
       user_id: userId,
-      key_insights: result.key_insights,
+      key_insights: result.extraction,
+      session_duration_choice: result.session_duration_choice,
       ai_summary: result.ai_summary,
     });
 
@@ -129,21 +114,21 @@ async function finalizeInterview(
 // ── 첫 AI 메시지 (인터뷰 시작 인사) ─────────────────────────
 function buildOpeningMessage(context: UserContext): string {
   const strengthNames = context.strengths.map((s) => s.name_ko).join(', ');
-  return `안녕하세요, ${context.nickname}님! 😊\n\n강점(${strengthNames})을 바탕으로 커리어 방향을 함께 찾아볼게요. 편하게 솔직하게 답해주시면 돼요.\n\n${CORE_QUESTIONS[0]}`;
+  return `안녕하세요, ${context.nickname}님! 😊\n\n강점(${strengthNames})을 바탕으로 커리어 방향을 함께 찾아볼게요. 편하게 솔직하게 답해주시면 돼요.\n\n오늘 시간은 어느 정도 되세요?`;
 }
 
 // ── 세션 저장/복원 (sessionStorage) ─────────────────────────
 const SESSION_KEY = 'career_interview_session';
 
-function saveSession(messages: Message[], coreIndex: number) {
+function saveSession(messages: Message[]) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ messages, coreIndex }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ messages }));
   } catch {
     // sessionStorage 실패 시 무시
   }
 }
 
-function loadSession(): { messages: Message[]; coreIndex: number } | null {
+function loadSession(): { messages: Message[] } | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
@@ -153,7 +138,7 @@ function loadSession(): { messages: Message[]; coreIndex: number } | null {
       ...m,
       timestamp: new Date(m.timestamp),
     }));
-    return parsed;
+    return { messages: parsed.messages };
   } catch {
     return null;
   }
@@ -174,9 +159,14 @@ function CareerInterviewContent() {
   const [loadingContext, setLoadingContext] = useState(true);
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [coreQuestionIndex, setCoreQuestionIndex] = useState(0); // 현재까지 진행된 코어 질문 수
   const [isComplete, setIsComplete] = useState(false);
-  const [isExtraMode, setIsExtraMode] = useState(false);
+  const [isSessionInvalid, setIsSessionInvalid] = useState(false);
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
+
+  // Running State (CONTRACT_v2 §5)
+  const [phase, setPhase] = useState<Phase>('opening');
+  const [agreedFocus, setAgreedFocus] = useState<string>('');
+  const [sessionDuration, setSessionDuration] = useState<SessionDurationLabel>('medium');
 
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -190,7 +180,7 @@ function CareerInterviewContent() {
 
   // 세션 복원 여부
   const [showResumePrompt, setShowResumePrompt] = useState(false);
-  const savedSessionRef = useRef<{ messages: Message[]; coreIndex: number } | null>(null);
+  const savedSessionRef = useRef<{ messages: Message[] } | null>(null);
 
   // ── 컨텍스트 로드 (프로필 + 강점) ──────────────────────────
   useEffect(() => {
@@ -239,18 +229,21 @@ function CareerInterviewContent() {
       timestamp: new Date(),
     };
     setMessages([opening]);
-    setCoreQuestionIndex(1); // Q1 이미 전달됨
     setIsComplete(false);
-    setIsExtraMode(false);
-    saveSession([opening], 1);
+    setPhase('opening');
+    setAgreedFocus('');
+    setSessionDuration('medium');
+    saveSession([opening]);
   }, []);
 
   const resumeInterview = useCallback(() => {
     const saved = savedSessionRef.current;
     if (!saved) return;
     setMessages(saved.messages);
-    setCoreQuestionIndex(saved.coreIndex);
-    setIsComplete(saved.coreIndex >= 6);
+    setIsComplete(false);
+    // 정확한 phase 복원은 어려우므로 가장 흔한 중간 상태로 가정.
+    // AI는 phase를 단서로만 사용하므로 미세한 어긋남은 무해.
+    setPhase('exploration');
     setShowResumePrompt(false);
   }, []);
 
@@ -322,14 +315,98 @@ function CareerInterviewContent() {
     };
   }, []);
 
+  // ── finalize 트리거 (Path A 자연 종료 / Path B 사용자 exit / 진단 완료 버튼) ──
+  const triggerFinalize = useCallback(async (msgs: Message[]) => {
+    if (!userId || !context) return;
+    setFinalizeError('');
+    setIsFinalizing(true);
+
+    try {
+      const result = await finalizeInterview(msgs, context, userId);
+      // CONTRACT_v2 §7: 세션 무효 — 신규 4키 중 핵심 3개가 모두 빈 문자열이면 결과 화면 진입 차단
+      const invalid =
+        !result.extraction.presenting_issue &&
+        !result.extraction.agreed_focus &&
+        !result.extraction.user_takeaway;
+      if (invalid) {
+        setIsSessionInvalid(true);
+        return;
+      }
+      clearSession();
+      router.push('/onboarding/career-result');
+    } catch {
+      setFinalizeError('저장 중 오류가 발생했어요. 다시 시도해주세요.');
+    } finally {
+      setIsFinalizing(false);
+    }
+  }, [userId, context, router]);
+
+  // ── Path C: 정서 위기 — AI 추출 스킵, DB에 메타만 INSERT, 모달 띄움 ──
+  const triggerCrisisFinalize = useCallback(async () => {
+    if (!userId) return;
+    try {
+      await supabase
+        .from('career_interview_results')
+        .insert({
+          user_id: userId,
+          key_insights: null,
+          session_duration_choice: sessionDuration,
+          ai_summary: '정서 위기 가드레일 작동으로 인터뷰 중단',
+        });
+    } catch {
+      // INSERT 실패해도 모달은 띄움 — 안전이 우선
+    }
+    clearSession();
+    setShowCrisisModal(true);
+  }, [userId, sessionDuration]);
+
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
     if (!input.trim() || isSending || !context || !userId) return;
 
+    const trimmed = input.trim();
+    const userMsgCountBefore = messages.filter((m) => m.role === 'user').length;
+
+    // Path B: 사용자 주도 종료 키워드 감지 시 chat 호출 생략하고 즉시 finalize
+    if (detectUserExit(trimmed)) {
+      const exitMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: trimmed,
+        displayContent: trimmed,
+        timestamp: new Date(),
+      };
+      const next = [...messages, exitMessage];
+      setMessages(next);
+      setInput('');
+      await triggerFinalize(next);
+      return;
+    }
+
+    // 첫 시간 응답이면 sessionDuration 추정값 갱신 (실제 DB값은 finalize 응답이 source of truth)
+    let nextSessionDuration = sessionDuration;
+    if (phase === 'opening' && userMsgCountBefore === 0) {
+      nextSessionDuration = classifySessionDuration(trimmed);
+      setSessionDuration(nextSessionDuration);
+    }
+
+    // Path C 감지 (chat 호출은 진행 — AI 시스템 프롬프트가 redirect 멘트 출력)
+    const isCrisis = detectCrisisRed(trimmed);
+
+    // Running State <현재_상태> 블록 prefix 주입 (CONTRACT_v2 §5)
+    const turnCount = userMsgCountBefore + 1;
+    const prefix = buildRunningStatePrefix({
+      phase,
+      agreedFocus,
+      turnCount,
+      sessionDuration: nextSessionDuration,
+    });
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content: prefix + trimmed, // AI 전송용
+      displayContent: trimmed,    // UI 렌더링용
       timestamp: new Date(),
     };
 
@@ -343,8 +420,6 @@ function CareerInterviewContent() {
       const response = await sendMessageToAI({
         messages: nextMessages,
         context,
-        coreQuestionIndex,
-        isExtraMode,
       });
 
       const assistantMessage: Message = {
@@ -356,13 +431,33 @@ function CareerInterviewContent() {
 
       const updatedMessages = [...nextMessages, assistantMessage];
       setMessages(updatedMessages);
-      setCoreQuestionIndex(response.nextCoreQuestionIndex);
+
+      // Path C: 정서 위기 — 추출 스킵, DB 메타만 INSERT, Crisis 모달
+      if (isCrisis) {
+        await triggerCrisisFinalize();
+        return;
+      }
+
+      // Phase 자동 전환
+      const next = inferPhase(phase, response.content, turnCount);
+      if (next.phase !== phase) setPhase(next.phase);
+      if (next.agreedFocus && next.agreedFocus !== agreedFocus) {
+        setAgreedFocus(next.agreedFocus);
+      }
+
+      // Path A: 코치 자연 종료 발화 감지 시 자동 finalize
+      if (detectCoachClosing(response.content)) {
+        setIsComplete(true);
+        clearSession();
+        await triggerFinalize(updatedMessages);
+        return;
+      }
 
       if (response.isInterviewComplete) {
         setIsComplete(true);
         clearSession();
       } else {
-        saveSession(updatedMessages, response.nextCoreQuestionIndex);
+        saveSession(updatedMessages);
       }
     } catch {
       setMessages((prev) => [
@@ -378,7 +473,7 @@ function CareerInterviewContent() {
       setIsSending(false);
       textareaRef.current?.focus();
     }
-  }, [input, isSending, context, userId, messages, coreQuestionIndex, isExtraMode]);
+  }, [input, isSending, context, userId, messages, phase, agreedFocus, sessionDuration, triggerFinalize, triggerCrisisFinalize]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -387,43 +482,10 @@ function CareerInterviewContent() {
     }
   };
 
-  // ── 인터뷰 더하기 모드 진입 ──────────────────────────────
-  const handleExtraMode = useCallback(() => {
-    setIsExtraMode(true);
-
-    const guideMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '추가로 나누고 싶은 이야기가 있으면 자유롭게 적어주세요 💬',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, guideMessage]);
-
-    // 입력창 enable + focus (스펙 3.5 v1.4)
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.disabled = false;
-        textareaRef.current.focus();
-      }
-    }, 100);
-  }, []);
-
-  // ── 진단 완료하기 ─────────────────────────────────────────
+  // ── 진단 완료하기 (사용자가 직접 누르는 경우) ─────────────────
   const handleFinalize = useCallback(async () => {
-    if (!userId || !context) return;
-    setFinalizeError('');
-    setIsFinalizing(true);
-
-    try {
-      await finalizeInterview(messages, context, userId);
-      clearSession();
-      router.push('/onboarding/career-result');
-    } catch {
-      setFinalizeError('저장 중 오류가 발생했어요. 다시 시도해주세요.');
-    } finally {
-      setIsFinalizing(false);
-    }
-  }, [userId, context, messages, router]);
+    await triggerFinalize(messages);
+  }, [triggerFinalize, messages]);
 
   // ── textarea 자동 높이 ────────────────────────────────────
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -431,10 +493,6 @@ function CareerInterviewContent() {
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
-
-  // ── 진행률 표시 (코어 질문 기준) ─────────────────────────
-  const progressRatio = Math.min(coreQuestionIndex / 6, 1);
-  const progressLabel = `Q${Math.min(coreQuestionIndex, 6)} / 6`;
 
   // ── 로딩 상태 ────────────────────────────────────────────
   if (loadingContext) {
@@ -496,27 +554,8 @@ function CareerInterviewContent() {
           <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', flex: 1, textAlign: 'center' }}>
             커리어 인터뷰
           </span>
-          {/* 진행률 라벨 */}
-          <span style={{
-            fontSize: '13px', fontWeight: 600,
-            color: isComplete ? 'var(--accent)' : 'var(--text-secondary)',
-            minWidth: '48px', textAlign: 'right',
-          }}>
-            {isComplete ? '완료 ✓' : progressLabel}
-          </span>
-        </div>
-
-        {/* 진행률 바 (코어 질문 기준, 스펙 3.3) */}
-        <div style={{
-          height: '4px', borderRadius: '999px',
-          background: 'var(--border)', overflow: 'hidden',
-        }}>
-          <div style={{
-            height: '100%', borderRadius: '999px',
-            background: isComplete ? '#10B981' : 'var(--accent)',
-            width: `${progressRatio * 100}%`,
-            transition: 'width .4s ease, background .3s ease',
-          }} />
+          {/* 우측 공백 (뒤로가기 버튼과 시각 대칭) */}
+          <div style={{ width: '44px', flexShrink: 0 }} />
         </div>
       </header>
 
@@ -634,23 +673,17 @@ function CareerInterviewContent() {
           </div>
         )}
 
-        {/* 완료 상태: 버튼 영역 (스펙 3.5) */}
+        {/* 완료 상태: 버튼 영역 */}
         {isComplete && !isFinalizing && (
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button onClick={handleFinalize} style={btnPrimary}>
               진단 완료하기 →
             </button>
-            {/* 인터뷰 더하기 버튼 — 추가 모드 진입 후에는 숨김 (스펙 3.5 v1.4) */}
-            {!isExtraMode && (
-              <button onClick={handleExtraMode} style={btnOutline}>
-                💬 인터뷰 더하기
-              </button>
-            )}
           </div>
         )}
 
         {/* 진행 중: 입력창 */}
-        {(!isComplete || isExtraMode) && (
+        {!isComplete && (
           <div style={{ padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
             <textarea
               ref={textareaRef}
@@ -704,6 +737,30 @@ function CareerInterviewContent() {
           30% { transform: translateY(-5px); opacity: 1; }
         }
       `}</style>
+
+      {/* Path C 정서 위기 모달 */}
+      <CrisisModal
+        open={showCrisisModal}
+        onClose={() => {
+          setShowCrisisModal(false);
+          clearSession();
+          router.push('/home');
+        }}
+      />
+
+      {/* 세션 무효 재시도 모달 */}
+      <RetryModal
+        open={isSessionInvalid}
+        onRetry={() => {
+          setIsSessionInvalid(false);
+          if (context) startNewInterview(context);
+        }}
+        onSkip={() => {
+          setIsSessionInvalid(false);
+          clearSession();
+          router.push('/home');
+        }}
+      />
     </div>
   );
 }
@@ -728,7 +785,7 @@ function MessageBubble({ message }: { message: Message }) {
         color: isUser ? '#fff' : 'var(--text-primary)',
         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       }}>
-        {message.content}
+        {message.displayContent ?? message.content}
       </div>
     </div>
   );
@@ -779,6 +836,73 @@ const btnOutline: React.CSSProperties = {
   border: '1.5px solid var(--accent)', fontSize: '14px', fontWeight: 600,
   fontFamily: 'inherit', cursor: 'pointer',
 };
+
+// ── Path C 정서 위기 모달 ─────────────────────────────────────
+function CrisisModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px',
+    }} role="dialog" aria-modal="true">
+      <div style={{
+        background: 'var(--surface)', borderRadius: '20px',
+        padding: '28px 24px', maxWidth: '340px', width: '100%',
+        boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+      }}>
+        <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '10px', color: 'var(--text-primary)' }}>
+          잠시 멈추고 알려드릴 게 있어요
+        </div>
+        <p style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--text-secondary)', marginBottom: '16px' }}>
+          지금 말씀해주신 마음은 혼자 견디지 않으셔도 됩니다. 아래 번호로 연결해보시는 걸 권해드려요.
+        </p>
+        <ul style={{ fontSize: '14px', listStyle: 'none', padding: 0, margin: '0 0 20px', display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-primary)' }}>
+          <li>📞 <b>자살예방상담전화 1393</b> (24시간 무료)</li>
+          <li>📞 <b>정신건강 위기상담전화 1577-0199</b> (24시간)</li>
+        </ul>
+        <button onClick={onClose} style={btnPrimary}>닫고 홈으로</button>
+      </div>
+    </div>
+  );
+}
+
+// ── 세션 무효 시 재시도 모달 ──────────────────────────────────
+function RetryModal({
+  open, onRetry, onSkip,
+}: {
+  open: boolean;
+  onRetry: () => void;
+  onSkip: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px',
+    }} role="dialog" aria-modal="true">
+      <div style={{
+        background: 'var(--surface)', borderRadius: '20px',
+        padding: '28px 24px', maxWidth: '340px', width: '100%',
+        boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+      }}>
+        <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '10px', color: 'var(--text-primary)' }}>
+          인터뷰가 충분히 진행되지 않았어요
+        </div>
+        <p style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--text-secondary)', marginBottom: '20px' }}>
+          한 가지 풀고 싶은 고민에 대해 좀 더 이야기 나눠보실까요? 다시 시작하시면 됩니다.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <button onClick={onRetry} style={btnPrimary}>다시 시도하기</button>
+          <button onClick={onSkip} style={btnOutline}>나중에</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Suspense 래퍼 ────────────────────────────────────────────
 export default function CareerInterviewPage() {
