@@ -428,6 +428,11 @@ function ActionItemsContent() {
 
         {/* 본문 */}
         <main style={mainStyle}>
+        {/* STEP 배지 */}
+        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', letterSpacing: '.08em', marginBottom: '12px' }}>
+          STEP 3
+        </div>
+
         {/* 안내 패널 (스펙 3.3) — 선택한 목표 + 액션 선택 안내 */}
         <div style={infoPanelStyle}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '.06em', marginBottom: '6px', opacity: 0.75 }}>

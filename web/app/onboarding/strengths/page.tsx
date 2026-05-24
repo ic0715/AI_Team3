@@ -184,7 +184,7 @@ function StrengthsContent() {
         <main style={mainStyle}>
         {/* 인트로 */}
         <div style={{ marginBottom: '28px' }}>
-          <div style={eyebrowStyle}>STEP 2</div>
+          <div style={eyebrowStyle}>STEP 1</div>
           <h1 style={titleStyle}>
             나의 강점 <strong>5가지</strong>를 골라주세요 💡
           </h1>

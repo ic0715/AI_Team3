@@ -265,7 +265,7 @@ function BasicInfoContent() {
 
         {/* 인트로 */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={eyebrowStyle}>{isEditMode ? 'EDIT' : 'STEP 1'}</div>
+          {isEditMode && <div style={eyebrowStyle}>EDIT</div>}
           <div style={sectionTitleStyle}>
             {isEditMode
               ? '기본 정보를 업데이트해주세요'

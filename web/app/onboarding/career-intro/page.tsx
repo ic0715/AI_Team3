@@ -81,7 +81,7 @@ export default function CareerIntroPage() {
           <div className="flex flex-col items-center text-center px-[6px] pt-7">
             <div className="text-[72px] mb-6 leading-none">🗺️</div>
             <div className="text-xs font-bold text-[var(--accent)] tracking-[0.08em] mb-2">
-              STEP 4
+              STEP 2
             </div>
             <h1 className="text-2xl font-black text-[var(--text-primary)] leading-[1.35] mb-3 tracking-[-0.02em]">
               이제 커리어 방향을
