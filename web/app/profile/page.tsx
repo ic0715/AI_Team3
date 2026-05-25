@@ -608,7 +608,7 @@ function LoadingScreen({ text }: { text: string }) {
 // ────────────────────────────────────────────────────────────
 
 const wrapStyle: CSSProperties = {
-  width: '390px',
+  width: 'min(430px, 100vw)',
   height: '100dvh',
   background: 'var(--surface)',
   display: 'flex',

@@ -756,7 +756,7 @@ function LoadingScreen({ text }: { text: string }) {
 // ────────────────────────────────────────────────────────────
 
 const wrapStyle: CSSProperties = {
-  width: '390px',
+  width: 'min(430px, 100vw)',
   height: '100dvh',        // minHeight → height: 화면 높이 고정
   background: 'var(--surface)',
   display: 'flex',
