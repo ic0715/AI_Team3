@@ -500,6 +500,9 @@ function CareerResultContent() {
           키우고 싶은 역량을{' '}
           <strong style={{ color: 'var(--accent)' }}>1개</strong> 골라주세요
         </h2>
+        <p style={bannerSubStyle}>
+          선택 후 바로 시작해 볼 수 있는 액션 아이템을 알려드립니다.
+        </p>
 
         {/* 5개 카드 (스펙 3.4) */}
         {loadingMatch ? (

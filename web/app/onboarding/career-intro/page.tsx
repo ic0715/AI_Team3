@@ -27,6 +27,11 @@ const INTERVIEW_CARDS = [
     desc: '강점과 답변을 종합해 다음 단계 5가지 역량 방향을 제안해드려요.',
     descHighlight: '5가지 역량 방향',
   },
+  {
+    icon: '🎯',
+    title: '액션 아이템 추천',
+    desc: '역량 목표를 고르면, 바로 시작해볼 수 있는 맞춤 액션을 제안해 드려요.',
+  },
 ];
 
 export default function CareerIntroPage() {
