@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 
@@ -31,51 +31,99 @@ type PanelType = 'tabs' | 'reset' | 'verify-email';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('login');
 
-  // Google OAuth / 이메일 인증 콜백에서 돌아왔을 때 처리
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+  // URL 파라미터로 초기 탭 결정 — 렌더 중 lazy init으로 처리해 effect 내 setState 불필요
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window === 'undefined') return 'login';
+    return new URLSearchParams(window.location.search).get('tab') === 'signup' ? 'signup' : 'login';
+  });
 
-    // 랜딩 CTA "동의하고 시작하기"에서 ?tab=signup 으로 진입한 경우 → 회원가입 탭 활성화
-    if (params.get('tab') === 'signup') {
-      setActiveTab('signup');
+  // useEffect 내에서 참조되는 상태를 먼저 선언
+  const [panel, setPanel] = useState<PanelType>('tabs');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+
+  // 인증 성공 후 라우팅 — useEffect보다 먼저 선언해 forward reference 제거
+  const handlePostAuthRouting = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    if (!user.email_confirmed_at) {
+      setPendingEmail(user.email ?? '');
+      setPanel('verify-email');
+      return;
     }
 
-    // Google OAuth 완료 콜백 감지:
-    // - PKCE flow:     auth/callback → /login?code=XXX&source=oauth
-    // - Implicit flow: auth/callback → /login?source=oauth#access_token=XXX
-    // 두 경우 모두 source=oauth 가 붙어서 오므로 이것만 체크.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('profile_completed')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
+
+    const { data: strengths } = await supabase
+      .from('strength_analyses')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_latest', true)
+      .limit(1);
+
+    if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
+
+    const { data: interviews } = await supabase
+      .from('career_interview_results')
+      .select('id, recommended_competencies')
+      .eq('user_id', user.id)
+      .limit(1);
+
+    if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
+    if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
+
+    const { data: goals } = await supabase
+      .from('goals')
+      .select('status, current_week, total_weeks')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    const activeGoal = goals?.find((g) => g.status === 'active');
+    const pausedGoal = goals?.find((g) => g.status === 'paused');
+    const completedGoal = goals?.find(
+      (g) => g.status === 'completed' && g.current_week >= g.total_weeks
+    );
+
+    if (activeGoal || pausedGoal) { router.push('/home'); return; }
+    if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
+
+    router.push('/onboarding/action-items');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
     const hasCode = !!params.get('code');
     const hasHash = window.location.hash.includes('access_token');
     const isOAuthCallback = params.get('source') === 'oauth';
-
-    if (hasCode || hasHash) {
-      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          authListener.subscription.unsubscribe();
-
-          if (isOAuthCallback) {
-            // Google OAuth: 세션 유지 → 상태 기반 라우팅
-            await handlePostAuthRouting();
-          } else {
-            // 이메일 인증 완료: 자동 로그인 방지 → 수동 로그인 유도
-            await supabase.auth.signOut();
-            setLoginEmail(session.user.email ?? '');
-            setVerifiedSuccess(true);
-            setPanel('tabs');
-            setActiveTab('login');
-          }
+    if (!hasCode && !hasHash) return;
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        authListener.subscription.unsubscribe();
+        if (isOAuthCallback) {
+          await handlePostAuthRouting();
+        } else {
+          await supabase.auth.signOut();
+          setLoginEmail(session.user.email ?? '');
+          setVerifiedSuccess(true);
+          setPanel('tabs');
+          setActiveTab('login');
         }
-      });
-      return;
-    }
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [panel, setPanel] = useState<PanelType>('tabs');
 
   // 로그인 폼
-  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -94,10 +142,6 @@ export default function LoginPage() {
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentAge, setConsentAge] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
-
-  // 이메일 인증 대기
-  const [pendingEmail, setPendingEmail] = useState('');
-  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
   // 비밀번호 재설정
   const [resetEmail, setResetEmail] = useState('');
@@ -207,65 +251,6 @@ export default function LoginPage() {
     } else {
       setResetMessage('재설정 링크를 이메일로 보냈어요 ✅');
     }
-  };
-
-  // 인증 성공 후 라우팅 (02_login.md 5번 라우팅 로직)
-  const handlePostAuthRouting = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // 1. 이메일 인증 미완료
-    if (!user.email_confirmed_at) {
-      setPendingEmail(user.email ?? '');
-      setPanel('verify-email');
-      return;
-    }
-
-    // 2. 온보딩 완료 여부 먼저 확인 (온보딩 미완료 → goals 체크 생략)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('profile_completed')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
-
-    const { data: strengths } = await supabase
-      .from('strength_analyses')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('is_latest', true)
-      .limit(1);
-
-    if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
-
-    const { data: interviews } = await supabase
-      .from('career_interview_results')
-      .select('id, recommended_competencies')
-      .eq('user_id', user.id)
-      .limit(1);
-
-    if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
-    if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
-
-    // 3. 온보딩 완료 → goals 상태 확인
-    const { data: goals } = await supabase
-      .from('goals')
-      .select('status, current_week, total_weeks')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    const activeGoal = goals?.find((g) => g.status === 'active');
-    const pausedGoal = goals?.find((g) => g.status === 'paused');
-    const completedGoal = goals?.find(
-      (g) => g.status === 'completed' && g.current_week >= g.total_weeks
-    );
-
-    if (activeGoal || pausedGoal) { router.push('/home'); return; }
-    if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
-
-    // 4. 온보딩은 끝났지만 아직 goal 없음 → 액션 아이템 선택
-    router.push('/onboarding/action-items');
   };
 
   return (

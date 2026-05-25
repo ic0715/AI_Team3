@@ -201,9 +201,9 @@ function ActionItemsContent() {
   useEffect(() => {
     if (!goal || !aiContext || baseSeeds.length === 0) return;
     let cancelled = false;
-    setAiLoading(true);
 
     const run = async () => {
+      setAiLoading(true);
       try {
         const res = await fetch('/api/career-actions', {
           method: 'POST',
@@ -381,7 +381,7 @@ function ActionItemsContent() {
       setError(`저장 실패: ${detail}`);
       setSaving(false);
     }
-  }, [selectedId, saving, goal, customAdded, seeds, router]);
+  }, [selectedId, saving, goal, customAdded, seeds, router, aiContext]);
 
   if (!ready || loadingData) return <LoadingScreen text="액션 아이템을 준비 중이에요..." />;
   if (!goal) {

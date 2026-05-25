@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
@@ -116,7 +116,7 @@ function HomeContent() {
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
 
   // 이번 주 월~일 7일
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const monday = startOfWeekMonday(today);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 

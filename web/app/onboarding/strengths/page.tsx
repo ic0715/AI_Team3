@@ -47,7 +47,17 @@ function StrengthsContent() {
   const searchParams = useSearchParams();
   // ?from=profile 진입: 저장 후 프로필로 복귀 (강점만 수정하는 흐름)
   const fromProfile = searchParams.get('from') === 'profile';
-  const [selected, setSelected] = useState<SelectedStrength[]>([]);
+  const [selected, setSelected] = useState<SelectedStrength[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as SelectedStrength[];
+        if (Array.isArray(parsed) && parsed.length <= 5) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,22 +73,10 @@ function StrengthsContent() {
     };
     init();
 
-    // localStorage에서 이전 선택 복원
-    try {
-      const saved = localStorage.getItem(LS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as SelectedStrength[];
-        if (Array.isArray(parsed) && parsed.length <= 5) {
-          setSelected(parsed);
-        }
-      }
-    } catch {
-      // localStorage 파싱 실패는 무시
-    }
-
     // 언마운트 시 디바운스 타이머 정리
+    const timer = saveTimerRef.current;
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (timer) clearTimeout(timer);
     };
   }, [router]);
 

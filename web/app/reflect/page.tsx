@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
@@ -90,7 +90,7 @@ function ReflectContent() {
   // v1.5: 주간 회고 입력 영역 제거 — weekly_retros 저장 없이도
   // AI 코치 CTA를 항상 노출. weekly_retros 관련 state/handler 모두 삭제.
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const monday = startOfWeekMonday(today);
   const sundayISO = formatLocalISO(addDays(monday, 6));
   const mondayISO = formatLocalISO(monday);
