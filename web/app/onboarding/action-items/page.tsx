@@ -413,6 +413,11 @@ function ActionItemsContent() {
 
   return (
     <div style={wrapStyle}>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* 상단 바 */}
       <header style={headerStyle}>
           <button
@@ -643,7 +648,18 @@ function ActionItemsContent() {
               selectedId && !saving ? '0 4px 16px rgba(45,91,255,.3)' : 'none',
           }}
         >
-          {saving ? '저장 중...' : '시작하기 🚀'}
+          {saving ? (
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span style={{
+                width: '16px', height: '16px', borderRadius: '50%',
+                border: '2.5px solid rgba(128,128,128,0.35)',
+                borderTopColor: 'var(--text-muted)',
+                animation: 'spin 0.75s linear infinite',
+                display: 'inline-block', flexShrink: 0,
+              }} />
+              저장 중...
+            </span>
+          ) : '시작하기 🚀'}
         </button>
       </footer>
     </div>
@@ -657,7 +673,18 @@ function ActionItemsContent() {
 function LoadingScreen({ text }: { text: string }) {
   return (
     <div style={wrapStyle}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+        <div style={{
+          width: '36px', height: '36px', borderRadius: '50%',
+          border: '3.5px solid var(--border)',
+          borderTopColor: 'var(--accent)',
+          animation: 'spin 0.75s linear infinite',
+        }} />
         <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
       </div>
     </div>
