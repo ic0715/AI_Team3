@@ -461,7 +461,7 @@ function scheduleLocalSave(
 
 // ── 공통 스타일 ───────────────────────────────────────────────
 const wrapStyle: React.CSSProperties = {
-  width: '390px',
+  width: 'min(430px, 100vw)',
   minHeight: '100dvh',
   background: 'var(--surface)',
   display: 'flex',

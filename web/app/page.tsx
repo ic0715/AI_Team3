@@ -103,7 +103,7 @@ export default function LandingPage() {
 
   return (
     <div style={{
-      width: '390px',
+      width: 'min(430px, 100vw)',
       background: 'var(--surface)',
       margin: '0 auto',
       boxShadow: '0 0 40px rgba(0,0,0,.18)',

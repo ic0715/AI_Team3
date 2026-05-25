@@ -271,7 +271,7 @@ export default function LoginPage() {
   return (
     <div
       style={{
-        width: '390px',
+        width: 'min(430px, 100vw)',
         minHeight: '100dvh',
         background: 'var(--surface)',
         display: 'flex',
