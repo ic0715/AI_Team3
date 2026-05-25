@@ -646,22 +646,32 @@ function CareerInterviewContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── 분석 로딩 오버레이 ───────────────────────────── */}
+      {/* ── 분석 로딩 오버레이 (인사이트 3 대응: 시간 현실화 + 변동 안내) ─── */}
       {isFinalizing && (
         <div style={{
           position: 'absolute', inset: 0, top: 0, left: '50%',
           transform: 'translateX(-50%)', width: 'min(430px, 100vw)',
           background: 'rgba(255,255,255,.95)',
           display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '16px',
+          alignItems: 'center', justifyContent: 'center', gap: '14px',
           zIndex: 50,
+          padding: '0 24px',
         }}>
           <div style={{ fontSize: '36px' }}>🔍</div>
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
             커리어 방향을 분석 중이에요
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            약 5~12초 정도 걸려요
+          <div style={{
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            textAlign: 'center',
+            lineHeight: 1.55,
+          }}>
+            약 20초 정도 걸려요
+            <br />
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              상황에 따라 조금 더 걸릴 수 있어요
+            </span>
           </div>
           <LoadingDots />
         </div>

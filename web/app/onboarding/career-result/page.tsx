@@ -476,20 +476,93 @@ function LoadingScreen({ text }: { text: string }) {
   );
 }
 
+/**
+ * 추천 역량 분석 중 스켈레톤 (인사이트 3 대응)
+ *
+ * 기존 정적 스켈레톤은 회색 카드만 있어 "에러난 것 같다"는 인상을 줬음.
+ * 개선:
+ *   1) 상단에 스피너 + 상태 텍스트 노출 ("역량을 찾는 중이에요...")
+ *   2) 일정 시간 경과 시 메시지 전환 ("거의 다 됐어요")
+ *   3) 카드에 pulse 애니메이션 → "분석이 진행되고 있다"는 인상
+ */
 function SkeletonCards() {
+  // 메시지 전환 타이밍: 7초 경과 후 "거의 다 됐어요"
+  const [phase, setPhase] = useState<'searching' | 'almost'>('searching');
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPhase('almost'), 7000);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const message =
+    phase === 'searching'
+      ? '역량을 찾는 중이에요...'
+      : '거의 다 됐어요';
+
   return (
     <div
       aria-busy="true"
       aria-label="추천 역량 분석 중"
+      aria-live="polite"
       style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
     >
+      {/* keyframes — pulse(카드 깜빡임) + spin(스피너) */}
+      <style>{`
+        @keyframes skel-pulse {
+          0%, 100% { opacity: 0.45; }
+          50%      { opacity: 0.75; }
+        }
+        @keyframes skel-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      {/* 상태 배너 — 스피너 + 메시지 (정적 스켈레톤만 보던 사용자 안심) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          marginBottom: '4px',
+          background: 'var(--accent-tint, #EEF2FF)',
+          border: '1px solid var(--accent-soft, #C7D2FE)',
+          borderRadius: '12px',
+        }}
+      >
+        <div
+          aria-hidden="true"
+          style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            border: '2.5px solid var(--accent-soft, #C7D2FE)',
+            borderTopColor: 'var(--accent, #4F46E5)',
+            animation: 'skel-spin 0.75s linear infinite',
+            flexShrink: 0,
+          }}
+        />
+        <div
+          style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--accent, #4F46E5)',
+            // 메시지 전환 시 부드럽게
+            transition: 'opacity .3s ease',
+          }}
+        >
+          {message}
+        </div>
+      </div>
+
       {[1, 2, 3, 4, 5].map((i) => (
         <div
           key={i}
           style={{
             ...cardStyle,
             pointerEvents: 'none',
-            opacity: 0.55,
+            // 정적 opacity 대신 pulse 애니메이션으로 살아있는 인상
+            animation: `skel-pulse 1.6s ease-in-out ${i * 0.12}s infinite`,
           }}
         >
           <div
