@@ -51,6 +51,8 @@ function StrengthsContent() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // userId를 ref로 보관 → scheduleLocalSave에서 유저 구분용으로 사용
+  const userIdRef = useRef<string | null>(null);
 
   // 인증 체크 + localStorage 복원
   useEffect(() => {
@@ -60,21 +62,26 @@ function StrengthsContent() {
         router.replace('/login');
         return;
       }
-    };
-    init();
+      userIdRef.current = user.id;
 
-    // localStorage에서 이전 선택 복원
-    try {
-      const saved = localStorage.getItem(LS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as SelectedStrength[];
-        if (Array.isArray(parsed) && parsed.length <= 5) {
-          setSelected(parsed);
+      // localStorage에서 이전 선택 복원 — 현재 유저 것만 허용
+      try {
+        const saved = localStorage.getItem(LS_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as { userId: string; strengths: SelectedStrength[] };
+          if (parsed.userId !== user.id) {
+            // 다른 계정 데이터 → 삭제 후 빈 상태로 시작
+            localStorage.removeItem(LS_KEY);
+          } else if (Array.isArray(parsed.strengths) && parsed.strengths.length <= 5) {
+            setSelected(parsed.strengths);
+          }
         }
+      } catch {
+        // localStorage 파싱 실패는 무시
       }
-    } catch {
-      // localStorage 파싱 실패는 무시
-    }
+    };
+
+    init();
 
     // 언마운트 시 디바운스 타이머 정리
     return () => {
@@ -90,7 +97,7 @@ function StrengthsContent() {
       if (alreadySelected) {
         // 선택 해제
         const next = prev.filter((s) => s.id !== strength.id);
-        scheduleLocalSave(next, saveTimerRef);
+        scheduleLocalSave(next, userIdRef.current ?? '', saveTimerRef);
         return next;
       }
 
@@ -101,7 +108,7 @@ function StrengthsContent() {
         ...prev,
         { id: strength.id, name: strength.name, nameEn: strength.nameEn, domain: strength.domain },
       ];
-      scheduleLocalSave(next, saveTimerRef);
+      scheduleLocalSave(next, userIdRef.current ?? '', saveTimerRef);
       return next;
     });
   }, []);
@@ -139,10 +146,11 @@ function StrengthsContent() {
 
       if (dbError) throw dbError;
 
-      // 다음 화면에서 prefill용 localStorage 보존
-      localStorage.setItem(LS_KEY, JSON.stringify(
-        selected.map((s) => ({ id: s.id, name: s.name, nameEn: s.nameEn, domain: s.domain }))
-      ));
+      // 다음 화면에서 prefill용 localStorage 보존 (userId 포함)
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        userId: user.id,
+        strengths: selected.map((s) => ({ id: s.id, name: s.name, nameEn: s.nameEn, domain: s.domain })),
+      }));
 
       // 진입 경로별 분기: ?from=profile이면 프로필로 복귀, 아니면 정상 온보딩 흐름
       if (fromProfile) {
@@ -438,12 +446,13 @@ function StrengthsContent() {
 // ── localStorage 디바운스 저장 헬퍼 ──────────────────────────
 function scheduleLocalSave(
   data: SelectedStrength[],
+  userId: string,
   timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
 ) {
   if (timerRef.current) clearTimeout(timerRef.current);
   timerRef.current = setTimeout(() => {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(data));
+      localStorage.setItem(LS_KEY, JSON.stringify({ userId, strengths: data }));
     } catch {
       // 무시
     }
