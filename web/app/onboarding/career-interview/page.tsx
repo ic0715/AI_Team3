@@ -471,7 +471,14 @@ function CareerInterviewContent() {
       ]);
     } finally {
       setIsSending(false);
-      textareaRef.current?.focus();
+      // iOS Safari: 키보드 전환 직후 프로그래매틱 focus()를 호출하면
+      // visualViewport resize가 두 번 발생하면서 position:fixed 컨테이너의
+      // 터치 히트 영역이 오래된 좌표로 고정되는 버그 발생 → 입력창이 안 눌림
+      // 모바일(iOS)에서는 skip, 데스크탑에서만 재포커스
+      const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+      if (!isIOS) {
+        textareaRef.current?.focus();
+      }
     }
   }, [input, isSending, context, userId, messages, phase, agreedFocus, sessionDuration, triggerFinalize, triggerCrisisFinalize]);
 
