@@ -504,7 +504,7 @@ function CareerInterviewContent() {
   // ── 로딩 상태 ────────────────────────────────────────────
   if (loadingContext) {
     return (
-      <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: '390px', height: '100dvh', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(0,0,0,.18)' }}>
+      <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: 'min(430px, 100vw)', height: '100dvh', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 40px rgba(0,0,0,.18)' }}>
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
           <div style={{ marginBottom: '12px', fontSize: '24px' }}>✨</div>
           인터뷰 준비 중...
@@ -523,7 +523,7 @@ function CareerInterviewContent() {
         top: 0,
         left: '50%',
         transform: 'translateX(-50%)',
-        width: '390px',
+        width: 'min(430px, 100vw)',
         height: '100dvh', // JS update() 호출 전 초기값
         background: 'var(--surface)',
         display: 'flex',
@@ -570,7 +570,7 @@ function CareerInterviewContent() {
       {showResumePrompt && (
         <div style={{
           position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-          width: '390px', height: '100dvh',
+          width: 'min(430px, 100vw)', height: '100dvh',
           background: 'rgba(0,0,0,.5)', display: 'flex',
           alignItems: 'center', justifyContent: 'center',
           zIndex: 100, padding: '24px',
@@ -642,7 +642,7 @@ function CareerInterviewContent() {
       {isFinalizing && (
         <div style={{
           position: 'absolute', inset: 0, top: 0, left: '50%',
-          transform: 'translateX(-50%)', width: '390px',
+          transform: 'translateX(-50%)', width: 'min(430px, 100vw)',
           background: 'rgba(255,255,255,.95)',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '16px',
@@ -722,26 +722,38 @@ function CareerInterviewContent() {
               disabled={!input.trim() || isSending}
               style={{
                 width: '44px', height: '44px', borderRadius: '12px',
-                background: input.trim() && !isSending ? 'var(--accent)' : 'var(--border)',
+                background: input.trim() && !isSending ? 'var(--accent)' : isSending ? 'var(--accent)' : 'var(--border)',
                 border: 'none', cursor: input.trim() && !isSending ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0, transition: 'background .2s',
               }}
               aria-label="전송"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
-              </svg>
+              {isSending ? (
+                <div style={{
+                  width: '18px', height: '18px', borderRadius: '50%',
+                  border: '2.5px solid rgba(255,255,255,0.35)',
+                  borderTopColor: 'white',
+                  animation: 'spin 0.75s linear infinite',
+                }} />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
+                </svg>
+              )}
             </button>
           </div>
         )}
       </div>
 
-      {/* 타이핑 애니메이션 스타일 */}
+      {/* 타이핑 애니메이션 + 스피너 스타일 */}
       <style>{`
         @keyframes typing-dot {
           0%, 60%, 100% { transform: translateY(0); opacity: .4; }
           30% { transform: translateY(-5px); opacity: 1; }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
 
