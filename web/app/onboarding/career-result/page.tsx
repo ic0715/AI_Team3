@@ -725,7 +725,7 @@ function ErrorRetry({
   );
 }
 
-function CompetencyCard({
+export function CompetencyCard({
   slot,
   selected,
   onClick,
