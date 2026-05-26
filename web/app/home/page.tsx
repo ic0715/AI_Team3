@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { TabBar } from '@/components/ui/TabBar';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
@@ -775,27 +776,6 @@ function TimelineFuture({
 }
 
 // ────────────────────────────────────────────────────────────
-// LoadingScreen
-// ────────────────────────────────────────────────────────────
-
-function LoadingScreen({ text }: { text: string }) {
-  return (
-    <div style={wrapStyle}>
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
 // 스타일
 // ────────────────────────────────────────────────────────────
 
@@ -968,15 +948,6 @@ const themeProgPct: CSSProperties = {
   fontSize: '12px',
   opacity: 0.7,
   flexShrink: 0,
-};
-
-const themeDesc: CSSProperties = {
-  marginTop: '12px',
-  fontSize: '10px',
-  lineHeight: 1.65,
-  opacity: 0.5,
-  letterSpacing: '-.005em',
-  position: 'relative',
 };
 
 const weeksTrack: CSSProperties = {
@@ -1289,15 +1260,3 @@ const tlDayFutureStyle: CSSProperties = {
   cursor: 'not-allowed',
 };
 
-const tlMilestoneTitle: CSSProperties = {
-  fontSize: '13px',
-  fontWeight: 700,
-  color: 'var(--text-primary)',
-  marginBottom: '4px',
-};
-
-const tlMilestoneDesc: CSSProperties = {
-  fontSize: '11px',
-  color: 'var(--text-secondary)',
-  lineHeight: 1.55,
-};

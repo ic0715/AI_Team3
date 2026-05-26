@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { anthropic, MODEL, extractText, parseJSONLoose } from '@/lib/anthropic';
 import { REFLECT_FINALIZE_SYSTEM, buildFinalizeUserPrompt } from '@/lib/prompts/reflect-coach';
+import { clipString } from '@/lib/utils/clip';
 
 export const runtime = 'nodejs';
 
@@ -26,11 +27,6 @@ interface FinalizeResponse {
   next_action_raw: string;
   user_mentioned_change: boolean;
   ai_summary: string;
-}
-
-function clipString(s: unknown, max: number): string {
-  if (typeof s !== 'string') return '';
-  return s.slice(0, max);
 }
 
 export async function POST(req: Request) {

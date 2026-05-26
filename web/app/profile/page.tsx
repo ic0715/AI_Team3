@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { TabBar } from '@/components/ui/TabBar';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
@@ -593,16 +594,6 @@ function ConfirmDialog({
   );
 }
 
-function LoadingScreen({ text }: { text: string }) {
-  return (
-    <div style={wrapStyle}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
-      </div>
-    </div>
-  );
-}
-
 // ────────────────────────────────────────────────────────────
 // 스타일
 // ────────────────────────────────────────────────────────────
@@ -759,14 +750,11 @@ const menuItemStyle: CSSProperties = {
   alignItems: 'center',
   gap: '12px',
   padding: '14px 16px',
+  border: 'none',
   borderTop: '1px solid var(--line)',
   cursor: 'pointer',
   width: '100%',
   background: '#fff',
-  border: 'none',
-  borderTopWidth: '1px',
-  borderTopStyle: 'solid',
-  borderTopColor: 'var(--line)',
   fontFamily: 'inherit',
   transition: 'background .12s',
 };

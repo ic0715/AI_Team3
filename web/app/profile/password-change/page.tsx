@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 // ────────────────────────────────────────────────────────────
 // NEW07 비밀번호 변경 (스펙 v1.3)
@@ -407,16 +408,6 @@ function PasswordField({
       ) : hint ? (
         <div style={fieldHintStyle}>{hint}</div>
       ) : null}
-    </div>
-  );
-}
-
-function LoadingScreen({ text }: { text: string }) {
-  return (
-    <div style={wrapStyle}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
-      </div>
     </div>
   );
 }

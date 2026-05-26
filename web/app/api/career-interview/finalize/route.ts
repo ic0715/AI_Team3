@@ -8,6 +8,7 @@ import type {
   CareerInterviewKeyInsights,
   SessionDurationChoice,
 } from '@/lib/types/database';
+import { clipString, clipArray } from '@/lib/utils/clip';
 
 export const runtime = 'nodejs';
 
@@ -35,19 +36,6 @@ const VALID_COMPETENCY_CODES = [
 ] as const;
 
 const VALID_DURATION: readonly SessionDurationChoice[] = ['short', 'medium', 'long'] as const;
-
-function clipString(s: unknown, max: number): string {
-  if (typeof s !== 'string') return '';
-  return s.slice(0, max);
-}
-
-function clipArray(arr: unknown, maxItems: number, maxItemLen: number): string[] {
-  if (!Array.isArray(arr)) return [];
-  return arr
-    .filter((x): x is string => typeof x === 'string' && x.length > 0)
-    .slice(0, maxItems)
-    .map((s) => s.slice(0, maxItemLen));
-}
 
 export async function POST(req: Request) {
   try {
