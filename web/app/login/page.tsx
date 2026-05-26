@@ -401,7 +401,7 @@ export default function LoginPage() {
             {(['login', 'signup'] as TabType[]).map((tab) => (
               <button
                 key={tab}
-                onClick={() => { setActiveTab(tab); setLoginError(''); setSignupError(''); }}
+                onClick={() => { setActiveTab(tab); setLoginError(''); setSignupError(''); router.replace(`/login?tab=${tab}`); }}
                 style={{
                   flex: 1, padding: '9px', textAlign: 'center', borderRadius: '6px',
                   fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none',
