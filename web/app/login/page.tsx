@@ -31,47 +31,14 @@ type PanelType = 'tabs' | 'reset' | 'verify-email';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('login');
-
-  // Google OAuth / 이메일 인증 콜백에서 돌아왔을 때 처리
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    // 랜딩 CTA "동의하고 시작하기"에서 ?tab=signup 으로 진입한 경우 → 회원가입 탭 활성화
-    if (params.get('tab') === 'signup') {
-      setActiveTab('signup');
-    }
-
-    // Google OAuth 완료 콜백 감지:
-    // - PKCE flow:     auth/callback → /login?code=XXX&source=oauth
-    // - Implicit flow: auth/callback → /login?source=oauth#access_token=XXX
-    // 두 경우 모두 source=oauth 가 붙어서 오므로 이것만 체크.
-    const hasCode = !!params.get('code');
-    const hasHash = window.location.hash.includes('access_token');
-    const isOAuthCallback = params.get('source') === 'oauth';
-
-    if (hasCode || hasHash) {
-      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          authListener.subscription.unsubscribe();
-
-          if (isOAuthCallback) {
-            // Google OAuth: 세션 유지 → 상태 기반 라우팅
-            await handlePostAuthRouting();
-          } else {
-            // 이메일 인증 완료: 자동 로그인 방지 → 수동 로그인 유도
-            await supabase.auth.signOut();
-            setLoginEmail(session.user.email ?? '');
-            setVerifiedSuccess(true);
-            setPanel('tabs');
-            setActiveTab('login');
-          }
-        }
-      });
-      return;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // 초기 탭: ?tab=signup 으로 진입하면 회원가입 탭. URL은 mount 시점에 고정이라
+  // lazy initializer로 한 번만 읽어 set-state-in-effect 패턴을 피한다.
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window === 'undefined') return 'login';
+    return new URLSearchParams(window.location.search).get('tab') === 'signup'
+      ? 'signup'
+      : 'login';
+  });
   const [panel, setPanel] = useState<PanelType>('tabs');
 
   // 로그인 폼
@@ -267,6 +234,44 @@ export default function LoginPage() {
     // 4. 온보딩은 끝났지만 아직 goal 없음 → 액션 아이템 선택
     router.push('/onboarding/action-items');
   };
+
+  // Google OAuth / 이메일 인증 콜백에서 돌아왔을 때 처리
+  // 모든 setter 및 handlePostAuthRouting 선언 이후에 배치 (react-hooks/immutability)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    // ?tab=signup 진입은 위 useState 초기값에서 이미 처리됨.
+
+    // Google OAuth 완료 콜백 감지:
+    // - PKCE flow:     auth/callback → /login?code=XXX&source=oauth
+    // - Implicit flow: auth/callback → /login?source=oauth#access_token=XXX
+    // 두 경우 모두 source=oauth 가 붙어서 오므로 이것만 체크.
+    const hasCode = !!params.get('code');
+    const hasHash = window.location.hash.includes('access_token');
+    const isOAuthCallback = params.get('source') === 'oauth';
+
+    if (hasCode || hasHash) {
+      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          authListener.subscription.unsubscribe();
+
+          if (isOAuthCallback) {
+            // Google OAuth: 세션 유지 → 상태 기반 라우팅
+            await handlePostAuthRouting();
+          } else {
+            // 이메일 인증 완료: 자동 로그인 방지 → 수동 로그인 유도
+            await supabase.auth.signOut();
+            setLoginEmail(session.user.email ?? '');
+            setVerifiedSuccess(true);
+            setPanel('tabs');
+            setActiveTab('login');
+          }
+        }
+      });
+      return;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
