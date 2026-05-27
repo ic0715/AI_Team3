@@ -201,6 +201,8 @@ function ActionItemsContent() {
   useEffect(() => {
     if (!goal || !aiContext || baseSeeds.length === 0) return;
     let cancelled = false;
+    // async fetch 시작 전 loading 표시 — 합법적인 effect 내 state 동기화
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAiLoading(true);
 
     const run = async () => {

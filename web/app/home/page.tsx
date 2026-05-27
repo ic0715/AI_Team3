@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
@@ -116,9 +116,14 @@ function HomeContent() {
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
 
   // 이번 주 월~일 7일
-  const today = new Date();
-  const monday = startOfWeekMonday(today);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  // today를 useMemo로 안정화해서 useCallback 의존성이 매 렌더마다 바뀌지 않게.
+  // 세션 도중 자정을 넘기는 경우 페이지 새로고침 필요 (실사용 시 큰 이슈 아님).
+  const today = useMemo(() => new Date(), []);
+  const monday = useMemo(() => startOfWeekMonday(today), [today]);
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(monday, i)),
+    [monday],
+  );
 
   // ── 데이터 로드 ───────────────────────────────────────────
   useEffect(() => {
