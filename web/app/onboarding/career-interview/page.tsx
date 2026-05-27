@@ -182,7 +182,24 @@ function CareerInterviewContent() {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const savedSessionRef = useRef<{ messages: Message[] } | null>(null);
 
+  const startNewInterview = useCallback((ctx: UserContext) => {
+    clearSession();
+    const opening: Message = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: buildOpeningMessage(ctx),
+      timestamp: new Date(),
+    };
+    setMessages([opening]);
+    setIsComplete(false);
+    setPhase('opening');
+    setAgreedFocus('');
+    setSessionDuration('medium');
+    saveSession([opening]);
+  }, []);
+
   // ── 컨텍스트 로드 (프로필 + 강점) ──────────────────────────
+  // startNewInterview 선언 이후에 배치해야 react-hooks/immutability 에러 회피
   useEffect(() => {
     const loadContext = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -218,22 +235,6 @@ function CareerInterviewContent() {
 
     loadContext();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const startNewInterview = useCallback((ctx: UserContext) => {
-    clearSession();
-    const opening: Message = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: buildOpeningMessage(ctx),
-      timestamp: new Date(),
-    };
-    setMessages([opening]);
-    setIsComplete(false);
-    setPhase('opening');
-    setAgreedFocus('');
-    setSessionDuration('medium');
-    saveSession([opening]);
   }, []);
 
   const resumeInterview = useCallback(() => {

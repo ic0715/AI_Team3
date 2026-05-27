@@ -71,7 +71,7 @@ function BasicInfoContent() {
   const [initialLoading, setInitialLoading] = useState(true);
 
   // 수정 모드: 원본 값 저장 (변경 여부 감지용)
-  const originalValues = useRef({ nickname: '', gender: '', jobField: '', careerLevel: '', mainConcern: '' });
+  const [originalValues, setOriginalValues] = useState({ nickname: '', gender: '', jobField: '', careerLevel: '', mainConcern: '' });
 
   // 닉네임 필드 앵커링용
   const nicknameRef = useRef<HTMLDivElement>(null);
@@ -104,7 +104,7 @@ function BasicInfoContent() {
         setCareerLevel(car);
         setMainConcern(con);
 
-        originalValues.current = { nickname: nick, gender: gen, jobField: job, careerLevel: car, mainConcern: con };
+        setOriginalValues({ nickname: nick, gender: gen, jobField: job, careerLevel: car, mainConcern: con });
 
         // 신규 진입인데 이미 완료된 경우 → 라우팅
         if (!isEditMode && profile.profile_completed) {
@@ -155,11 +155,11 @@ function BasicInfoContent() {
 
   // ── 버튼 활성화 조건 ───────────────────────────────────────
   const isChanged = isEditMode && (
-    nickname !== originalValues.current.nickname ||
-    gender   !== originalValues.current.gender   ||
-    jobField !== originalValues.current.jobField  ||
-    careerLevel !== originalValues.current.careerLevel ||
-    mainConcern !== originalValues.current.mainConcern
+    nickname !== originalValues.nickname ||
+    gender   !== originalValues.gender   ||
+    jobField !== originalValues.jobField  ||
+    careerLevel !== originalValues.careerLevel ||
+    mainConcern !== originalValues.mainConcern
   );
   const requiredFilled = nickname.trim() && jobField && careerLevel &&
     (!isEditMode ? !!birthdate : true);

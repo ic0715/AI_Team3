@@ -73,6 +73,8 @@ function StrengthsContent() {
             // 다른 계정 데이터 → 삭제 후 빈 상태로 시작
             localStorage.removeItem(LS_KEY);
           } else if (Array.isArray(parsed.strengths) && parsed.strengths.length <= 5) {
+            // auth 검증 후 본인 데이터만 복원 — 합법적인 async 후 setState 패턴
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSelected(parsed.strengths);
           }
         }
