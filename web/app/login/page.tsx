@@ -3,28 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-
-// 비밀번호 강도 계산
-function getPasswordStrength(password: string): { level: 0 | 1 | 2 | 3; label: string; color: string } {
-  if (password.length === 0) return { level: 0, label: '', color: '' };
-  if (password.length < 8) return { level: 1, label: '약함', color: '#EF4444' };
-  const hasLetter = /[a-zA-Z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  if (hasLetter && hasNumber && password.length >= 12) return { level: 3, label: '강함', color: '#10B981' };
-  if (hasLetter && hasNumber) return { level: 2, label: '보통', color: '#F59E0B' };
-  return { level: 1, label: '약함', color: '#EF4444' };
-}
-
-// 만 14세 이상 검증
-function isOver14(birthdate: string): boolean {
-  if (!birthdate) return false;
-  const birth = new Date(birthdate);
-  const today = new Date();
-  const age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) return age - 1 >= 14;
-  return age >= 14;
-}
+import { getPasswordStrength, isOver14 } from '@/lib/utils/auth-validation';
 
 type TabType = 'login' | 'signup';
 type PanelType = 'tabs' | 'reset' | 'verify-email';
