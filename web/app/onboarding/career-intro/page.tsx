@@ -146,9 +146,6 @@ export default function CareerIntroPage() {
                 </span>
               )}
             </div>
-            <div className="mt-[11px] text-[12px] text-[var(--text-muted)]">
-              이 강점들을 컨텍스트로 인터뷰가 진행돼요.
-            </div>
           </div>
         </div>
 
