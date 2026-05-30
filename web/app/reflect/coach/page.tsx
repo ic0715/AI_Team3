@@ -223,6 +223,15 @@ function isConfirmation(text: string): boolean {
   return CONFIRM_WORDS.some((w) => t.includes(w));
 }
 
+// Path B — 사용자 주도 종료 키워드 (커리어 career-interview.ts USER_EXIT_KEYWORDS와 동일 세트).
+//   감지 시 chat 호출 없이 코치 클로징 멘트를 띄우고 '회고 완료하기' 버튼을 노출(readyToFinalize).
+//   커리어 Path B와 마찬가지로 자동 finalize는 하지 않음 — 버튼 게이트로 끝남.
+const USER_EXIT_WORDS = ['여기까지 할게요', '그만하고 싶어요', '이제 됐어요', '오늘은 여기까지'];
+
+function detectUserExit(text: string): boolean {
+  return USER_EXIT_WORDS.some((w) => text.includes(w));
+}
+
 // ────────────────────────────────────────────────────────────
 // 페이지 export
 // ────────────────────────────────────────────────────────────
@@ -405,6 +414,26 @@ function CoachContent() {
   const handleSend = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || isSending || !context || !userId) return;
+
+    // Path B: 사용자 주도 종료 — chat 호출 생략, 코치 클로징 멘트 + '회고 완료하기' 버튼 노출.
+    //   재협의(isRenegotiate) 모드에서는 무시 — 그땐 이미 요약이 떠 있고, 액션 합의는
+    //   isConfirmation/3턴 초과로 자체 종료되므로 Path B는 메인 대화에서만 동작.
+    //   자동 finalize 하지 않음(커리어 Path B와 동일) — readyToFinalize=true로만 끝냄.
+    if (!isRenegotiate && detectUserExit(trimmed)) {
+      const exitMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: trimmed,
+      };
+      const closingMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'coach',
+        content: '네, 여기까지 나눈 것만으로도 충분해요. 위로 올려 대화를 다시 보실 수 있고, 준비되시면 아래 ‘회고 완료하기’를 눌러주세요. 🌱',
+      };
+      setMessages([...messages, exitMessage, closingMessage]);
+      setReadyToFinalize(true);
+      return;
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
