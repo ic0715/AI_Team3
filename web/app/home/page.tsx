@@ -361,8 +361,7 @@ function HomeContent() {
               <em style={greetingNameStyle}>{data.nickname}님</em>
             ) : (
               '친구님'
-            )}{' '}
-            👋
+            )}
           </div>
           <div style={greetingSubStyle}>
             {WEEKDAY_KO[today.getDay()]}요일 · {today.getMonth() + 1}월 {today.getDate()}일 ·{' '}
@@ -542,7 +541,7 @@ function TodayCard({
         }}
         aria-live="polite"
       >
-        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요 ✅'}
+        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요'}
       </div>
     </div>
   );
@@ -572,7 +571,7 @@ function MemoNotif({ onGoReflect }: { onGoReflect: () => void }) {
         </div>
         <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)' }}>
           <strong style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
-            오늘의 메모, 짧게라도 남겨볼까요? ✏️
+            오늘의 메모, 짧게라도 남겨볼까요?
           </strong>
           주말에 코치와 마감 회고를 할 때 컨텍스트가 돼요.
         </div>

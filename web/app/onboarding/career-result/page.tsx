@@ -337,7 +337,7 @@ function CareerResultContent() {
         <main style={mainStyle}>
         {/* 결과 배너 (스펙 3.2) */}
         <div style={bannerStyle}>
-          <div style={bannerEyebrowStyle}>🎯 AI 분석 완료</div>
+          <div style={bannerEyebrowStyle}>AI 분석 완료</div>
           <h1 style={bannerTitleStyle}>지금 집중해야 할 역량 목표예요</h1>
           <p style={bannerSubStyle}>
             강점 · 가치관 · 현재 상황을 종합 분석한 결과예요
@@ -345,11 +345,11 @@ function CareerResultContent() {
         </div>
 
         {/* 선택 안내 (스펙 3.3) */}
-        <h2 style={sectionTitleStyle}>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: '4px' }}>
           키우고 싶은 역량을{' '}
           <strong style={{ color: 'var(--accent)' }}>1개</strong> 골라주세요
         </h2>
-        <p style={bannerSubStyle}>
+        <p style={{ ...bannerSubStyle, color: 'var(--text-secondary)', marginBottom: '14px' }}>
           선택 후 바로 시작해 볼 수 있는 액션 아이템을 알려드립니다.
         </p>
 
@@ -740,7 +740,7 @@ function CompetencyCard({
             lineHeight: 1.3,
           }}
         >
-          {slot.emoji} {slot.goalTitle}
+          {slot.goalTitle}
         </div>
       </div>
 
@@ -760,7 +760,7 @@ function CompetencyCard({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {slot.tags.map((tag) => (
           <span key={tag} style={tagStyle}>
-            {tag}
+            {tag.replace(/^\p{Emoji}\s*/u, '')}
           </span>
         ))}
       </div>
