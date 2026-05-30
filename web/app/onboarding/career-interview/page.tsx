@@ -367,7 +367,8 @@ function CareerInterviewContent() {
     const trimmed = input.trim();
     const userMsgCountBefore = messages.filter((m) => m.role === 'user').length;
 
-    // Path B: 사용자 주도 종료 키워드 감지 시 chat 호출 생략하고 즉시 finalize
+    // Path B: 사용자 주도 종료 키워드 감지 시 chat 호출 생략하고 완료 상태로 전환
+    //   (자동 finalize 하지 않음 — 사용자가 대화를 다시 보고 '진단 완료하기'를 눌러야 진행)
     if (detectUserExit(trimmed)) {
       const exitMessage: Message = {
         id: crypto.randomUUID(),
@@ -376,10 +377,17 @@ function CareerInterviewContent() {
         displayContent: trimmed,
         timestamp: new Date(),
       };
-      const next = [...messages, exitMessage];
+      const closingMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '네, 여기까지 이야기 나눈 것만으로도 충분해요. 위로 올려 대화를 다시 보실 수 있고, 준비되시면 아래 ‘진단 완료하기’를 눌러주세요. 😊',
+        timestamp: new Date(),
+      };
+      const next = [...messages, exitMessage, closingMessage];
       setMessages(next);
       setInput('');
-      await triggerFinalize(next);
+      setIsComplete(true);
+      saveSession(next);
       return;
     }
 
@@ -445,11 +453,11 @@ function CareerInterviewContent() {
         setAgreedFocus(next.agreedFocus);
       }
 
-      // Path A: 코치 자연 종료 발화 감지 시 자동 finalize
+      // Path A: 코치 자연 종료 발화 감지 시 완료 상태로 전환
+      //   (자동 finalize 하지 않음 — 사용자가 대화를 다시 보고 '진단 완료하기'를 눌러야 진행)
       if (detectCoachClosing(response.content)) {
         setIsComplete(true);
-        clearSession();
-        await triggerFinalize(updatedMessages);
+        saveSession(updatedMessages);
         return;
       }
 
