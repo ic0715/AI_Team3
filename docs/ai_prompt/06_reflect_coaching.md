@@ -216,9 +216,10 @@ candidates = sorted(
 ```
 
 > **종료 감지 방식 차이 (구현 주의):**
-> - **5.1 메인 코칭 대화**: 코치 발화에서 `"오늘 코칭은 여기서 마무리하겠습니다"` 문자열을 클라이언트가 감지하는 방식 (03.career_interview.md와 동일).
+> - **5.1 메인 코칭 대화 (코치 주도 종료 = Path A)**: 코치 발화에서 `"오늘 코칭은 여기서 마무리하겠습니다"` 문자열을 클라이언트가 감지하는 방식 (03.career_interview.md와 동일).
 > - **5.5 재협의 대화**: 코치 발화 직후 `---ACTION_REVISED---` 구분자 + JSON을 클라이언트가 파싱하는 방식.
-> 두 단계는 반드시 다른 로직으로 처리해야 한다.
+> - **사용자 주도 종료 = Path B (v1.6 추가)**: 사용자 입력에서 종료 의사 키워드(`여기까지 할게요` / `그만하고 싶어요` / `이제 됐어요` / `오늘은 여기까지`)를 클라이언트가 감지하는 방식. 감지 시 **chat(AI) 호출을 생략**하고 코치 클로징 멘트를 붙인 뒤 '회고 완료하기' 버튼을 노출한다(`readyToFinalize`). 03.career_interview.md의 `USER_EXIT_KEYWORDS`와 동일 세트. 재협의(`isRenegotiate`) 모드에서는 무시 — 재협의는 위 5.5 자체 종료 로직으로 끝난다. **자동 finalize 하지 않음**: Path A와 동일하게 버튼 게이트로만 끝나며, 추출·저장은 사용자가 버튼을 눌렀을 때만 실행.
+> 위 단계들은 반드시 다른 로직으로 처리해야 한다.
 
 > **v1.1 추가: 요약 화면 이후 액션 재협의 루프(#8) 신규 추가. 종료는 코치의 자연 마무리 발화 감지 방식 (명시적 확정어 의존 제거).**
 > **v1.2 추가: 완료된 액션 제외 로직 추가. 종료 감지 방식 차이 명시.**
@@ -872,4 +873,5 @@ DB 입력, 코칭 대화, 인사이트 추출, 결정적 판단, 액션 생성 �
 | v1.2 | 2026-05-20 | **[완료 액션 제외 로직 추가 + 종료 감지 방식 명시]** **2.1** DB 쿼리 3번 수정(completed_date 단독 → title·source_seed_id 함께 조회), 쿼리 8번 신규 추가(목표 전체 사용 시드 조회). **2.2** completed_action_titles·completed_seed_ids 변수 추가. **2.3** 시드 슬라이싱에 used_seed_ids 필터링 적용 — available_pool 도입, fallback 로직 추가. **4.1** 종료 감지 방식 차이(5.1 문자열 vs 5.5 구분자) 명시. **5.1** 종료 발화 주석에 감지 방식 차이 명시. **5.3** 강점 블록 슬라이싱 룰 참조 주석 추가(05_action_item.md 2.2.B). 완료 액션 주입 블록 신규 추가. 작성 규칙 7번 신규 추가(완료 액션 유사 추천 금지). **9.3** 완료 액션 목록 토큰(~50) 추가. **10** Edge Case #18(시드 소진 fallback), #19(유사 액션 모니터링) 추가. |
 | v1.3 | 2026-05-24 | **[03 v2 정합 — 품질 기법 3종 도입]** **Prompt Caching** (system 블록에 `cache_control: { type: 'ephemeral' }`, 입력 토큰 ~90% 절감). **Temperature 분리** (대화 0.7 / 추출·액션 생성 0). **🔴 정서 위기 가드레일** — 03 §4.5 동일 키워드/멘트로 자해·자살·타인 가해 감지 시 즉시 redirect, "오늘 코칭은 여기서 마무리하겠습니다" 포함시켜 클라이언트 종료 감지 연동. Extended Thinking은 v1.3에서 채택하지 않음 (다단계 추론 불필요, 비용·지연 부담). 구현: `web/lib/prompts/reflect-coach.ts`, `web/app/api/reflect-coach/{chat,finalize}/route.ts`. |
 | v1.4 | 2026-05-24 | **[깊이 회복 — 자유 흐름 단일 모드]** 4-주제 순차 인터뷰 + 토픽당 echo-back 1~2회 cap 폐기. 자유 흐름 탐색 + 액션 합의 시 종료 단일 모드로 전환. 액션 재협의는 별도 모드(구 §5.5)가 아니라 메인 대화 안에서 동일 프롬프트로 처리. `isRenegotiate` 파라미터는 backward-compat용으로만 유지. |
+| v1.6 | 2026-05-30 | **[Path B 사용자 주도 종료 — 커리어 인터뷰와 정합]** 사용자가 종료 의사 키워드(`여기까지 할게요`/`그만하고 싶어요`/`이제 됐어요`/`오늘은 여기까지`)를 입력하면 chat(AI) 호출을 생략하고 코치 클로징 멘트 + '회고 완료하기' 버튼을 노출(`readyToFinalize`). 03.career_interview.md `USER_EXIT_KEYWORDS`와 동일 세트. 자동 finalize 안 함 — Path A(코치 주도 종료)와 동일한 버튼 게이트로 수렴(Phase 1 manual-finalize 정합). 재협의(`isRenegotiate`) 모드에서는 무시 — 재협의는 §5.5 자체 종료 로직으로 끝남. **§4.1 종료 감지 방식 차이** 노트에 Path B 항목 추가. 구현: `web/app/reflect/coach/page.tsx`(`detectUserExit`/`USER_EXIT_WORDS` 인라인, `handleSend` 진입부 분기). |
 | v1.5 | 2026-05-30 | **[능동 코칭/꼬리물기 금지 정합 — 커리어 인터뷰와 통일]** 커리어 코칭에 도입된 "말꼬리 잡기 금지 + 능동 코칭 행동 4종(이분법 frame / 구조 정리형 / 가설 제안형 / 실행 시나리오 검증형)" 규칙을 회고 코칭에도 이식. 양쪽이 공유하는 `web/lib/prompts/shared-coaching-rules.ts`(`ACTIVE_COACHING_RULES`)를 신규 생성해 `reflect-coach.ts`·`career-interview.ts`가 함께 import. **§5.1 탐색 블록** 수정 — 구 "신호가 보이면 그 자리에서 2~3번 더 파고듭니다"(꼬리물기 유발 + 존재하지 않는 `system_prompt §최우선 규칙 #2` dangling 참조)를 "한 번 받아주되 같은 단어 반복 캐묻기 금지, 같은 신호 2번째 등장 시 능동 코칭 4종으로 전환"으로 교체. 구현: `web/lib/prompts/{shared-coaching-rules,reflect-coach,career-interview}.ts`. |
