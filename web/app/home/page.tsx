@@ -661,7 +661,6 @@ function TimelineDone({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotDone }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardDone }}>
         {hasInsight ? (
@@ -708,37 +707,11 @@ function TimelineCurrent({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotCurrent }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardCurrent }}>
         <div style={tlStatusCurrent}>이번 주 · 진행 중 ({doneCount}/7)</div>
         <div style={tlActionTitleCurrent}>{action?.title ?? '액션이 없어요'}</div>
 
-        <div style={tlDayRow}>
-          {weekDays.map((day) => {
-            const dayISO = formatLocalISO(day);
-            const isCompleted = completedDates.has(dayISO);
-            const isToday = isSameDay(day, today);
-            const isFuture = day.getTime() > today.getTime() && !isToday;
-            return (
-              <button
-                key={dayISO}
-                type="button"
-                onClick={() => onToggleDay(day)}
-                disabled={isFuture}
-                style={{
-                  ...tlDayStyle,
-                  ...(isCompleted ? tlDayFilledStyle : {}),
-                  ...(isToday ? tlDayTodayStyle : {}),
-                  ...(isFuture ? tlDayFutureStyle : {}),
-                }}
-                aria-label={`${WEEKDAY_KO[day.getDay()]}요일 ${isCompleted ? '완료' : '미완료'}`}
-              >
-                {isCompleted ? '✓' : WEEKDAY_KO[day.getDay()]}
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
@@ -756,7 +729,6 @@ function TimelineFuture({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotFuture }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardFuture }}>
         {plannedActionTitle ? (
@@ -766,7 +738,7 @@ function TimelineFuture({
           </>
         ) : (
           <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            🌱 코치와 함께 정해요
+            코치와 함께 정해요
           </div>
         )}
       </div>
