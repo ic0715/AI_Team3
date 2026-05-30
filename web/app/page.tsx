@@ -151,7 +151,7 @@ export default function LandingPage() {
         </section>
 
         {/* 3. TRUST */}
-        <section style={cardStyle}>
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
           <div style={kickerStyle}>그런데, 믿을 만해요</div>
           <h2 style={{ ...h2Style, marginTop: '10px' }}>
             아무 말이나 하는<br />
@@ -167,11 +167,10 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <div style={{ flex: 1, minHeight: '16px' }} />
         </section>
 
         {/* 4. JOURNEY */}
-        <section style={cardStyle}>
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
           <div style={kickerStyle}>이렇게 진행돼요</div>
           <h2 style={{ ...h2Style, marginTop: '10px' }}>
             강점에서 시작해,<br />
