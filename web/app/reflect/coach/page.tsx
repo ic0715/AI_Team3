@@ -247,6 +247,10 @@ function CoachContent() {
   const [questionIndex, setQuestionIndex] = useState(1); // 1~4
   const [isComplete, setIsComplete] = useState(false);
   const [isRenegotiate, setIsRenegotiate] = useState(false);
+  // v1.6: 코치가 종료를 알렸지만 아직 finalize(추출·저장) 전 상태.
+  //   true면 입력창 대신 '회고 완료하기' 버튼을 노출 — 사용자가 대화를 다시 보고 눌러야 진행.
+  //   (커리어 manual-finalize PR #107 패턴 이식. 자동 finalize 폐기.)
+  const [readyToFinalize, setReadyToFinalize] = useState(false);
 
   // v1.7: input state는 자식 MessageInput 컴포넌트로 이동 (typing lag fix)
   const [isSending, setIsSending] = useState(false);
@@ -439,18 +443,10 @@ function CoachContent() {
       setQuestionIndex(response.nextQuestionIndex);
 
       if (response.isComplete && !isRenegotiate) {
-        // finalize → coaching_insights + action_items INSERT → 요약 화면 전환
-        setIsFinalizing(true);
-        try {
-          const result = await finalizeCoaching([...nextMessages, coachMessage], context, userId);
-          setSummary(result);
-          setIsComplete(true);
-        } catch (e) {
-          console.error('[13] finalize:', e);
-          setError('저장에 실패했어요. 다시 시도해주세요.');
-        } finally {
-          setIsFinalizing(false);
-        }
+        // v1.6: 자동 finalize 폐기 — 코치 종료 발화 후 '회고 완료하기' 버튼을 노출하고,
+        //   사용자가 직접 눌렀을 때만 추출·저장 진행 (handleFinalize).
+        //   재협의 확정 경로(위 isConfirmation 분기)는 이 흐름을 타지 않음.
+        setReadyToFinalize(true);
       }
     } catch (e) {
       console.error('[13] send:', e);
@@ -466,6 +462,26 @@ function CoachContent() {
       setIsSending(false);
     }
   }, [isSending, context, userId, messages, questionIndex, isRenegotiate]);
+
+  // ── 회고 완료하기 (사용자가 직접 누름) → 추출·저장 → 요약 화면 ──
+  // v1.6: 자동 finalize를 대체. 중복 클릭 가드(isFinalizing), 실패 시 readyToFinalize
+  //   유지하여 재시도 가능, 성공 시에만 해제하고 요약(summary) 노출.
+  const handleFinalize = useCallback(async () => {
+    if (!context || !userId || isFinalizing) return;
+    setError(null);
+    setIsFinalizing(true);
+    try {
+      const result = await finalizeCoaching(messages, context, userId);
+      setSummary(result);
+      setIsComplete(true);
+      setReadyToFinalize(false);
+    } catch (e) {
+      console.error('[13] finalize:', e);
+      setError('저장에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setIsFinalizing(false);
+    }
+  }, [context, userId, messages, isFinalizing]);
 
   // ── 재협의 시작 ───────────────────────────────────────────
   const handleRenegotiate = useCallback(() => {
@@ -530,9 +546,13 @@ function CoachContent() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* 입력창 — v1.7: 자식 컴포넌트로 분리 (한글 IME typing lag fix) */}
+          {/* 입력창 또는 완료 버튼 — v1.6: 코치 종료 후엔 '회고 완료하기' 버튼으로 교체 */}
           {!isFinalizing && (
-            <MessageInput onSend={handleSend} isSending={isSending} />
+            readyToFinalize ? (
+              <FinalizeBar onFinalize={handleFinalize} />
+            ) : (
+              <MessageInput onSend={handleSend} isSending={isSending} />
+            )
           )}
         </>
       )}
@@ -624,6 +644,18 @@ const MessageInput = memo(function MessageInput({
     </div>
   );
 });
+
+// 완료 버튼 바 (v1.6) — 코치 종료 후 입력창 자리에 노출.
+//   누르면 handleFinalize 실행(추출·저장 → 요약). 누르기 전까진 위로 스크롤해 대화 재확인 가능.
+function FinalizeBar({ onFinalize }: { onFinalize: () => void }) {
+  return (
+    <div style={finalizeBarStyle}>
+      <button type="button" onClick={onFinalize} style={finalizeBtnStyle}>
+        회고 완료하기 →
+      </button>
+    </div>
+  );
+}
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user';
@@ -894,6 +926,29 @@ const sendBtnStyle: CSSProperties = {
   flexShrink: 0,
   transition: 'opacity .2s',
   boxShadow: '0 2px 8px -2px rgba(45,91,255,.4)',
+};
+
+// 완료 버튼 바 (v1.6) — inputArea와 동일한 하단 영역 레이아웃
+const finalizeBarStyle: CSSProperties = {
+  padding: '14px 16px',
+  paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+  background: 'var(--surface)',
+  borderTop: '1px solid var(--line)',
+  flexShrink: 0,
+};
+
+const finalizeBtnStyle: CSSProperties = {
+  width: '100%',
+  padding: '15px',
+  borderRadius: '14px',
+  border: 'none',
+  background: 'var(--accent)',
+  color: '#fff',
+  fontFamily: 'inherit',
+  fontWeight: 700,
+  fontSize: '15px',
+  cursor: 'pointer',
+  boxShadow: '0 4px 16px rgba(45,91,255,.3)',
 };
 
 const errorAlertStyle: CSSProperties = {
