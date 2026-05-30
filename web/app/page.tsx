@@ -270,7 +270,7 @@ const TRUST_POINTS = [
 const JOURNEY_STEPS = [
   { title: '강점 고르기', desc: '내가 가진 것에서 출발' },
   { title: '코치와 대화', desc: '스스로 답을 꺼내는 과정' },
-  { title: '방향 & 액션 아이템 제안', desc: '내 문제와 강점을 기반으로 알려줘요' },
+  { title: '방향 & 액션 아이템 제안', desc: '나에 대한 이해를 바탕으로 제안해줘요' },
   { title: '12주 실천 & 회고', desc: '매주 행동하고 돌아보며 진짜 변화로' },
 ];
 
