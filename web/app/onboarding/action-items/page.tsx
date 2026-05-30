@@ -779,6 +779,10 @@ function ActionCard({
               fontSize: '12.5px',
               color: 'var(--text-secondary)',
               lineHeight: 1.6,
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2,
+              overflow: 'hidden',
             }}
           >
             {seed.description}
