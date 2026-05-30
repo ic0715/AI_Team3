@@ -24,7 +24,7 @@
     "career_concern":          "string (≤400자)",
     "dream":                   "string (≤400자)"
   },
-  "mentioned_competencies":    ["T-1", "..."]       // 0~3개, 12역량 enum
+  "growth_competencies":       ["T-1", "..."]       // 0~5개, 우선순위 순, 12역량 enum (기르고 싶은 역량)
 }
 ```
 
