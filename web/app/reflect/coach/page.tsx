@@ -438,11 +438,16 @@ function CoachContent() {
     const trimmed = text.trim();
     if (!trimmed || isSending || !context || !userId) return;
 
+    // Path C 판정은 가장 먼저 — 정서 위기는 모든 종료 경로보다 우선한다.
+    //   한 발화에 이탈 표현 + 위기 표현이 같이 와도 Path B로 새지 않고 위기 모달로 가도록,
+    //   아래 Path B 조건에 !isCrisis를 건다. (위기는 chat 호출 흐름을 타고 Path C 인터셉트로)
+    const isCrisis = detectCrisisRed(trimmed);
+
     // Path B: 사용자 주도 종료 — chat 호출 생략, 코치 클로징 멘트 + '회고 완료하기' 버튼 노출.
     //   재협의(isRenegotiate) 모드에서는 무시 — 그땐 이미 요약이 떠 있고, 액션 합의는
     //   isConfirmation/3턴 초과로 자체 종료되므로 Path B는 메인 대화에서만 동작.
     //   자동 finalize 하지 않음(커리어 Path B와 동일) — readyToFinalize=true로만 끝냄.
-    if (!isRenegotiate && detectUserExit(trimmed)) {
+    if (!isRenegotiate && detectUserExit(trimmed) && !isCrisis) {
       const exitMessage: Message = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -457,10 +462,6 @@ function CoachContent() {
       setReadyToFinalize(true);
       return;
     }
-
-    // Path C 판정 — chat 호출은 그대로 진행(서버 가드가 redirect 멘트 출력).
-    //   재협의 모드에서도 위기는 잡아야 하므로 isRenegotiate 가드 없이 판정.
-    const isCrisis = detectCrisisRed(trimmed);
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
