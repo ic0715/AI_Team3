@@ -237,11 +237,20 @@ export const INTERVIEW_FINALIZE_SYSTEM = `${CAREER_INTERVIEW_MD}
     "career_concern"?:         string,
     "dream"?:                  string
   },
-  "mentioned_competencies":    string[]       // 0~3개, 12역량 enum: T-1,T-2,T-3,I-1,I-2,I-3,R-1,R-2,R-3,E-1,E-2,E-3
+  "growth_competencies":       string[]       // 기르고 싶은 역량 0~5개, 우선순위 순. 12역량 enum: T-1,T-2,T-3,I-1,I-2,I-3,R-1,R-2,R-3,E-1,E-2,E-3
 }
 
+## growth_competencies 추출 기준 (중요)
+- "사용자가 *앞으로 기르고 싶어 하는* 역량"만 뽑는다. 강점(이미 잘하는 것)이 아니다.
+- 두 종류의 신호를 모두 인정한다:
+  (1) 명시 발언: "~을 더 잘하고 싶다 / 배우고 싶다 / 키우고 싶다 / 부족하다고 느낀다" 류.
+  (2) gap 추론: 직접 "기르고 싶다"고 말하진 않았어도, 답답함·반복되는 좌절·이루고 싶은 목표(future_vision/dream)를 달성하려면 필요한 역량.
+- **사용자가 이미 강점으로 잘 발휘하는 역량은 넣지 않는다.** (강점은 별도로 활용됨)
+- 가장 강하게·반복적으로 드러난 것부터 우선순위 순으로 배열한다.
+- 0개도 정상(성장 의도가 전혀 드러나지 않으면 빈 배열). 추정·과잉 매칭 금지: 근거가 약하면 넣지 않는다. 최대 5개.
+
 응답 예시:
-{"presenting_issue":"...","agreed_focus":"...","agreement_evolution":"","user_takeaway":"...","session_duration_choice":"medium","key_insights":{"current_frustration":"..."},"mentioned_competencies":["T-2"]}
+{"presenting_issue":"...","agreed_focus":"...","agreement_evolution":"","user_takeaway":"...","session_duration_choice":"medium","key_insights":{"current_frustration":"..."},"growth_competencies":["T-1","I-3"]}
 ---SUMMARY---
 한 줄 요약 60자 이내
 `;

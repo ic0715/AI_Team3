@@ -111,15 +111,18 @@ export async function POST(req: Request) {
       dream:                clipString(legacy.dream, 400),
     };
 
-    // mentioned_competencies (enum 위반·중복·초과 제거)
-    const rawCompetencies = Array.isArray(extraction.mentioned_competencies)
-      ? extraction.mentioned_competencies
+    // growth_competencies (기르고 싶은 역량, 우선순위 순)
+    // enum 위반 제거 + 중복 제거(첫 등장 우선순위 유지) + 최대 5개
+    const rawCompetencies = Array.isArray(extraction.growth_competencies)
+      ? extraction.growth_competencies
       : [];
+    const seen = new Set<string>();
     const cleanCompetencies = rawCompetencies
       .filter((c: unknown): c is string =>
         typeof c === 'string' && (VALID_COMPETENCY_CODES as readonly string[]).includes(c),
       )
-      .slice(0, 3);
+      .filter((c) => (seen.has(c) ? false : (seen.add(c), true)))
+      .slice(0, 5);
 
     const result: FinalizeResponse = {
       extraction: {
@@ -128,7 +131,7 @@ export async function POST(req: Request) {
         agreement_evolution,
         user_takeaway,
         key_insights,
-        mentioned_competencies: cleanCompetencies,
+        growth_competencies: cleanCompetencies,
       },
       session_duration_choice: sessionDuration,
       ai_summary: clipString(aiSummary, 80) || '커리어 인터뷰가 완료되었습니다.',

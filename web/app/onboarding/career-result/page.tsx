@@ -6,6 +6,15 @@ import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import { COMPETENCIES, COMPETENCY_BY_ID, COMPETENCY_BY_CODE } from '@/lib/constants/competencies';
 import type { Domain } from '@/lib/constants/strengths';
+import {
+  deterministicMatch,
+  getCompetencyCode,
+  BADGE_TO_FIT,
+  type BadgeKey,
+  type FitLabel,
+  type UserStrength,
+  type MatchedSlot,
+} from '@/lib/competency/match';
 
 // ─────────────────────────────────────────────────────────────
 // 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
@@ -33,32 +42,11 @@ import type { Domain } from '@/lib/constants/strengths';
 // 12역량의 id (slug). lib/constants/competencies.ts에서 정의됨.
 type CompetencyId = string;
 
-type BadgeKey = 'strength_match' | 'user_interest' | 'growth_potential';
-type FitLabel = '추천' | '강점 연계 높음' | '성장 잠재력 높음';
-
-interface UserStrength {
-  name_ko: string;
-  name_en: string;
-  domain: string;
-  rank?: number;
-}
-
 interface UserProfileLite {
   nickname: string;
   jobField: string;
   careerLevel: string;
   mainConcern: string;
-}
-
-interface MatchedSlot {
-  slot: number;          // 1~5
-  competencyId: CompetencyId;
-  goalTitle: string;
-  domain: Domain;
-  badge: BadgeKey;
-  fitLabel: FitLabel;
-  tags: string[];
-  emoji: string;
 }
 
 interface RecommendedSlot extends MatchedSlot {
@@ -75,19 +63,6 @@ interface PersonalizationParams {
 
 interface PersonalizationResult {
   slots: RecommendedSlot[];
-}
-
-// 슬롯 1~3: strength_match / 슬롯 4: user_interest / 슬롯 5: growth_potential
-// 단, fallback 시(slot 4의 mentioned가 비었거나 slot 5가 도메인 전부 커버 시) badge가 strength_match로 다운그레이드 됨 (04 spec §4.1)
-const BADGE_TO_FIT: Record<BadgeKey, FitLabel> = {
-  strength_match: '강점 연계 높음',
-  user_interest: '추천',
-  growth_potential: '성장 잠재력 높음',
-};
-
-// 슬러그(competencies.ts id) → DB CHECK constraint 코드 매핑은 COMPETENCY_BY_ID에서 가져옴
-function getCompetencyCode(id: string): string {
-  return COMPETENCY_BY_ID[id]?.code ?? id;
 }
 
 // domain 컬럼도 T/I/R/E 단일 문자 CHECK. 갤럽 도메인명 → 코드 매핑.
@@ -123,133 +98,7 @@ async function generatePersonalizedTexts(
   return res.json();
 }
 // ─────────────────────────────────────────────────────────────
-
-// Step1: 결정적 매칭 (코드, AI 미사용)
-// 04 spec §4.1 알고리즘:
-//   match_score = 사용자 Top 5 강점과 각 역량의 연계 강점 5개의 교집합 크기 (0~5)
-//   슬롯 1~3: 점수 내림차순, 도메인 분산 우선 (새 도메인 먼저, 동점 시 코드 순)
-//   슬롯 4: mentioned[0] 중 1~3에 없는 첫 항목 (없으면 결정적 4위로 fallback, badge='strength_match')
-//   슬롯 5: 1~4와 다른 도메인 중 score 최고 (4도메인 다 커버되면 fallback)
-function deterministicMatch(
-  userStrengths: UserStrength[],
-  mentioned: string[],
-): MatchedSlot[] {
-  // 사용자 강점 한글명 set (예: {"화합", "절친", ...})
-  const userStrengthNames = new Set(userStrengths.map((s) => s.name_ko));
-
-  // 12역량 각각의 score 계산
-  type Scored = {
-    competencyId: string;
-    code: string;
-    goalTitle: string;
-    domain: Domain;
-    tags: string[];
-    emoji: string;
-    score: number;
-  };
-  const scored: Scored[] = COMPETENCIES.map((c) => ({
-    competencyId: c.id,
-    code: c.code,
-    goalTitle: c.title,
-    domain: c.domain,
-    tags: c.tags,
-    emoji: c.emoji,
-    score: c.linkedStrengths.filter((name) => userStrengthNames.has(name)).length,
-  }));
-
-  // 점수 내림차순, 동점 시 code 사전순 (안정 정렬 보장)
-  scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.code.localeCompare(b.code);
-  });
-
-  // 슬롯 1~3 선택: 도메인 분산 우선 (04 spec select_top3)
-  function selectTop3(): Scored[] {
-    const chosen: Scored[] = [];
-    const usedDomains = new Set<Domain>();
-    const groupedByScore = new Map<number, Scored[]>();
-    for (const item of scored) {
-      if (!groupedByScore.has(item.score)) groupedByScore.set(item.score, []);
-      groupedByScore.get(item.score)!.push(item);
-    }
-    const sortedScores = [...groupedByScore.keys()].sort((a, b) => b - a);
-    for (const score of sortedScores) {
-      const bucket = groupedByScore.get(score)!;
-      // 새 도메인 먼저, 같은 도메인은 뒤
-      const newDomain = bucket.filter((b) => !usedDomains.has(b.domain));
-      const sameDomain = bucket.filter((b) => usedDomains.has(b.domain));
-      const ordered = [
-        ...newDomain.sort((a, b) => a.code.localeCompare(b.code)),
-        ...sameDomain.sort((a, b) => a.code.localeCompare(b.code)),
-      ];
-      for (const item of ordered) {
-        if (chosen.length === 3) return chosen;
-        chosen.push(item);
-        usedDomains.add(item.domain);
-      }
-    }
-    return chosen;
-  }
-
-  const slots1to3 = selectTop3();
-  const chosenCodes = new Set(slots1to3.map((s) => s.code));
-
-  // 슬롯 4: mentioned 중 chosen에 없는 첫 항목
-  let slot4: Scored & { badge: BadgeKey };
-  let slot4Picked: Scored | undefined;
-  for (const code of mentioned) {
-    const item = scored.find((s) => s.code === code);
-    if (item && !chosenCodes.has(item.code)) {
-      slot4Picked = item;
-      break;
-    }
-  }
-  if (slot4Picked) {
-    slot4 = { ...slot4Picked, badge: 'user_interest' };
-  } else {
-    // fallback: 결정적 매칭에서 1~3에 없는 첫 항목 (4위에 해당)
-    const fallback = scored.find((s) => !chosenCodes.has(s.code));
-    if (!fallback) throw new Error('슬롯 4 fallback 실패 (12역량 모두 슬롯 1~3에 차지 못함)');
-    slot4 = { ...fallback, badge: 'strength_match' };
-  }
-  chosenCodes.add(slot4.code);
-
-  // 슬롯 5: 1~4와 다른 도메인 중 score 최고
-  const slots1to4Domains = new Set<Domain>(
-    [...slots1to3, slot4].map((s) => s.domain),
-  );
-  let slot5: Scored & { badge: BadgeKey };
-  if (slots1to4Domains.size === 4) {
-    // 4도메인 다 커버됨 → fallback: 다음 순위
-    const fallback = scored.find((s) => !chosenCodes.has(s.code));
-    if (!fallback) throw new Error('슬롯 5 fallback 실패');
-    slot5 = { ...fallback, badge: 'strength_match' };
-  } else {
-    const otherDomainPool = scored.filter(
-      (s) => !chosenCodes.has(s.code) && !slots1to4Domains.has(s.domain),
-    );
-    const pick = otherDomainPool[0];
-    if (!pick) throw new Error('슬롯 5 다른 도메인 없음');
-    slot5 = { ...pick, badge: 'growth_potential' };
-  }
-
-  const finalSlots: Array<Scored & { badge: BadgeKey }> = [
-    ...slots1to3.map((s) => ({ ...s, badge: 'strength_match' as const })),
-    slot4,
-    slot5,
-  ];
-
-  return finalSlots.map((s, i) => ({
-    slot: i + 1,
-    competencyId: s.competencyId,
-    goalTitle: s.goalTitle,
-    domain: s.domain,
-    badge: s.badge,
-    fitLabel: BADGE_TO_FIT[s.badge],
-    tags: s.tags,
-    emoji: s.emoji,
-  }));
-}
+// Step1 역량 선택 로직(deterministicMatch)은 @/lib/competency/match 로 분리됨 (단위 테스트 대상).
 
 // ────────────────────────────────────────────────────────────
 // 컴포넌트
@@ -337,11 +186,11 @@ function CareerResultContent() {
         // Step1: 결정적 매칭
         const userStrengths: UserStrength[] =
           (strengthRes.data?.strengths as UserStrength[] | undefined) ?? [];
-        const mentioned: CompetencyId[] =
+        const growthCodes: CompetencyId[] =
           (interviewRes.data.key_insights as {
-            mentioned_competencies?: CompetencyId[];
-          } | null)?.mentioned_competencies ?? [];
-        const matched = deterministicMatch(userStrengths, mentioned);
+            growth_competencies?: CompetencyId[];
+          } | null)?.growth_competencies ?? [];
+        const matched = deterministicMatch(userStrengths, growthCodes);
 
         // Step2: AI 개인화 (mock — TODO: Claude API)
         const result = await generatePersonalizedTexts({
