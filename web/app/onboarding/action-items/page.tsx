@@ -659,7 +659,7 @@ function ActionItemsContent() {
               }} />
               저장 중...
             </span>
-          ) : '시작하기 🚀'}
+          ) : '시작하기'}
         </button>
       </footer>
     </div>
@@ -694,7 +694,6 @@ function LoadingScreen({ text }: { text: string }) {
 function EmptySeeds() {
   return (
     <div style={{ padding: '20px', background: 'var(--bg)', borderRadius: '12px', textAlign: 'center' }}>
-      <div style={{ fontSize: '24px', marginBottom: '8px' }}>📭</div>
       <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         이 역량의 추천 액션이 아직 준비되지 않았어요.
         <br />
@@ -787,13 +786,6 @@ function ActionCard({
           >
             {seed.description}
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-            {seed.tags.map((tag) => (
-              <span key={tag} style={tagStyle}>
-                {tag}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
     </button>

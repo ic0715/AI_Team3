@@ -337,7 +337,7 @@ function CareerResultContent() {
         <main style={mainStyle}>
         {/* 결과 배너 (스펙 3.2) */}
         <div style={bannerStyle}>
-          <div style={bannerEyebrowStyle}>🎯 AI 분석 완료</div>
+          <div style={bannerEyebrowStyle}>AI 분석 완료</div>
           <h1 style={bannerTitleStyle}>지금 집중해야 할 역량 목표예요</h1>
           <p style={bannerSubStyle}>
             강점 · 가치관 · 현재 상황을 종합 분석한 결과예요
@@ -687,7 +687,7 @@ function CompetencyCard({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {slot.tags.map((tag) => (
           <span key={tag} style={tagStyle}>
-            {tag}
+            {tag.replace(/^\p{Emoji}\s*/u, '')}
           </span>
         ))}
       </div>
