@@ -444,7 +444,7 @@ function ActionItemsContent() {
             내가 선택한 목표
           </div>
           <div style={infoTitleStyle}>
-            {seedEmoji} {goal.goal_title}
+            {goal.goal_title}
           </div>
           <div style={{ borderTop: '1px solid rgba(45,91,255,0.15)', margin: '10px 0' }} />
           <div style={infoDescStyle}>
@@ -778,10 +778,6 @@ function ActionCard({
               fontSize: '12.5px',
               color: 'var(--text-secondary)',
               lineHeight: 1.6,
-              display: '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: 2,
-              overflow: 'hidden',
             }}
           >
             {seed.description}
@@ -881,8 +877,8 @@ const infoDescStyle: React.CSSProperties = {
 
 const cardStyle: React.CSSProperties = {
   border: '1.5px solid var(--border)',
-  borderRadius: '14px',
-  padding: '14px',
+  borderRadius: '16px',
+  padding: '16px',
   background: 'var(--surface)',
   width: '100%',
 };
