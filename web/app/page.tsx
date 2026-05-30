@@ -262,9 +262,9 @@ export default function LandingPage() {
 
 // ── 데이터 ────────────────────────────────────────────────
 const TRUST_POINTS = [
-  '<strong>갤럽 인증 강점코치</strong>와 <strong>글로벌 코치</strong>가 함께 만들었어요.',
-  'AI 코치는 <strong>최고 등급(MCC) 코치</strong>의 코칭 방식을 학습했어요.',
-  '설계 전 과정에서 <strong>전문 코치진의 자문</strong>을 받았어요.',
+  '<strong>갤럽 인증 강점코치</strong>와 <strong>글로벌 코치</strong>가 함께 만들었어요',
+  'AI 코치는 <strong>MCC급 코치</strong>의 코칭 방식을 학습했어요',
+  '설계 전 과정에서 <strong>전문 코치진의 자문</strong>을 받았어요',
 ];
 
 const JOURNEY_STEPS = [
@@ -415,28 +415,29 @@ const trustListStyle: CSSProperties = {
 
 const trustItemStyle: CSSProperties = {
   display: 'flex',
-  alignItems: 'flex-start',
-  gap: '11px',
+  alignItems: 'center',
+  gap: '9px',
   background: 'var(--bg)',
-  borderRadius: '14px',
-  padding: '15px 16px',
+  borderRadius: '12px',
+  padding: '10px 12px',
 };
 
 const trustChkStyle: CSSProperties = {
   flex: 'none',
-  width: '20px',
-  height: '20px',
+  width: '16px',
+  height: '16px',
   borderRadius: '50%',
   background: 'var(--accent-light)',
   display: 'grid',
   placeItems: 'center',
-  marginTop: '1px',
 };
 
 const trustTxStyle: CSSProperties = {
-  fontSize: '14.5px',
+  fontSize: '12.5px',
   color: 'var(--text-secondary)',
-  lineHeight: 1.5,
+  lineHeight: 1.45,
+  flex: 1,
+  minWidth: 0,
 };
 
 const flowStyle: CSSProperties = {
