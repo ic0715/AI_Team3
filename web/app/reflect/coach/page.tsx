@@ -232,6 +232,17 @@ function detectUserExit(text: string): boolean {
   return USER_EXIT_WORDS.some((w) => text.includes(w));
 }
 
+// Path C — 정서 위기 키워드 (커리어 career-interview.ts CRISIS_RED_KEYWORDS와 동일 세트).
+//   감지 시 추출·저장(finalize)을 가로채고 위기 안내 모달을 띄운다.
+//   서버 EMOTIONAL_CRISIS_GUARD가 redirect 멘트(…"오늘 코칭은 여기서 마무리하겠습니다")를
+//   출력해 isComplete=true가 돌아오므로, 클라이언트가 readyToFinalize 대신 모달로 분기해야
+//   위기 대화에 대한 부적절한 인사이트/액션 저장을 막을 수 있다.
+const CRISIS_RED_WORDS = ['죽고 싶다', '사라지고 싶다', '끝내고 싶다', '이 세상에서 없어졌으면', '스스로 다치게', '해치고 싶다'];
+
+function detectCrisisRed(text: string): boolean {
+  return CRISIS_RED_WORDS.some((w) => text.includes(w));
+}
+
 // ────────────────────────────────────────────────────────────
 // 페이지 export
 // ────────────────────────────────────────────────────────────
@@ -260,6 +271,10 @@ function CoachContent() {
   //   true면 입력창 대신 '회고 완료하기' 버튼을 노출 — 사용자가 대화를 다시 보고 눌러야 진행.
   //   (커리어 manual-finalize PR #107 패턴 이식. 자동 finalize 폐기.)
   const [readyToFinalize, setReadyToFinalize] = useState(false);
+  // v1.8: Path C 정서 위기 — 위기 키워드 감지 시 finalize를 가로채고 안내 모달만 노출.
+  //   (커리어 Path C 패턴 이식. 단 회고는 재도 가능 + coaching_insights가 홈 UI를 구동하므로
+  //    DB 메타 기록은 하지 않음 — 모달만 띄움.)
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
 
   // v1.7: input state는 자식 MessageInput 컴포넌트로 이동 (typing lag fix)
   const [isSending, setIsSending] = useState(false);
@@ -407,6 +422,14 @@ function CoachContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
+  // ── Path C: 정서 위기 — 추출·저장 스킵, 안내 모달만 노출 ──
+  // v1.8: 회고는 주차 UPSERT라 재도 가능 + coaching_insights가 홈 타임라인 UI를 구동하므로
+  //   위기 세션의 메타 행은 남기지 않는다(커리어 career_interview_results 메타 INSERT와 다름).
+  //   안전(모달 노출) > 기록.
+  const triggerCrisisFinalize = useCallback(() => {
+    setShowCrisisModal(true);
+  }, []);
+
   // ── 메시지 전송 ───────────────────────────────────────────
   // v1.7(2026-05-25): typing lag fix를 위해 input state를 자식 MessageInput으로 분리.
   //   handleSend는 text 인자를 받는 형태로 변경. 부모는 input 변경 시마다 재렌더링되지
@@ -434,6 +457,10 @@ function CoachContent() {
       setReadyToFinalize(true);
       return;
     }
+
+    // Path C 판정 — chat 호출은 그대로 진행(서버 가드가 redirect 멘트 출력).
+    //   재협의 모드에서도 위기는 잡아야 하므로 isRenegotiate 가드 없이 판정.
+    const isCrisis = detectCrisisRed(trimmed);
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -471,6 +498,13 @@ function CoachContent() {
       setMessages((prev) => [...prev, coachMessage]);
       setQuestionIndex(response.nextQuestionIndex);
 
+      // Path C: 위기 감지 시 finalize 경로 가로채기 — readyToFinalize를 세우지 않고 모달만.
+      //   (서버 redirect 멘트로 response.isComplete=true가 와도 아래 블록을 타지 않게 먼저 처리.)
+      if (isCrisis) {
+        triggerCrisisFinalize();
+        return;
+      }
+
       if (response.isComplete && !isRenegotiate) {
         // v1.6: 자동 finalize 폐기 — 코치 종료 발화 후 '회고 완료하기' 버튼을 노출하고,
         //   사용자가 직접 눌렀을 때만 추출·저장 진행 (handleFinalize).
@@ -490,7 +524,7 @@ function CoachContent() {
     } finally {
       setIsSending(false);
     }
-  }, [isSending, context, userId, messages, questionIndex, isRenegotiate]);
+  }, [isSending, context, userId, messages, questionIndex, isRenegotiate, triggerCrisisFinalize]);
 
   // ── 회고 완료하기 (사용자가 직접 누름) → 추출·저장 → 요약 화면 ──
   // v1.6: 자동 finalize를 대체. 중복 클릭 가드(isFinalizing), 실패 시 readyToFinalize
@@ -585,6 +619,16 @@ function CoachContent() {
           )}
         </>
       )}
+
+      {/* Path C 정서 위기 모달 — v1.8. 위기 시 isComplete를 세우지 않아 showSummary=false 유지,
+          채팅 위에 모달이 오버레이된다. 닫으면 홈으로(회고는 세션 저장이 없어 clear 불필요). */}
+      <CrisisModal
+        open={showCrisisModal}
+        onClose={() => {
+          setShowCrisisModal(false);
+          router.push('/home');
+        }}
+      />
     </div>
   );
 }
@@ -682,6 +726,65 @@ function FinalizeBar({ onFinalize }: { onFinalize: () => void }) {
       <button type="button" onClick={onFinalize} style={finalizeBtnStyle}>
         회고 완료하기 →
       </button>
+    </div>
+  );
+}
+
+// ── Path C 정서 위기 모달 (v1.8) ──
+//   커리어 career-interview CrisisModal과 동일 구조·문구. 단 reflect 디자인 토큰 사용:
+//   --border→--line, --text-primary→--ink, 버튼은 finalizeBtnStyle(accent) 재사용.
+function CrisisModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        background: 'rgba(0,0,0,.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--surface)',
+          borderRadius: '20px',
+          padding: '28px 24px',
+          maxWidth: '340px',
+          width: '100%',
+          boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+        }}
+      >
+        <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '10px', color: 'var(--ink)' }}>
+          잠시 멈추고 알려드릴 게 있어요
+        </div>
+        <p style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--ink)', opacity: 0.7, marginBottom: '16px' }}>
+          지금 말씀해주신 마음은 혼자 견디지 않으셔도 됩니다. 아래 번호로 연결해보시는 걸 권해드려요.
+        </p>
+        <ul
+          style={{
+            fontSize: '14px',
+            listStyle: 'none',
+            padding: 0,
+            margin: '0 0 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            color: 'var(--ink)',
+          }}
+        >
+          <li>📞 <b>자살예방상담전화 1393</b> (24시간 무료)</li>
+          <li>📞 <b>정신건강 위기상담전화 1577-0199</b> (24시간)</li>
+        </ul>
+        <button type="button" onClick={onClose} style={finalizeBtnStyle}>
+          닫고 홈으로
+        </button>
+      </div>
     </div>
   );
 }
