@@ -3,6 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { ACTIVE_COACHING_RULES } from '@/lib/prompts/shared-coaching-rules';
 
 const DOCS_DIR = path.join(process.cwd(), '..', 'docs', 'ai_prompt');
 const SYSTEM_PROMPT_MD = fs.readFileSync(path.join(DOCS_DIR, 'system_prompt.md'), 'utf8');
@@ -55,6 +56,10 @@ const BASE_SYSTEM = `${SYSTEM_PROMPT_MD}
 ${REFLECT_COACHING_MD}
 
 ---
+
+${ACTIVE_COACHING_RULES}
+
+---
 ${EMOTIONAL_CRISIS_GUARD}`;
 
 // ─────────────────────────────────────────────────────────────
@@ -104,12 +109,16 @@ export function buildChatSystemPrompt(ctx: ReflectChatContext, isRenegotiate: bo
    컨텍스트(액션·완료 카운트·한 줄 회고)는 인지하되 첫 발화에서 평가·확인하지 마세요.
 
 2. **탐색 (자유 흐름)**: 사용자가 꺼내는 주제를 따라갑니다. 정해진 순서 없음.
-   다음 신호 보이면 그 자리에서 2~3번 더 파고듭니다 (system_prompt §"🚨 최우선 규칙 #2"):
+   다음 신호가 보이면 **한 번 받아주되, 같은 단어를 반복해서 캐묻지 마세요**.
+   같은 신호가 2번째 등장하면 위 "🚨 최우선 규칙 §2 능동 코칭 행동 4종"
+   (이분법 frame / 구조 정리형 / 가설 제안형 / 실행 시나리오 검증형)으로 **전환**합니다:
      - 감정 표현 ("답답해요", "막막해요")
      - 갈등/모순 ("강점인데 안 보여요")
      - 추상 키워드 ("부담", "방향성", "어색함")
      - 미확정 ("~인 것 같아요")
-   → 무시하고 다른 주제로 넘기면 premature_closure 안티패턴.
+   → 신호를 무시하고 다른 주제로 넘기면 premature_closure 안티패턴.
+   → 반대로 같은 감정어·단어를 2번 이상 follow-up하며 머무는 것도 금지(§1 말꼬리 잡기 금지).
+     맥락(역할·실행·다음 주 액션)으로 움직이세요.
 
 3. **다음 주 액션 도출 — 사용자 주도, 코치 미러링** (ICF 정통):
    - 충분히 탐색됐다 판단되면 What/How 개방형 질문으로 사용자가 스스로 액션을 떠올리게 유도.
