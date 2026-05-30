@@ -345,11 +345,11 @@ function CareerResultContent() {
         </div>
 
         {/* 선택 안내 (스펙 3.3) */}
-        <h2 style={sectionTitleStyle}>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: '4px' }}>
           키우고 싶은 역량을{' '}
           <strong style={{ color: 'var(--accent)' }}>1개</strong> 골라주세요
         </h2>
-        <p style={bannerSubStyle}>
+        <p style={{ ...bannerSubStyle, color: 'var(--text-secondary)', marginBottom: '14px' }}>
           선택 후 바로 시작해 볼 수 있는 액션 아이템을 알려드립니다.
         </p>
 
@@ -667,7 +667,7 @@ function CompetencyCard({
             lineHeight: 1.3,
           }}
         >
-          {slot.emoji} {slot.goalTitle}
+          {slot.goalTitle}
         </div>
       </div>
 
