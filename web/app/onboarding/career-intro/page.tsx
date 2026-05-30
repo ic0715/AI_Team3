@@ -263,7 +263,7 @@ export default function CareerIntroPage() {
                       className={`flex items-center gap-[4px] px-[9px] py-[4px] rounded-full text-[11.5px] font-bold border-[1.5px] cursor-pointer transition-all ${
                         done
                           ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                          : 'bg-white text-[#e0524f] border-[#e0524f]'
+                          : 'bg-white text-[var(--danger)] border-[var(--danger)]'
                       }`}
                     >
                       <span>{idx + 1}</span>
@@ -282,16 +282,16 @@ export default function CareerIntroPage() {
               type="button"
               onClick={handleStart}
               disabled={!allConfirmed}
-              className={`mt-4 w-full border-none rounded-[12px] font-bold text-[14.5px] py-[12px] font-inherit transition-all duration-200 ${
+              className={`mt-4 w-full border-none rounded-[var(--radius-md)] font-bold text-[14.5px] py-[12px] font-inherit transition-all duration-200 ${
                 allConfirmed
-                  ? 'bg-[var(--accent)] text-white cursor-pointer shadow-[0_6px_18px_rgba(47,84,235,0.35)] active:scale-[0.985]'
-                  : 'bg-[#c9c9d2] text-white cursor-not-allowed'
+                  ? 'bg-[var(--accent)] text-white cursor-pointer shadow-[0_6px_18px_rgba(45,91,255,0.35)] active:scale-[0.985]'
+                  : 'bg-[var(--border-strong)] text-white cursor-not-allowed'
               }`}
             >
               인터뷰 시작하기 →
             </button>
             <div
-              className={`mt-[8px] text-[11.5px] font-semibold text-[#e0524f] transition-opacity ${
+              className={`mt-[8px] text-[11.5px] font-semibold text-[var(--danger)] transition-opacity ${
                 hintShown && !allConfirmed ? 'opacity-100' : 'opacity-0'
               }`}
               aria-live="polite"
@@ -367,7 +367,7 @@ function ConfirmCard({
     <section className="flex-none w-full snap-center px-5 pt-3 pb-3 flex flex-col overflow-hidden">
       {/* 확인 eyebrow — "이 카드는 확인이 필요하다"는 사실을 사용자가 한눈에 알도록 */}
       <div
-        className={`inline-flex items-center gap-[5px] self-start px-[8px] py-[3px] rounded-full text-[10.5px] font-extrabold tracking-[0.04em] mb-[8px] transition-colors ${
+        className={`inline-flex items-center gap-[5px] self-start px-[9px] py-[3px] rounded-full text-[11.5px] font-extrabold tracking-[0.04em] mb-[8px] transition-colors ${
           confirmed
             ? 'bg-[var(--accent)] text-white'
             : 'bg-[var(--accent-light)] text-[var(--accent)]'
@@ -419,8 +419,8 @@ function CompareRow({
       }`}
     >
       <span
-        className={`flex-none w-[18px] h-[18px] rounded-full grid place-items-center text-[10px] font-extrabold text-white ${
-          type === 'no' ? 'bg-[#e0524f]' : 'bg-[var(--accent)]'
+        className={`flex-none w-[18px] h-[18px] rounded-full grid place-items-center text-[11px] font-extrabold text-white ${
+          type === 'no' ? 'bg-[var(--danger)]' : 'bg-[var(--accent)]'
         }`}
       >
         {type === 'no' ? '✕' : '✓'}
@@ -464,7 +464,7 @@ function ProcCard({
         <div className="font-bold text-[13px] text-[var(--text-primary)]">{title}</div>
         <div className="text-[var(--text-secondary)] text-[11.5px] mt-[1px] leading-[1.4]">{desc}</div>
         {warn && (
-          <div className="text-[#e0524f] text-[11px] font-semibold mt-[4px] leading-[1.35]">
+          <div className="text-[var(--danger)] text-[11px] font-semibold mt-[4px] leading-[1.35]">
             {warn}
           </div>
         )}
