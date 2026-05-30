@@ -433,11 +433,6 @@ function ActionItemsContent() {
 
         {/* 본문 */}
         <main style={mainStyle}>
-        {/* STEP 배지 */}
-        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', letterSpacing: '.08em', marginBottom: '12px' }}>
-          STEP 3
-        </div>
-
         {/* 안내 패널 (스펙 3.3) — 선택한 목표 + 액션 선택 안내 */}
         <div style={infoPanelStyle}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '.06em', marginBottom: '6px', opacity: 0.75 }}>
@@ -659,7 +654,7 @@ function ActionItemsContent() {
               }} />
               저장 중...
             </span>
-          ) : '시작하기 🚀'}
+          ) : '시작하기'}
         </button>
       </footer>
     </div>
@@ -694,7 +689,6 @@ function LoadingScreen({ text }: { text: string }) {
 function EmptySeeds() {
   return (
     <div style={{ padding: '20px', background: 'var(--bg)', borderRadius: '12px', textAlign: 'center' }}>
-      <div style={{ fontSize: '24px', marginBottom: '8px' }}>📭</div>
       <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         이 역량의 추천 액션이 아직 준비되지 않았어요.
         <br />
@@ -787,13 +781,6 @@ function ActionCard({
           >
             {seed.description}
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-            {seed.tags.map((tag) => (
-              <span key={tag} style={tagStyle}>
-                {tag}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
     </button>

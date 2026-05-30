@@ -167,7 +167,7 @@ function CompleteContent() {
 
         {/* 요약 카드 4행 (스펙 3.3) */}
         <div style={summaryCardStyle}>
-          <SummaryRow label="🎯 강점">
+          <SummaryRow label="강점">
             <div
               style={{
                 display: 'flex',
@@ -189,17 +189,17 @@ function CompleteContent() {
             </div>
           </SummaryRow>
 
-          <SummaryRow label="🗺 방향">
+          <SummaryRow label="방향">
             <span style={valueTextStyle}>{data.goalTitle || '—'}</span>
           </SummaryRow>
 
-          <SummaryRow label="✅ 액션">
+          <SummaryRow label="액션">
             <span style={{ ...valueTextStyle, textAlign: 'right' }}>
               {data.actionTitle || '—'}
             </span>
           </SummaryRow>
 
-          <SummaryRow label="📅 일정" isLast>
+          <SummaryRow label="일정" isLast>
             <span style={valueTextStyle}>
               <time dateTime={data.startedAt}>{startLabel}</time>
               <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>→</span>
@@ -249,9 +249,9 @@ function SummaryRow({
     >
       <span
         style={{
-          fontSize: '13px',
+          fontSize: '14px',
           fontWeight: 700,
-          color: 'var(--text-secondary)',
+          color: 'var(--text-primary)',
           minWidth: '56px',
           flexShrink: 0,
           letterSpacing: '-.01em',

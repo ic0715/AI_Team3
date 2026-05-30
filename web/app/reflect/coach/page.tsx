@@ -400,7 +400,7 @@ function CoachContent() {
         const openingMessage: Message = {
           id: crypto.randomUUID(),
           role: 'coach',
-          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${calculatedWeek} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
+          content: `안녕하세요, ${ctx.nickname}님\nWeek ${calculatedWeek} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
         };
         setMessages([openingMessage]);
         setLoadingContext(false);

@@ -361,8 +361,7 @@ function HomeContent() {
               <em style={greetingNameStyle}>{data.nickname}님</em>
             ) : (
               '친구님'
-            )}{' '}
-            👋
+            )}
           </div>
           <div style={greetingSubStyle}>
             {WEEKDAY_KO[today.getDay()]}요일 · {today.getMonth() + 1}월 {today.getDate()}일 ·{' '}
@@ -542,7 +541,7 @@ function TodayCard({
         }}
         aria-live="polite"
       >
-        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요 ✅'}
+        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요'}
       </div>
     </div>
   );
@@ -572,7 +571,7 @@ function MemoNotif({ onGoReflect }: { onGoReflect: () => void }) {
         </div>
         <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)' }}>
           <strong style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
-            오늘의 메모, 짧게라도 남겨볼까요? ✏️
+            오늘의 메모, 짧게라도 남겨볼까요?
           </strong>
           주말에 코치와 마감 회고를 할 때 컨텍스트가 돼요.
         </div>
@@ -662,7 +661,6 @@ function TimelineDone({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotDone }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardDone }}>
         {hasInsight ? (
@@ -709,37 +707,11 @@ function TimelineCurrent({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotCurrent }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardCurrent }}>
         <div style={tlStatusCurrent}>이번 주 · 진행 중 ({doneCount}/7)</div>
         <div style={tlActionTitleCurrent}>{action?.title ?? '액션이 없어요'}</div>
 
-        <div style={tlDayRow}>
-          {weekDays.map((day) => {
-            const dayISO = formatLocalISO(day);
-            const isCompleted = completedDates.has(dayISO);
-            const isToday = isSameDay(day, today);
-            const isFuture = day.getTime() > today.getTime() && !isToday;
-            return (
-              <button
-                key={dayISO}
-                type="button"
-                onClick={() => onToggleDay(day)}
-                disabled={isFuture}
-                style={{
-                  ...tlDayStyle,
-                  ...(isCompleted ? tlDayFilledStyle : {}),
-                  ...(isToday ? tlDayTodayStyle : {}),
-                  ...(isFuture ? tlDayFutureStyle : {}),
-                }}
-                aria-label={`${WEEKDAY_KO[day.getDay()]}요일 ${isCompleted ? '완료' : '미완료'}`}
-              >
-                {isCompleted ? '✓' : WEEKDAY_KO[day.getDay()]}
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
@@ -757,7 +729,6 @@ function TimelineFuture({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotFuture }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardFuture }}>
         {plannedActionTitle ? (
@@ -767,7 +738,7 @@ function TimelineFuture({
           </>
         ) : (
           <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            🌱 코치와 함께 정해요
+            코치와 함께 정해요
           </div>
         )}
       </div>
