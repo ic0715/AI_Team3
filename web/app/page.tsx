@@ -19,7 +19,16 @@ export default function LandingPage() {
   }, [router]);
 
   // ── 이미 로그인된 사용자 → 상태 기반 자동 리다이렉트 (spec 01_landing.md §2)
+  //
+  // 🚧 TEMP (2026-05-31): 랜딩 swipe deck UI 테스트를 위해 auto-redirect를
+  //   임시 비활성화. ?redirect=1 쿼리 파라미터를 붙이면 원래 동작 유지.
+  //   테스트 끝나면 아래 `if (!shouldRedirect) return;` 라인 제거.
   useEffect(() => {
+    const shouldRedirect =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('redirect') === '1';
+    if (!shouldRedirect) return; // 🚧 TEMP: 평소엔 redirect 안 함 (랜딩 deck 보여줌)
+
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -115,10 +124,26 @@ export default function LandingPage() {
             <polyline points="2,12 7,12 9.5,6 13,18 15.5,12 22,12" />
           </svg>
         </div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={brandTitleStyle}>CareerPT</div>
           <div style={brandSubStyle}>내 강점으로 커리어 방향을 찾는 AI 코치</div>
         </div>
+        {/* 🚧 TEMP (2026-05-31): 로그아웃 접근용 임시 프로필 버튼.
+            랜딩 UI 테스트 끝나면 제거 권장. */}
+        <button
+          type="button"
+          onClick={() => router.push('/profile')}
+          aria-label="프로필 (로그아웃)"
+          title="프로필 / 로그아웃"
+          style={profileBtnStyle}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <title>프로필</title>
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21v-1a8 8 0 0 1 16 0v1" />
+          </svg>
+        </button>
       </header>
 
       {/* ── Swipe Deck (5장) ── */}
@@ -326,6 +351,22 @@ const brandSubStyle: CSSProperties = {
   marginTop: '3px',
   fontSize: '12px',
   color: 'var(--text-muted)',
+};
+
+// 🚧 TEMP: 우측 상단 프로필 버튼
+const profileBtnStyle: CSSProperties = {
+  flex: 'none',
+  width: '40px',
+  height: '40px',
+  borderRadius: '50%',
+  border: '1.5px solid var(--border)',
+  background: 'var(--bg)',
+  color: 'var(--text-secondary)',
+  display: 'grid',
+  placeItems: 'center',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  transition: 'all .15s',
 };
 
 const deckStyle: CSSProperties = {
