@@ -157,6 +157,7 @@ export default function CareerIntroPage() {
         >
           {/* Card 1 — 코칭 vs 컨설팅/멘토링 */}
           <ConfirmCard
+            stepIndex={1}
             confirmed={confirmed.has(0)}
             onToggle={() => toggleConfirm(0)}
           >
@@ -179,6 +180,7 @@ export default function CareerIntroPage() {
 
           {/* Card 2 — 역량 = 지식 + 스킬 + 태도 */}
           <ConfirmCard
+            stepIndex={2}
             confirmed={confirmed.has(1)}
             onToggle={() => toggleConfirm(1)}
           >
@@ -210,6 +212,7 @@ export default function CareerIntroPage() {
 
           {/* Card 3 — 진행 방식 + 30분 이상 권장 */}
           <ConfirmCard
+            stepIndex={3}
             confirmed={confirmed.has(2)}
             onToggle={() => toggleConfirm(2)}
           >
@@ -242,8 +245,38 @@ export default function CareerIntroPage() {
               <br />
               이제 코치와 시작해볼까요?
             </p>
-            <div className="mt-3 text-[13.5px] font-semibold text-[var(--text-muted)]">
-              {confirmed.size} / {REQUIRED_CONFIRMS} 확인
+
+            {/* 확인 progress chips — 안 한 카드는 빨간색 강조, 클릭하면 해당 카드로 이동 */}
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <div className="text-[12.5px] font-semibold text-[var(--text-muted)]">
+                카드별 확인 상태
+              </div>
+              <div className="flex gap-2">
+                {[0, 1, 2].map((idx) => {
+                  const done = confirmed.has(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => goTo(idx)}
+                      aria-label={`카드 ${idx + 1} ${done ? '확인 완료' : '확인 필요'} — 이동`}
+                      className={`flex items-center gap-[5px] px-[11px] py-[6px] rounded-full text-[12.5px] font-bold border-[1.5px] cursor-pointer transition-all ${
+                        done
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                          : 'bg-white text-[#e0524f] border-[#e0524f]'
+                      }`}
+                    >
+                      <span>{idx + 1}</span>
+                      <span>{done ? '✓' : '✗'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[12px] text-[var(--text-muted)]">
+                {allConfirmed
+                  ? '모두 확인했어요'
+                  : '안 한 카드를 누르면 해당 카드로 이동해요'}
+              </div>
             </div>
             <button
               type="button"
@@ -318,27 +351,45 @@ export default function CareerIntroPage() {
 
 // ── 서브 컴포넌트 ────────────────────────────────────────
 
-/** 카드 1·2·3 공통 셸 — 본문 + 하단 "이해했어요" 확인 버튼 */
+/** 카드 1·2·3 공통 셸 — 상단 확인 eyebrow + 본문 + 하단 "이해했어요" 확인 버튼 */
 function ConfirmCard({
+  stepIndex,
   confirmed,
   onToggle,
   children,
 }: {
+  stepIndex: number; // 1·2·3 (UI 표시용, 사용자 확인 진행률)
   confirmed: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
     <section className="flex-none w-full snap-center px-6 pt-5 pb-4 flex flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* 확인 eyebrow — "이 카드는 확인이 필요하다"는 사실을 사용자가 한눈에 알도록 */}
+      <div
+        className={`inline-flex items-center gap-[6px] self-start px-[10px] py-[4px] rounded-full text-[11.5px] font-extrabold tracking-[0.04em] mb-[10px] transition-colors ${
+          confirmed
+            ? 'bg-[var(--accent)] text-white'
+            : 'bg-[var(--accent-light)] text-[var(--accent)]'
+        }`}
+      >
+        {confirmed ? '✓ 확인 완료' : `확인이 필요해요 · ${stepIndex} / 3`}
+      </div>
       {children}
       <div className="flex-1 min-h-3" />
+      {/* 확인 안 한 경우 버튼 위에 안내 한 줄 — 발견성 보강 */}
+      {!confirmed && (
+        <div className="mt-[12px] text-center text-[12.5px] text-[var(--text-muted)]">
+          👇 이해되셨다면 아래 버튼을 눌러주세요
+        </div>
+      )}
       <button
         type="button"
         onClick={onToggle}
-        className={`mt-[15px] w-full border-[1.5px] rounded-[12px] font-bold text-[14.5px] py-[13px] font-inherit transition-all duration-200 cursor-pointer ${
+        className={`mt-[10px] w-full border-[1.5px] rounded-[12px] font-bold text-[14.5px] py-[13px] font-inherit transition-all duration-200 cursor-pointer ${
           confirmed
             ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-            : 'bg-white text-[var(--accent)] border-[var(--accent-light)]'
+            : 'bg-white text-[var(--accent)] border-[var(--accent)] shadow-[0_0_0_4px_rgba(47,84,235,0.08)]'
         }`}
       >
         {confirmed ? '✓ 확인했어요' : '이해했어요'}
