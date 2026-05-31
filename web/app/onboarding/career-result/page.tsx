@@ -16,6 +16,7 @@ import {
   type MatchedSlot,
 } from '@/lib/competency/match';
 import { localISODate } from '@/lib/utils/localDate';
+import { stripLeadingEmoji } from '@/lib/utils/emoji';
 import {
   domainToCode,
   extractGrowthCompetencies,
@@ -744,7 +745,7 @@ function CompetencyCard({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {slot.tags.map((tag) => (
           <span key={tag} style={tagStyle}>
-            {tag.replace(/^\p{Emoji}\s*/u, '')}
+            {stripLeadingEmoji(tag)}
           </span>
         ))}
       </div>
