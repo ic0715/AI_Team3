@@ -67,6 +67,25 @@ def build_html(summary: dict, out_path: Path) -> None:
     current = next((s for s in scenarios if s["scenario"] == "current"), scenarios[0])
     at_risk = current.get("at_risk_personas", [])
 
+    # ── 이탈 위험 페르소나의 시나리오별 12주 잔존율 (risk 비교 차트용)
+    # scenario_{name}.json 에서 개별 페르소나 데이터 조회
+    at_risk_ids = [p["persona_id"] for p in at_risk]
+    risk_cross: dict[str, list[float]] = {}  # scenario_name → [week12 per at-risk persona]
+    for sc in scenarios:
+        sc_name = sc["scenario"]
+        sc_file = RESULTS_DIR / f"scenario_{sc_name}.json"
+        if sc_file.exists():
+            sc_personas = {
+                r["persona_id"]: r
+                for r in json.loads(sc_file.read_text(encoding="utf-8"))
+            }
+            risk_cross[sc_name] = [
+                round(sc_personas[pid]["week12_retention"] * 100, 1) if pid in sc_personas else 0.0
+                for pid in at_risk_ids
+            ]
+        else:
+            risk_cross[sc_name] = [0.0] * len(at_risk_ids)
+
     # ── 시나리오 간 12주 잔존율 델타
     sc_map = {s["scenario"]: s for s in scenarios}
     delta_pt = 0.0
@@ -242,9 +261,11 @@ const LINE_DATASETS = {json.dumps(line_datasets)};
 const ATYPICAL_DATASETS = {json.dumps(atypical_datasets)};
 const HEATMAP_ROWS = {json.dumps(heatmap_rows)};
 const AT_RISK = {json.dumps(at_risk)};
+const AT_RISK_NAMES = {json.dumps([p['nickname'] for p in at_risk])};
 const SC_COLORS = {json.dumps([SC_META.get(s['scenario'], {}).get('color', '#94a3b8') for s in scenarios])};
 const SC_LABELS = {json.dumps([SC_META.get(s['scenario'], {}).get('label', s['scenario']) for s in scenarios])};
 const SC_WEEK12 = {json.dumps([round(s['week12_mean_retention']*100,1) for s in scenarios])};
+const RISK_CROSS = {json.dumps([risk_cross.get(s['scenario'], []) for s in scenarios])};
 
 function switchTab(idx) {{
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
@@ -326,16 +347,15 @@ new Chart(document.getElementById('atypical-canvas'), {{
   }},
 }});
 
-// ── 이탈 위험 페르소나 시나리오 비교
+// ── 이탈 위험 페르소나 시나리오 비교 (RISK_CROSS: scenario × at-risk persona)
 if (AT_RISK.length) {{
-  const riskNames = AT_RISK.map(p => p.nickname);
   new Chart(document.getElementById('risk-canvas'), {{
     type: 'bar',
     data: {{
-      labels: riskNames,
+      labels: AT_RISK_NAMES,
       datasets: SC_LABELS.map((label, i) => ({{
         label,
-        data: AT_RISK.map(p => {{}}).map((_, pi) => null), // placeholder — filled below
+        data: RISK_CROSS[i],
         backgroundColor: SC_COLORS[i] + 'aa',
         borderColor: SC_COLORS[i],
         borderWidth: 1.5,
@@ -343,10 +363,13 @@ if (AT_RISK.length) {{
     }},
     options: {{
       responsive: true,
-      plugins: {{ legend: {{ labels: {{ color: '#94a3b8' }} }}, tooltip: {{ callbacks: {{ label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' }} }} }},
+      plugins: {{
+        legend: {{ labels: {{ color: '#94a3b8' }} }},
+        tooltip: {{ callbacks: {{ label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' }} }},
+      }},
       scales: {{
         x: {{ ticks: {{ color: '#64748b' }}, grid: {{ color: '#1e293b' }} }},
-        y: {{ min:0, ticks: {{ color: '#64748b', callback: v => v+'%' }}, grid: {{ color: '#1e293b' }} }},
+        y: {{ min:0, title: {{ display:true, text:'12주 잔존율 (%)', color:'#64748b' }}, ticks: {{ color: '#64748b', callback: v => v+'%' }}, grid: {{ color: '#1e293b' }} }},
       }},
     }},
   }});

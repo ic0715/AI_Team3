@@ -50,7 +50,10 @@ def main() -> None:
 
     out_dir: Path = args.out or (SIM_HOME / "retention_results")
 
-    # 1) 스코어 로드
+    # 1) 비정형 페르소나 목록 (스코어 생성보다 먼저 로드)
+    atypical_ids = _load_atypical_ids(DATA_DIR)
+
+    # 2) 스코어 로드
     if args.round is not None:
         rd = round_dir(args.round)
         print(f"[retention_sim] 라운드 {args.round} 결과 로드: {rd}")
@@ -63,11 +66,8 @@ def main() -> None:
     else:
         personas_jsonl = DATA_DIR / "personas_with_goals.jsonl"
         print(f"[retention_sim] 합성 스코어 생성 (seed={args.seed}): {personas_jsonl}")
-        scores = _synthetic_scores(personas_jsonl, seed=args.seed)
+        scores = _synthetic_scores(personas_jsonl, seed=args.seed, atypical_ids=atypical_ids)
         print(f"  {len(scores)}명 페르소나 합성 스코어 생성 완료")
-
-    # 2) 비정형 페르소나 목록
-    atypical_ids = _load_atypical_ids(DATA_DIR)
     if atypical_ids:
         print(f"  비정형 페르소나: {sorted(atypical_ids)}")
     else:

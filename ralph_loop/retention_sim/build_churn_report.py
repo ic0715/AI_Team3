@@ -127,7 +127,8 @@ def _apply_hook(
 def build_evaluation() -> dict:
     personas_jsonl = DATA_DIR / "personas_with_goals.jsonl"
     atypical_ids = _load_atypical_ids(DATA_DIR)
-    scores = _synthetic_scores(personas_jsonl, seed=42)
+    atypical_ids = _load_atypical_ids(DATA_DIR)
+    scores = _synthetic_scores(personas_jsonl, seed=42, atypical_ids=atypical_ids)
     meta = _load_persona_meta(personas_jsonl)
 
     # current 시나리오 (실측 기준)
@@ -249,7 +250,7 @@ def build_html(ev: dict, out_path: Path) -> None:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CareerPT 12주 Retention — Hook 효과 분석</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.3.0/dist/chartjs-chart-matrix.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }}

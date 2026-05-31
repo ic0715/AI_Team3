@@ -58,16 +58,23 @@ def _load_round_scores(round_dir: Path) -> dict[int, dict]:
     return scores
 
 
-def _synthetic_scores(personas_jsonl: Path, seed: int = 42) -> dict[int, dict]:
+def _synthetic_scores(
+    personas_jsonl: Path,
+    seed: int = 42,
+    atypical_ids: set[int] | None = None,
+) -> dict[int, dict]:
     """personas_with_goals.jsonl → 합성 스코어 생성.
 
     방법 B에서 실제 세션 데이터 없이 이탈 분석을 돌릴 때 사용.
     emotional_tone, specificity_level 으로 현실적인 분포를 모사.
+    atypical_ids: 비정형 페르소나 ID 집합 — 추가 패널티 적용.
     """
     rng = random.Random(seed)
     scores: dict[int, dict] = {}
+    atypical_ids = atypical_ids or set()
 
     # emotional_tone → 기대 desire_to_return 분포
+    # resigned/apathetic 등 명세에 없는 tone은 낮은 값으로 명시
     dtr_by_tone = {
         "motivated":   (7.5, 1.0),
         "curious":     (7.2, 1.0),
@@ -76,6 +83,8 @@ def _synthetic_scores(personas_jsonl: Path, seed: int = 42) -> dict[int, dict]:
         "exhausted":   (4.8, 1.4),
         "defiant":     (4.5, 1.5),
         "withdrawn":   (4.2, 1.5),
+        "resigned":    (4.0, 1.4),
+        "apathetic":   (3.8, 1.4),
         "neutral":     (6.5, 1.1),
     }
     es_by_tone = {
@@ -86,6 +95,8 @@ def _synthetic_scores(personas_jsonl: Path, seed: int = 42) -> dict[int, dict]:
         "exhausted":   (5.5, 1.3),
         "defiant":     (5.0, 1.4),
         "withdrawn":   (5.2, 1.4),
+        "resigned":    (5.0, 1.4),
+        "apathetic":   (4.8, 1.5),
         "neutral":     (7.0, 1.0),
     }
 
@@ -112,8 +123,9 @@ def _synthetic_scores(personas_jsonl: Path, seed: int = 42) -> dict[int, dict]:
             tone = (p.get("selected_goal") or {}).get("emotional_tone", "neutral")
             tone = tone.lower()
 
-            dtr_mu, dtr_sd = dtr_by_tone.get(tone, (6.5, 1.2))
-            es_mu, es_sd   = es_by_tone.get(tone, (7.0, 1.1))
+            # tone 맵에 없는 값은 낮은 분포로 fallback (unknown → 이탈 위험 있음으로 보수 처리)
+            dtr_mu, dtr_sd = dtr_by_tone.get(tone, (5.0, 1.3))
+            es_mu, es_sd   = es_by_tone.get(tone, (5.5, 1.3))
 
             # specificity_level 보정: low → 약간 낮은 novelty
             spec = (p.get("selected_goal") or {}).get("specificity_level", "medium")
@@ -122,6 +134,12 @@ def _synthetic_scores(personas_jsonl: Path, seed: int = 42) -> dict[int, dict]:
             dtr = max(1.0, min(10.0, rng.gauss(dtr_mu, dtr_sd)))
             es  = max(1.0, min(10.0, rng.gauss(es_mu,  es_sd)))
             nov = max(1.0, min(10.0, rng.gauss(nov_mu,  1.2)))
+
+            # 비정형 페르소나: tone 외 추가 패널티 (단답·비협조·이탈 경향 모사)
+            if pid in atypical_ids:
+                dtr = max(1.0, dtr - 1.2)
+                es  = max(1.0, es  - 0.8)
+
             ss  = max(1.0, min(10.0, 0.35 * dtr + 0.25 * es + 0.20 * nov + rng.gauss(2.5, 0.5)))
 
             scores[pid] = {
