@@ -25,3 +25,6 @@ Thumbs.db
 # 만약 누군가 SIM_HOME을 워크스페이스 안으로 잡으면 무시
 careerpt-sim-output/
 round_*/
+
+# retention_sim 산출물 (SIM_HOME 기본값 경로)
+retention_results/
