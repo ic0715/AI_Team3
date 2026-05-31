@@ -36,11 +36,6 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    // 랜딩 CTA "동의하고 시작하기"에서 ?tab=signup 으로 진입한 경우 → 회원가입 모달 오픈
-    if (params.get('tab') === 'signup') {
-      setShowSignupModal(true);
-    }
-
     // Google OAuth 완료 콜백 감지:
     // - PKCE flow:     auth/callback → /login?code=XXX&source=oauth
     // - Implicit flow: auth/callback → /login?source=oauth#access_token=XXX
