@@ -564,7 +564,7 @@ function CareerInterviewContent() {
       }}>
         {/* ── 배경: 채팅 UI 목업 ────────────────────────────── */}
         <div style={{
-          position: 'absolute', inset: 0, opacity: 0.28,
+          position: 'absolute', inset: 0, opacity: 0.45,
           pointerEvents: 'none', display: 'flex', flexDirection: 'column',
         }}>
           {/* 헤더 */}
@@ -616,9 +616,9 @@ function CareerInterviewContent() {
         {/* ── 흰색 오버레이 + 완료 안내 패널 ──────────────────── */}
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'rgba(255,255,255,0.90)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
+          background: 'rgba(255,255,255,0.82)',
+          backdropFilter: 'blur(3px)',
+          WebkitBackdropFilter: 'blur(3px)',
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           padding: '0 32px',
