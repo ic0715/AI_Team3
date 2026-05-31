@@ -7,6 +7,15 @@ import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { COMPETENCIES, COMPETENCY_BY_ID, COMPETENCY_BY_CODE } from '@/lib/constants/competencies';
 import type { Domain } from '@/lib/constants/strengths';
+import {
+  deterministicMatch,
+  getCompetencyCode,
+  BADGE_TO_FIT,
+  type BadgeKey,
+  type FitLabel,
+  type UserStrength,
+  type MatchedSlot,
+} from '@/lib/competency/match';
 
 // ─────────────────────────────────────────────────────────────
 // 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
@@ -34,32 +43,11 @@ import type { Domain } from '@/lib/constants/strengths';
 // 12역량의 id (slug). lib/constants/competencies.ts에서 정의됨.
 type CompetencyId = string;
 
-type BadgeKey = 'strength_match' | 'user_interest' | 'growth_potential';
-type FitLabel = '추천' | '강점 연계 높음' | '성장 잠재력 높음';
-
-interface UserStrength {
-  name_ko: string;
-  name_en: string;
-  domain: string;
-  rank?: number;
-}
-
 interface UserProfileLite {
   nickname: string;
   jobField: string;
   careerLevel: string;
   mainConcern: string;
-}
-
-interface MatchedSlot {
-  slot: number;          // 1~5
-  competencyId: CompetencyId;
-  goalTitle: string;
-  domain: Domain;
-  badge: BadgeKey;
-  fitLabel: FitLabel;
-  tags: string[];
-  emoji: string;
 }
 
 interface RecommendedSlot extends MatchedSlot {
@@ -76,19 +64,6 @@ interface PersonalizationParams {
 
 interface PersonalizationResult {
   slots: RecommendedSlot[];
-}
-
-// 슬롯 1~3: strength_match / 슬롯 4: user_interest / 슬롯 5: growth_potential
-// 단, fallback 시(slot 4의 mentioned가 비었거나 slot 5가 도메인 전부 커버 시) badge가 strength_match로 다운그레이드 됨 (04 spec §4.1)
-const BADGE_TO_FIT: Record<BadgeKey, FitLabel> = {
-  strength_match: '강점 연계 높음',
-  user_interest: '추천',
-  growth_potential: '성장 잠재력 높음',
-};
-
-// 슬러그(competencies.ts id) → DB CHECK constraint 코드 매핑은 COMPETENCY_BY_ID에서 가져옴
-function getCompetencyCode(id: string): string {
-  return COMPETENCY_BY_ID[id]?.code ?? id;
 }
 
 // domain 컬럼도 T/I/R/E 단일 문자 CHECK. 갤럽 도메인명 → 코드 매핑.
@@ -124,133 +99,7 @@ async function generatePersonalizedTexts(
   return res.json();
 }
 // ─────────────────────────────────────────────────────────────
-
-// Step1: 결정적 매칭 (코드, AI 미사용)
-// 04 spec §4.1 알고리즘:
-//   match_score = 사용자 Top 5 강점과 각 역량의 연계 강점 5개의 교집합 크기 (0~5)
-//   슬롯 1~3: 점수 내림차순, 도메인 분산 우선 (새 도메인 먼저, 동점 시 코드 순)
-//   슬롯 4: mentioned[0] 중 1~3에 없는 첫 항목 (없으면 결정적 4위로 fallback, badge='strength_match')
-//   슬롯 5: 1~4와 다른 도메인 중 score 최고 (4도메인 다 커버되면 fallback)
-function deterministicMatch(
-  userStrengths: UserStrength[],
-  mentioned: string[],
-): MatchedSlot[] {
-  // 사용자 강점 한글명 set (예: {"화합", "절친", ...})
-  const userStrengthNames = new Set(userStrengths.map((s) => s.name_ko));
-
-  // 12역량 각각의 score 계산
-  type Scored = {
-    competencyId: string;
-    code: string;
-    goalTitle: string;
-    domain: Domain;
-    tags: string[];
-    emoji: string;
-    score: number;
-  };
-  const scored: Scored[] = COMPETENCIES.map((c) => ({
-    competencyId: c.id,
-    code: c.code,
-    goalTitle: c.title,
-    domain: c.domain,
-    tags: c.tags,
-    emoji: c.emoji,
-    score: c.linkedStrengths.filter((name) => userStrengthNames.has(name)).length,
-  }));
-
-  // 점수 내림차순, 동점 시 code 사전순 (안정 정렬 보장)
-  scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.code.localeCompare(b.code);
-  });
-
-  // 슬롯 1~3 선택: 도메인 분산 우선 (04 spec select_top3)
-  function selectTop3(): Scored[] {
-    const chosen: Scored[] = [];
-    const usedDomains = new Set<Domain>();
-    const groupedByScore = new Map<number, Scored[]>();
-    for (const item of scored) {
-      if (!groupedByScore.has(item.score)) groupedByScore.set(item.score, []);
-      groupedByScore.get(item.score)!.push(item);
-    }
-    const sortedScores = [...groupedByScore.keys()].sort((a, b) => b - a);
-    for (const score of sortedScores) {
-      const bucket = groupedByScore.get(score)!;
-      // 새 도메인 먼저, 같은 도메인은 뒤
-      const newDomain = bucket.filter((b) => !usedDomains.has(b.domain));
-      const sameDomain = bucket.filter((b) => usedDomains.has(b.domain));
-      const ordered = [
-        ...newDomain.sort((a, b) => a.code.localeCompare(b.code)),
-        ...sameDomain.sort((a, b) => a.code.localeCompare(b.code)),
-      ];
-      for (const item of ordered) {
-        if (chosen.length === 3) return chosen;
-        chosen.push(item);
-        usedDomains.add(item.domain);
-      }
-    }
-    return chosen;
-  }
-
-  const slots1to3 = selectTop3();
-  const chosenCodes = new Set(slots1to3.map((s) => s.code));
-
-  // 슬롯 4: mentioned 중 chosen에 없는 첫 항목
-  let slot4: Scored & { badge: BadgeKey };
-  let slot4Picked: Scored | undefined;
-  for (const code of mentioned) {
-    const item = scored.find((s) => s.code === code);
-    if (item && !chosenCodes.has(item.code)) {
-      slot4Picked = item;
-      break;
-    }
-  }
-  if (slot4Picked) {
-    slot4 = { ...slot4Picked, badge: 'user_interest' };
-  } else {
-    // fallback: 결정적 매칭에서 1~3에 없는 첫 항목 (4위에 해당)
-    const fallback = scored.find((s) => !chosenCodes.has(s.code));
-    if (!fallback) throw new Error('슬롯 4 fallback 실패 (12역량 모두 슬롯 1~3에 차지 못함)');
-    slot4 = { ...fallback, badge: 'strength_match' };
-  }
-  chosenCodes.add(slot4.code);
-
-  // 슬롯 5: 1~4와 다른 도메인 중 score 최고
-  const slots1to4Domains = new Set<Domain>(
-    [...slots1to3, slot4].map((s) => s.domain),
-  );
-  let slot5: Scored & { badge: BadgeKey };
-  if (slots1to4Domains.size === 4) {
-    // 4도메인 다 커버됨 → fallback: 다음 순위
-    const fallback = scored.find((s) => !chosenCodes.has(s.code));
-    if (!fallback) throw new Error('슬롯 5 fallback 실패');
-    slot5 = { ...fallback, badge: 'strength_match' };
-  } else {
-    const otherDomainPool = scored.filter(
-      (s) => !chosenCodes.has(s.code) && !slots1to4Domains.has(s.domain),
-    );
-    const pick = otherDomainPool[0];
-    if (!pick) throw new Error('슬롯 5 다른 도메인 없음');
-    slot5 = { ...pick, badge: 'growth_potential' };
-  }
-
-  const finalSlots: Array<Scored & { badge: BadgeKey }> = [
-    ...slots1to3.map((s) => ({ ...s, badge: 'strength_match' as const })),
-    slot4,
-    slot5,
-  ];
-
-  return finalSlots.map((s, i) => ({
-    slot: i + 1,
-    competencyId: s.competencyId,
-    goalTitle: s.goalTitle,
-    domain: s.domain,
-    badge: s.badge,
-    fitLabel: BADGE_TO_FIT[s.badge],
-    tags: s.tags,
-    emoji: s.emoji,
-  }));
-}
+// Step1 역량 선택 로직(deterministicMatch)은 @/lib/competency/match 로 분리됨 (단위 테스트 대상).
 
 // ────────────────────────────────────────────────────────────
 // 컴포넌트
@@ -338,11 +187,11 @@ function CareerResultContent() {
         // Step1: 결정적 매칭
         const userStrengths: UserStrength[] =
           (strengthRes.data?.strengths as UserStrength[] | undefined) ?? [];
-        const mentioned: CompetencyId[] =
+        const growthCodes: CompetencyId[] =
           (interviewRes.data.key_insights as {
-            mentioned_competencies?: CompetencyId[];
-          } | null)?.mentioned_competencies ?? [];
-        const matched = deterministicMatch(userStrengths, mentioned);
+            growth_competencies?: CompetencyId[];
+          } | null)?.growth_competencies ?? [];
+        const matched = deterministicMatch(userStrengths, growthCodes);
 
         // Step2: AI 개인화 (mock — TODO: Claude API)
         const result = await generatePersonalizedTexts({
@@ -490,7 +339,7 @@ function CareerResultContent() {
         <main style={mainStyle}>
         {/* 결과 배너 (스펙 3.2) */}
         <div style={bannerStyle}>
-          <div style={bannerEyebrowStyle}>🎯 AI 분석 완료</div>
+          <div style={bannerEyebrowStyle}>AI 분석 완료</div>
           <h1 style={bannerTitleStyle}>지금 집중해야 할 역량 목표예요</h1>
           <p style={bannerSubStyle}>
             강점 · 가치관 · 현재 상황을 종합 분석한 결과예요
@@ -498,10 +347,13 @@ function CareerResultContent() {
         </div>
 
         {/* 선택 안내 (스펙 3.3) */}
-        <h2 style={sectionTitleStyle}>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: '4px' }}>
           키우고 싶은 역량을{' '}
           <strong style={{ color: 'var(--accent)' }}>1개</strong> 골라주세요
         </h2>
+        <p style={{ ...bannerSubStyle, color: 'var(--text-secondary)', marginBottom: '14px' }}>
+          선택 후 바로 시작해 볼 수 있는 액션 아이템을 알려드립니다.
+        </p>
 
         {/* 5개 카드 (스펙 3.4) */}
         {loadingMatch ? (
@@ -626,20 +478,93 @@ function LoadingScreen({ text }: { text: string }) {
   );
 }
 
+/**
+ * 추천 역량 분석 중 스켈레톤 (인사이트 3 대응)
+ *
+ * 기존 정적 스켈레톤은 회색 카드만 있어 "에러난 것 같다"는 인상을 줬음.
+ * 개선:
+ *   1) 상단에 스피너 + 상태 텍스트 노출 ("역량을 찾는 중이에요...")
+ *   2) 일정 시간 경과 시 메시지 전환 ("거의 다 됐어요")
+ *   3) 카드에 pulse 애니메이션 → "분석이 진행되고 있다"는 인상
+ */
 function SkeletonCards() {
+  // 메시지 전환 타이밍: 7초 경과 후 "거의 다 됐어요"
+  const [phase, setPhase] = useState<'searching' | 'almost'>('searching');
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setPhase('almost'), 7000);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const message =
+    phase === 'searching'
+      ? '역량을 찾는 중이에요...'
+      : '거의 다 됐어요';
+
   return (
     <div
       aria-busy="true"
       aria-label="추천 역량 분석 중"
+      aria-live="polite"
       style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
     >
+      {/* keyframes — pulse(카드 깜빡임) + spin(스피너) */}
+      <style>{`
+        @keyframes skel-pulse {
+          0%, 100% { opacity: 0.45; }
+          50%      { opacity: 0.75; }
+        }
+        @keyframes skel-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      {/* 상태 배너 — 스피너 + 메시지 (정적 스켈레톤만 보던 사용자 안심) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          marginBottom: '4px',
+          background: 'var(--accent-tint, #EEF2FF)',
+          border: '1px solid var(--accent-soft, #C7D2FE)',
+          borderRadius: '12px',
+        }}
+      >
+        <div
+          aria-hidden="true"
+          style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            border: '2.5px solid var(--accent-soft, #C7D2FE)',
+            borderTopColor: 'var(--accent, #4F46E5)',
+            animation: 'skel-spin 0.75s linear infinite',
+            flexShrink: 0,
+          }}
+        />
+        <div
+          style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--accent, #4F46E5)',
+            // 메시지 전환 시 부드럽게
+            transition: 'opacity .3s ease',
+          }}
+        >
+          {message}
+        </div>
+      </div>
+
       {[1, 2, 3, 4, 5].map((i) => (
         <div
           key={i}
           style={{
             ...cardStyle,
             pointerEvents: 'none',
-            opacity: 0.55,
+            // 정적 opacity 대신 pulse 애니메이션으로 살아있는 인상
+            animation: `skel-pulse 1.6s ease-in-out ${i * 0.12}s infinite`,
           }}
         >
           <div
@@ -817,7 +742,7 @@ function CompetencyCard({
             lineHeight: 1.3,
           }}
         >
-          {slot.emoji} {slot.goalTitle}
+          {slot.goalTitle}
         </div>
       </div>
 
@@ -837,7 +762,7 @@ function CompetencyCard({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {slot.tags.map((tag) => (
           <span key={tag} style={tagStyle}>
-            {tag}
+            {tag.replace(/^\p{Emoji}\s*/u, '')}
           </span>
         ))}
       </div>

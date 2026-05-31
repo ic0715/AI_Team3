@@ -26,7 +26,6 @@ function isOver14(birthdate: string): boolean {
   return age >= 14;
 }
 
-type TabType = 'login' | 'signup';
 type PanelType = 'tabs' | 'reset' | 'verify-email' | 'resume';
 
 interface ResumeRoute {
@@ -37,16 +36,11 @@ interface ResumeRoute {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('login');
+  const [showSignupModal, setShowSignupModal] = useState(false);
 
   // Google OAuth / 이메일 인증 콜백에서 돌아왔을 때 처리
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-
-    // 랜딩 CTA "동의하고 시작하기"에서 ?tab=signup 으로 진입한 경우 → 회원가입 탭 활성화
-    if (params.get('tab') === 'signup') {
-      setActiveTab('signup');
-    }
 
     // Google OAuth 완료 콜백 감지:
     // - PKCE flow:     auth/callback → /login?code=XXX&source=oauth
@@ -70,7 +64,6 @@ export default function LoginPage() {
             setLoginEmail(session.user.email ?? '');
             setVerifiedSuccess(true);
             setPanel('tabs');
-            setActiveTab('login');
           }
         }
       });
@@ -107,6 +100,9 @@ export default function LoginPage() {
 
   // 이어서 하기 라우팅 정보
   const [pendingRoute, setPendingRoute] = useState<ResumeRoute | null>(null);
+
+  // 회원가입 즉시 완료 (이메일 인증 OFF 환경)
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   // 비밀번호 재설정
   const [resetEmail, setResetEmail] = useState('');
@@ -161,7 +157,7 @@ export default function LoginPage() {
     e.preventDefault();
     setSignupError('');
     if (!signupEmail) { setSignupError('이메일을 입력해주세요'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupError('올바른 이메일 형식이 아니에요'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupError('유효하지 않은 이메일 주소예요 (@가 포함된 올바른 형식으로 입력해주세요)'); return; }
     if (signupPassword.length < 8) { setSignupError('비밀번호는 최소 8자 이상이어야 해요'); return; }
     if (!isOver14(signupBirthdate)) { setSignupError('만 14세 이상만 가입할 수 있어요'); return; }
     if (!consentPrivacy || !consentTerms || !consentAge) { setSignupError('필수 항목에 동의해주세요'); return; }
@@ -182,11 +178,10 @@ export default function LoginPage() {
       const msg = error.message.toLowerCase();
       if (msg.includes('already registered') || msg.includes('already been registered')) {
         setSignupError('이미 가입된 이메일이에요. 로그인을 시도해보세요');
-        setActiveTab('login');
       } else if (msg.includes('rate limit') || msg.includes('only request this once') || msg.includes('too many')) {
         setSignupError('잠시 후 다시 시도해주세요 (이메일 발송 횟수 제한)');
       } else if (msg.includes('invalid email') || msg.includes('unable to validate')) {
-        setSignupError('올바른 이메일 형식이 아니에요');
+        setSignupError('유효하지 않은 이메일 주소예요');
       } else if (msg.includes('password') && msg.includes('weak')) {
         setSignupError('비밀번호가 너무 간단해요. 영문+숫자 조합으로 바꿔주세요');
       } else {
@@ -195,14 +190,26 @@ export default function LoginPage() {
       }
       return;
     }
-    // 이메일 인증 OFF: 세션이 바로 생성됨 → 온보딩으로 이동
-    // 이메일 인증 ON: 세션 없음 → 인증 안내 패널 표시
-    if (signupData.session) {
-      await handlePostAuthRouting();
+
+    // 이메일 인증 OFF 환경에서 중복 이메일은 error 없이 identities=[] 로 반환됨
+    if (!signupData.user?.identities?.length) {
+      // 중복 이메일로 인해 기존 유저로 자동 로그인된 상태 → 즉시 로그아웃
+      await supabase.auth.signOut();
+      setSignupError('이미 가입된 이메일이에요. 로그인을 시도해보세요');
       return;
     }
-    setPendingEmail(signupEmail);
-    setPanel('verify-email');
+
+    // 가입 성공 — 세션이 바로 오면(이메일 인증 OFF) 완료 메시지, 없으면 인증 대기 패널
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      // 이메일 인증 OFF: 즉시 가입 완료
+      setSignupSuccess(true);
+    } else {
+      // 이메일 인증 ON: 인증 메일 발송 안내
+      setPendingEmail(signupEmail);
+      setPanel('verify-email');
+      setShowSignupModal(false);
+    }
   };
 
   // 비밀번호 재설정 처리
@@ -375,7 +382,7 @@ export default function LoginPage() {
           </form>
 
           <button
-            onClick={() => { setPanel('tabs'); setActiveTab('login'); setResetMessage(''); }}
+            onClick={() => { setPanel('tabs'); setResetMessage(''); }}
             style={{ width: '100%', marginTop: '12px', background: 'none', border: 'none', color: 'var(--accent)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', padding: '12px', fontFamily: 'inherit' }}
           >
             ← 로그인으로 돌아가기
@@ -409,7 +416,7 @@ export default function LoginPage() {
             메일이 안 보이면 스팸함을 확인해주세요.
           </div>
           <button
-            onClick={() => { setPanel('tabs'); setActiveTab('login'); }}
+            onClick={() => { setPanel('tabs'); }}
             style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', padding: '12px', fontFamily: 'inherit' }}
           >
             ← 로그인으로 돌아가기
@@ -507,120 +514,166 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* 탭 + 폼 패널 */}
+      {/* 로그인 폼 패널 */}
       {panel === 'tabs' && (
-        <>
-          {/* 탭 네비게이션 */}
-          <div style={{
-            display: 'flex', margin: '0 24px 24px',
-            background: '#F0F0EC', borderRadius: 'var(--radius-sm)',
-            padding: '3px', flexShrink: 0,
-          }}>
-            {(['login', 'signup'] as TabType[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => { setActiveTab(tab); setLoginError(''); setSignupError(''); router.replace(`/login?tab=${tab}`); }}
-                style={{
-                  flex: 1, padding: '9px', textAlign: 'center', borderRadius: '6px',
-                  fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                  fontFamily: 'inherit', transition: 'all .15s',
-                  background: activeTab === tab ? 'var(--surface)' : 'none',
-                  color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  boxShadow: activeTab === tab ? '0 1px 4px rgba(0,0,0,.1)' : 'none',
-                }}
-              >
-                {tab === 'login' ? '로그인' : '회원가입'}
-              </button>
-            ))}
-          </div>
+        <div style={{ flex: 1, padding: '0 24px 40px', overflowY: 'auto' }}>
 
-          <div style={{ flex: 1, padding: '0 24px 40px', overflowY: 'auto' }}>
+          {/* 이메일 인증 완료 배너 */}
+          {verifiedSuccess && (
+            <div style={{
+              padding: '14px 16px', borderRadius: 'var(--radius-md)',
+              background: '#ecfdf5', border: '1.5px solid #6ee7b7',
+              fontSize: '14px', color: '#065f46', marginBottom: '16px',
+              display: 'flex', alignItems: 'center', gap: '10px',
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span>이메일 인증이 완료되었습니다. 로그인해주세요.</span>
+            </div>
+          )}
 
-            {/* 로그인 패널 */}
-            {/* 이메일 인증 완료 배너 */}
-            {verifiedSuccess && (
-              <div style={{
-                padding: '14px 16px', borderRadius: 'var(--radius-md)',
-                background: '#ecfdf5', border: '1.5px solid #6ee7b7',
-                fontSize: '14px', color: '#065f46', marginBottom: '16px',
-                display: 'flex', alignItems: 'center', gap: '10px',
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                <span>이메일 인증이 완료되었습니다. 로그인해주세요.</span>
-              </div>
-            )}
+          <form onSubmit={handleLogin}>
+            {loginError && <ErrorBox message={loginError} />}
 
-            {activeTab === 'login' && (
-              <form onSubmit={handleLogin}>
-                {loginError && <ErrorBox message={loginError} />}
+            <FieldRow label="이메일">
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => { setLoginEmail(e.target.value); setLoginError(''); }}
+                placeholder="example@email.com"
+                autoComplete="username"
+                style={inputStyle}
+              />
+            </FieldRow>
 
-                <FieldRow label="이메일">
-                  <input
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => { setLoginEmail(e.target.value); setLoginError(''); }}
-                    placeholder="example@email.com"
-                    autoComplete="username"
-                    style={inputStyle}
-                  />
-                </FieldRow>
-
-                <FieldRow label="비밀번호">
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={showLoginPassword ? 'text' : 'password'}
-                      value={loginPassword}
-                      onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
-                      placeholder="비밀번호 입력"
-                      autoComplete="current-password"
-                      style={{ ...inputStyle, paddingRight: '44px' }}
-                    />
-                    <button
-                      type="button"
-                      aria-pressed={showLoginPassword}
-                      onClick={() => setShowLoginPassword(!showLoginPassword)}
-                      style={eyeBtnStyle}
-                    >
-                      {showLoginPassword ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                          <line x1="1" y1="1" x2="23" y2="23"/>
-                        </svg>
-                      ) : (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                          <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </FieldRow>
-
-                <button type="submit" disabled={loginLoading} style={primaryBtnStyle}>
-                  {loginLoading ? '로그인 중...' : '로그인'}
-                </button>
-
+            <FieldRow label="비밀번호">
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  value={loginPassword}
+                  onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
+                  placeholder="비밀번호 입력"
+                  autoComplete="current-password"
+                  style={{ ...inputStyle, paddingRight: '44px' }}
+                />
                 <button
                   type="button"
-                  onClick={() => setPanel('reset')}
-                  style={{ display: 'block', margin: '12px auto 0', background: 'none', border: 'none', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}
+                  aria-pressed={showLoginPassword}
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  style={eyeBtnStyle}
                 >
-                  비밀번호를 잊으셨나요?
+                  {showLoginPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  )}
                 </button>
+              </div>
+            </FieldRow>
 
-                <Divider />
+            <button type="submit" disabled={loginLoading} style={primaryBtnStyle}>
+              {loginLoading ? '로그인 중...' : '로그인'}
+            </button>
 
-                <GoogleButton />
-              </form>
-            )}
+            <button
+              type="button"
+              onClick={() => setPanel('reset')}
+              style={{ display: 'block', margin: '12px auto 0', background: 'none', border: 'none', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              비밀번호를 잊으셨나요?
+            </button>
 
-            {/* 회원가입 패널 */}
-            {activeTab === 'signup' && (
-              <form onSubmit={handleSignup}>
+            <Divider />
+
+            <GoogleButton />
+
+            {/* 회원가입 링크 */}
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>처음이신가요?&nbsp;</span>
+              <button
+                type="button"
+                onClick={() => { setSignupError(''); setShowSignupModal(true); }}
+                style={{ background: 'none', border: 'none', fontSize: '14px', fontWeight: 700, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+              >
+                회원가입하기
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 회원가입 모달 */}
+      {showSignupModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSignupModal(false); }}
+        >
+          <div style={{
+            width: 'min(430px, 100vw)',
+            maxHeight: '92dvh',
+            background: 'var(--surface)',
+            borderRadius: '20px 20px 0 0',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 -8px 40px rgba(0,0,0,.2)',
+          }}>
+            {/* 모달 헤더 */}
+            <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>회원가입</div>
+              <button
+                onClick={() => setShowSignupModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+                aria-label="닫기"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* 모달 본문 (스크롤 가능) */}
+            <div style={{ overflowY: 'auto', padding: '20px 24px 40px' }}>
+
+              {/* 가입 완료 화면 (이메일 인증 OFF 환경) */}
+              {signupSuccess && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '16px 0 8px' }}>
+                  <div style={{
+                    width: '64px', height: '64px', borderRadius: '50%',
+                    background: '#ecfdf5', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', marginBottom: '20px',
+                  }}>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '10px', color: 'var(--text-primary)' }}>
+                    회원가입이 완료되었습니다!
+                  </div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: '32px' }}>
+                    CareerPT에 오신 걸 환영해요.<br />
+                    지금 바로 커리어 코칭을 시작해보세요.
+                  </div>
+                  <button
+                    onClick={() => { setShowSignupModal(false); handlePostAuthRouting(); }}
+                    style={{ ...primaryBtnStyle, width: '100%' }}
+                  >
+                    시작하기 →
+                  </button>
+                </div>
+              )}
+
+              {!signupSuccess && <form onSubmit={handleSignup}>
                 {signupError && <ErrorBox message={signupError} />}
 
                 <FieldRow label="이메일">
@@ -692,7 +745,6 @@ export default function LoginPage() {
                     value={signupBirthdate}
                     onChange={(e) => {
                       setSignupBirthdate(e.target.value);
-                      // 생년월일과 만 14세 동의 자동 연동
                       if (isOver14(e.target.value)) setConsentAge(true);
                       else setConsentAge(false);
                     }}
@@ -704,12 +756,11 @@ export default function LoginPage() {
                   </div>
                 </FieldRow>
 
-                {/* 분리 동의 영역 */}
+                {/* 동의 영역 */}
                 <div style={{
                   border: '1.5px solid var(--border)', borderRadius: 'var(--radius-md)',
                   padding: '14px 16px', marginBottom: '14px',
                 }}>
-                  {/* 전체 동의 */}
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
                     <input
                       type="checkbox"
@@ -719,41 +770,16 @@ export default function LoginPage() {
                     />
                     <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>전체 동의</span>
                   </label>
-
-                  <ConsentRow
-                    checked={consentPrivacy}
-                    onChange={setConsentPrivacy}
-                    label="[필수] 개인정보 수집 및 이용 동의"
-                    showView
-                  />
-                  <ConsentRow
-                    checked={consentTerms}
-                    onChange={setConsentTerms}
-                    label="[필수] 서비스 이용약관 동의"
-                    showView
-                  />
-                  <ConsentRow
-                    checked={consentAge}
-                    onChange={setConsentAge}
-                    label="[필수] 만 14세 이상 확인"
-                  />
-                  <ConsentRow
-                    checked={consentMarketing}
-                    onChange={setConsentMarketing}
-                    label="[선택] 마케팅 정보 수신 동의"
-                    showView
-                    last
-                  />
+                  <ConsentRow checked={consentPrivacy} onChange={setConsentPrivacy} label="[필수] 개인정보 수집 및 이용 동의" showView />
+                  <ConsentRow checked={consentTerms} onChange={setConsentTerms} label="[필수] 서비스 이용약관 동의" showView />
+                  <ConsentRow checked={consentAge} onChange={setConsentAge} label="[필수] 만 14세 이상 확인" />
+                  <ConsentRow checked={consentMarketing} onChange={setConsentMarketing} label="[선택] 마케팅 정보 수신 동의" showView last />
                 </div>
 
                 <button
                   type="submit"
                   disabled={!signupEnabled || signupLoading}
-                  style={{
-                    ...primaryBtnStyle,
-                    opacity: signupEnabled ? 1 : 0.4,
-                    cursor: signupEnabled ? 'pointer' : 'not-allowed',
-                  }}
+                  style={{ ...primaryBtnStyle, opacity: signupEnabled ? 1 : 0.4, cursor: signupEnabled ? 'pointer' : 'not-allowed' }}
                 >
                   {signupLoading ? '처리 중...' : '시작하기 →'}
                 </button>
@@ -761,10 +787,10 @@ export default function LoginPage() {
                 <Divider />
 
                 <GoogleButton label="Google로 시작하기" />
-              </form>
-            )}
+              </form>}
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

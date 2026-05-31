@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
 
 // ────────────────────────────────────────────────────────────
@@ -53,6 +54,8 @@ interface HomeData {
   currentAction: ActionItem | null;
   strengths: UserStrength[];
   insights: CoachingInsight[];
+  /** 미래 주차에 코칭이 이미 정해둔 액션 (week_number → title) */
+  futureActionsByWeek: Map<number, string>;
 }
 
 const TOTAL_WEEKS = 12;
@@ -169,11 +172,11 @@ function HomeContent() {
         const currentWeek = calculateCurrentWeek(goalRow.started_at);
         const goal: ActiveGoal = { ...goalRow, current_week: currentWeek };
 
-        // 2차 fetch: action_items + insights 병렬 (둘 다 action_item_id에 의존하지 않음)
+        // 2차 fetch: action_items(현재 주차) + insights(과거) + future actions(미래 주차) 병렬
         const mondayISO = formatLocalISO(monday);
         const sundayISO = formatLocalISO(addDays(monday, 6));
 
-        const [actionRes, insightRes] = await Promise.all([
+        const [actionRes, insightRes, futureActionRes] = await Promise.all([
           supabase
             .from('action_items')
             // v0.8: strength_link 컬럼 사용 — 오늘의 액션 카드 "강점 「○○」을 발휘하는 시간" 표시
@@ -191,6 +194,16 @@ function HomeContent() {
             .eq('goal_id', goal.id)
             .lt('week_number', currentWeek)
             .order('week_number', { ascending: true }),
+          // v1.6: 코칭이 이미 정해둔 미래 주차 액션 가져오기 → 타임라인 future 카드에 표시
+          supabase
+            .from('action_items')
+            .select('week_number, title')
+            .eq('user_id', user.id)
+            .eq('goal_id', goal.id)
+            .gt('week_number', currentWeek)
+            .lte('week_number', TOTAL_WEEKS)
+            .order('week_number', { ascending: true })
+            .order('created_at', { ascending: false }), // 같은 주차 중복 시 최신 우선
         ]);
 
         if (cancelled) return;
@@ -201,6 +214,7 @@ function HomeContent() {
         };
         logErr('action_items', actionRes.error);
         logErr('coaching_insights', insightRes.error);
+        logErr('action_items (future)', futureActionRes.error);
 
         if (!actionRes.data) {
           // 현재 주차 action_items 없음 → 진입 조건 위반
@@ -223,12 +237,21 @@ function HomeContent() {
         if (cancelled) return;
         logErr('action_completions', completionRes.error);
 
+        // 미래 주차 액션 맵 만들기 (같은 주차에 여러 row면 최신 created_at 우선)
+        const futureActionsByWeek = new Map<number, string>();
+        (futureActionRes.data ?? []).forEach((row: { week_number: number; title: string }) => {
+          if (!futureActionsByWeek.has(row.week_number)) {
+            futureActionsByWeek.set(row.week_number, row.title);
+          }
+        });
+
         setData({
           nickname: profileRes.data?.nickname ?? '',
           goal,
           currentAction: actionRes.data as ActionItem,
           strengths: (strengthRes.data?.strengths as UserStrength[] | undefined) ?? [],
           insights: (insightRes.data as CoachingInsight[] | undefined) ?? [],
+          futureActionsByWeek,
         });
 
         const dates = new Set<string>();
@@ -406,8 +429,7 @@ function HomeContent() {
               <em style={greetingNameStyle}>{data.nickname}님</em>
             ) : (
               '친구님'
-            )}{' '}
-            👋
+            )}
           </div>
           <div style={greetingSubStyle}>
             {WEEKDAY_KO[today.getDay()]}요일 · {today.getMonth() + 1}월 {today.getDate()}일 ·{' '}
@@ -441,6 +463,7 @@ function HomeContent() {
           goal={data.goal}
           insights={data.insights}
           currentAction={data.currentAction}
+          futureActionsByWeek={data.futureActionsByWeek}
           weekDays={weekDays}
           today={today}
           completedDates={completedDates}
@@ -586,7 +609,7 @@ function TodayCard({
         }}
         aria-live="polite"
       >
-        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요 ✅'}
+        {todayCompleted ? '🎉 오늘 완료했어요!' : '실행한 요일에 체크해주세요'}
       </div>
     </div>
   );
@@ -616,7 +639,7 @@ function MemoNotif({ onGoReflect }: { onGoReflect: () => void }) {
         </div>
         <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)' }}>
           <strong style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
-            오늘의 메모, 짧게라도 남겨볼까요? ✏️
+            오늘의 메모, 짧게라도 남겨볼까요?
           </strong>
           주말에 코치와 마감 회고를 할 때 컨텍스트가 돼요.
         </div>
@@ -643,6 +666,7 @@ function Timeline({
   goal,
   insights,
   currentAction,
+  futureActionsByWeek,
   weekDays,
   today,
   completedDates,
@@ -651,6 +675,7 @@ function Timeline({
   goal: ActiveGoal;
   insights: CoachingInsight[];
   currentAction: ActionItem | null;
+  futureActionsByWeek: Map<number, string>;
   weekDays: Date[];
   today: Date;
   completedDates: Set<string>;
@@ -680,7 +705,13 @@ function Timeline({
             />
           );
         }
-        return <TimelineFuture key={week} week={week} />;
+        return (
+          <TimelineFuture
+            key={week}
+            week={week}
+            plannedActionTitle={futureActionsByWeek.get(week) ?? null}
+          />
+        );
       })}
     </div>
   );
@@ -698,7 +729,6 @@ function TimelineDone({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotDone }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardDone }}>
         {hasInsight ? (
@@ -745,75 +775,40 @@ function TimelineCurrent({
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotCurrent }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardCurrent }}>
         <div style={tlStatusCurrent}>이번 주 · 진행 중 ({doneCount}/7)</div>
         <div style={tlActionTitleCurrent}>{action?.title ?? '액션이 없어요'}</div>
 
-        <div style={tlDayRow}>
-          {weekDays.map((day) => {
-            const dayISO = formatLocalISO(day);
-            const isCompleted = completedDates.has(dayISO);
-            const isToday = isSameDay(day, today);
-            const isFuture = day.getTime() > today.getTime() && !isToday;
-            return (
-              <button
-                key={dayISO}
-                type="button"
-                onClick={() => onToggleDay(day)}
-                disabled={isFuture}
-                style={{
-                  ...tlDayStyle,
-                  ...(isCompleted ? tlDayFilledStyle : {}),
-                  ...(isToday ? tlDayTodayStyle : {}),
-                  ...(isFuture ? tlDayFutureStyle : {}),
-                }}
-                aria-label={`${WEEKDAY_KO[day.getDay()]}요일 ${isCompleted ? '완료' : '미완료'}`}
-              >
-                {isCompleted ? '✓' : WEEKDAY_KO[day.getDay()]}
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
 }
 
-function TimelineFuture({ week }: { week: number }) {
-  // 모든 future 주차 동일 표시 (W6/W12 마일스톤 별도 처리 제거)
+function TimelineFuture({
+  week,
+  plannedActionTitle,
+}: {
+  week: number;
+  plannedActionTitle?: string | null;
+}) {
+  // v1.6: 코칭이 이미 정해둔 액션이 있으면 제목 표시. 없으면 기본 안내.
   return (
     <div style={tlItemStyle}>
       <div style={tlLeftCol}>
         <div style={{ ...tlDot, ...tlDotFuture }}>{week}</div>
-        <div style={tlWeekLabel}>W{week}</div>
       </div>
       <div style={{ ...tlCard, ...tlCardFuture }}>
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          🌱 코치와 함께 정해요
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
-// LoadingScreen
-// ────────────────────────────────────────────────────────────
-
-function LoadingScreen({ text }: { text: string }) {
-  return (
-    <div style={wrapStyle}>
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{text}</div>
+        {plannedActionTitle ? (
+          <>
+            <div style={tlPlannedLabel}>📋 코치와 정한 액션</div>
+            <div style={tlPlannedTitle}>{plannedActionTitle}</div>
+          </>
+        ) : (
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            코치와 함께 정해요
+          </div>
+        )}
       </div>
     </div>
   );
@@ -992,15 +987,6 @@ const themeProgPct: CSSProperties = {
   fontSize: '12px',
   opacity: 0.7,
   flexShrink: 0,
-};
-
-const themeDesc: CSSProperties = {
-  marginTop: '12px',
-  fontSize: '10px',
-  lineHeight: 1.65,
-  opacity: 0.5,
-  letterSpacing: '-.005em',
-  position: 'relative',
 };
 
 const weeksTrack: CSSProperties = {
@@ -1215,6 +1201,22 @@ const tlCardFuture: CSSProperties = {
   border: '1px dashed var(--line-strong)',
 };
 
+// v1.6: 코칭이 이미 정해둔 미래 액션 표시용 (TimelineFuture 안)
+const tlPlannedLabel: CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  color: 'var(--accent)',
+  marginBottom: '4px',
+  letterSpacing: '.02em',
+};
+
+const tlPlannedTitle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
+  lineHeight: 1.4,
+};
+
 const tlStatusDone: CSSProperties = {
   color: 'var(--accent-deep)',
   fontSize: '11px',
@@ -1297,15 +1299,3 @@ const tlDayFutureStyle: CSSProperties = {
   cursor: 'not-allowed',
 };
 
-const tlMilestoneTitle: CSSProperties = {
-  fontSize: '13px',
-  fontWeight: 700,
-  color: 'var(--text-primary)',
-  marginBottom: '4px',
-};
-
-const tlMilestoneDesc: CSSProperties = {
-  fontSize: '11px',
-  color: 'var(--text-secondary)',
-  lineHeight: 1.55,
-};

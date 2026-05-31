@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import { useCallback, useEffect, useRef, useState, memo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
@@ -116,42 +116,101 @@ async function finalizeCoaching(
   // 2) v0.8: 완료율 기반 badge/comment (11 홈 타임라인 done 카드용)
   const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
 
-  // 3) coaching_insights INSERT — schema v0.8/v0.9
-  const { error: insightErr } = await supabase.from('coaching_insights').insert({
-    user_id: userId,
-    goal_id: context.goal.id,
-    weekly_retro_id: context.weeklyRetroId,
-    week_number: context.goal.current_week,
+  const TOTAL_WEEKS = 12;
+  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
+
+  // ───── 3) coaching_insights — UPSERT 패턴 ─────
+  // schema 제약: (user_id, goal_id, week_number) UNIQUE → 같은 주에 다시 코칭하면
+  //   UPDATE해야 함 (그냥 INSERT하면 23505 위반).
+  // ※ next_action_reason은 main의 AI 응답(ai.next_action_reason)을 우선 사용.
+  const insightPayload = {
+    weekly_retro_id: context.weeklyRetroId, // v0.8: 연결된 주차 회고 FK
     topic: result.topic,
     pattern_insight: result.patternInsight,
     next_action_title: result.nextActionTitle,
     next_action_reason: ai.next_action_reason || result.patternInsight,
     strength_link: result.strengthLink,
-    badge,
-    comment,
-  });
-  if (insightErr) {
-    console.error('[13] coaching_insights INSERT:', insightErr);
+    badge,    // v0.8: 11 홈 타임라인 done 카드 이모지
+    comment,  // v0.8: 11 홈 타임라인 done 카드 코멘트
+  };
+
+  const { data: existingInsight, error: insightSelectErr } = await supabase
+    .from('coaching_insights')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', context.goal.id)
+    .eq('week_number', context.goal.current_week)
+    .maybeSingle();
+  if (insightSelectErr) {
+    console.error('[13] coaching_insights SELECT:', insightSelectErr);
   }
 
-  // 4) action_items INSERT (다음 주차)
-  // v1.5(2026-05-24): 주차는 goals.current_week이 아닌 started_at 기준 계산값 사용. 12주 클램프.
-  const TOTAL_WEEKS = 12;
-  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
-  const { error: actionErr } = await supabase.from('action_items').insert({
-    user_id: userId,
-    goal_id: context.goal.id,
-    week_number: nextWeek,
+  if (existingInsight) {
+    const { error: updErr } = await supabase
+      .from('coaching_insights')
+      .update(insightPayload)
+      .eq('id', existingInsight.id);
+    if (updErr) console.error('[13] coaching_insights UPDATE:', updErr);
+  } else {
+    const { error: insErr } = await supabase.from('coaching_insights').insert({
+      user_id: userId,
+      goal_id: context.goal.id,
+      week_number: context.goal.current_week,
+      ...insightPayload,
+    });
+    if (insErr) console.error('[13] coaching_insights INSERT:', insErr);
+  }
+
+  // ───── 4) action_items (다음 주차) — UPSERT 패턴 ─────
+  // 같은 (user_id, goal_id, week_number=nextWeek, is_custom=false) 행이 이미 있으면
+  // UPDATE (사용자가 마음 바뀌어 코칭 다시 받음 → 다음 주 액션 덮어쓰기).
+  // 없으면 INSERT (첫 코칭).
+  // ※ id를 유지하므로 action_completions FK 연결도 안전.
+  // ※ description은 main의 AI 응답(ai.next_action_reason)을 우선 사용.
+  const actionPayload = {
     title: result.nextActionTitle,
     description: ai.next_action_reason || result.patternInsight,
     tags: [],
     is_custom: false,
     source_seed_id: null,
-    strength_link: result.strengthLink,
-  });
-  if (actionErr) {
-    console.error('[13] action_items INSERT:', actionErr);
+    strength_link: result.strengthLink, // v0.8: top 강점명 (자유 텍스트)
+  };
+
+  // 가장 최근 created_at row를 UPDATE 대상으로 (11 home의 future fetch 정렬과 일치).
+  // 같은 주차에 중복 row가 이미 있는 경우 화면에 보이는 것과 동일한 row를 갱신해야
+  // 사용자에게 "업데이트됐다"가 즉시 인지됨.
+  const { data: existingAction, error: actionSelectErr } = await supabase
+    .from('action_items')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', context.goal.id)
+    .eq('week_number', nextWeek)
+    .eq('is_custom', false)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (actionSelectErr) {
+    console.error('[13] action_items SELECT:', actionSelectErr);
   }
+
+  if (existingAction) {
+    const { error: updErr } = await supabase
+      .from('action_items')
+      .update(actionPayload)
+      .eq('id', existingAction.id);
+    if (updErr) console.error('[13] action_items UPDATE:', updErr);
+  } else {
+    const { error: insErr } = await supabase.from('action_items').insert({
+      user_id: userId,
+      goal_id: context.goal.id,
+      week_number: nextWeek,
+      ...actionPayload,
+    });
+    if (insErr) console.error('[13] action_items INSERT:', insErr);
+  }
+
+  // v1.5: goals.current_week UPDATE 제거.
+  // 주차는 항상 started_at 기준 날짜 계산으로 결정되므로 DB값 변경 불필요.
 
   return result;
 }
@@ -162,6 +221,26 @@ const CONFIRM_WORDS = ['확정', '좋아요', '네', '응', '맞아', 'OK', 'ok'
 function isConfirmation(text: string): boolean {
   const t = text.trim();
   return CONFIRM_WORDS.some((w) => t.includes(w));
+}
+
+// Path B — 사용자 주도 종료 키워드 (커리어 career-interview.ts USER_EXIT_KEYWORDS와 동일 세트).
+//   감지 시 chat 호출 없이 코치 클로징 멘트를 띄우고 '회고 완료하기' 버튼을 노출(readyToFinalize).
+//   커리어 Path B와 마찬가지로 자동 finalize는 하지 않음 — 버튼 게이트로 끝남.
+const USER_EXIT_WORDS = ['여기까지 할게요', '그만하고 싶어요', '이제 됐어요', '오늘은 여기까지'];
+
+function detectUserExit(text: string): boolean {
+  return USER_EXIT_WORDS.some((w) => text.includes(w));
+}
+
+// Path C — 정서 위기 키워드 (커리어 career-interview.ts CRISIS_RED_KEYWORDS와 동일 세트).
+//   감지 시 추출·저장(finalize)을 가로채고 위기 안내 모달을 띄운다.
+//   서버 EMOTIONAL_CRISIS_GUARD가 redirect 멘트(…"오늘 코칭은 여기서 마무리하겠습니다")를
+//   출력해 isComplete=true가 돌아오므로, 클라이언트가 readyToFinalize 대신 모달로 분기해야
+//   위기 대화에 대한 부적절한 인사이트/액션 저장을 막을 수 있다.
+const CRISIS_RED_WORDS = ['죽고 싶다', '사라지고 싶다', '끝내고 싶다', '이 세상에서 없어졌으면', '스스로 다치게', '해치고 싶다'];
+
+function detectCrisisRed(text: string): boolean {
+  return CRISIS_RED_WORDS.some((w) => text.includes(w));
 }
 
 // ────────────────────────────────────────────────────────────
@@ -188,8 +267,16 @@ function CoachContent() {
   const [questionIndex, setQuestionIndex] = useState(1); // 1~4
   const [isComplete, setIsComplete] = useState(false);
   const [isRenegotiate, setIsRenegotiate] = useState(false);
+  // v1.6: 코치가 종료를 알렸지만 아직 finalize(추출·저장) 전 상태.
+  //   true면 입력창 대신 '회고 완료하기' 버튼을 노출 — 사용자가 대화를 다시 보고 눌러야 진행.
+  //   (커리어 manual-finalize PR #107 패턴 이식. 자동 finalize 폐기.)
+  const [readyToFinalize, setReadyToFinalize] = useState(false);
+  // v1.8: Path C 정서 위기 — 위기 키워드 감지 시 finalize를 가로채고 안내 모달만 노출.
+  //   (커리어 Path C 패턴 이식. 단 회고는 재도 가능 + coaching_insights가 홈 UI를 구동하므로
+  //    DB 메타 기록은 하지 않음 — 모달만 띄움.)
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
 
-  const [input, setInput] = useState('');
+  // v1.7: input state는 자식 MessageInput 컴포넌트로 이동 (typing lag fix)
   const [isSending, setIsSending] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [summary, setSummary] = useState<CoachingResult | null>(null);
@@ -313,7 +400,7 @@ function CoachContent() {
         const openingMessage: Message = {
           id: crypto.randomUUID(),
           role: 'coach',
-          content: `안녕하세요, ${ctx.nickname}님 🌱\nWeek ${calculatedWeek} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
+          content: `안녕하세요, ${ctx.nickname}님\nWeek ${calculatedWeek} 회고 잘 봤어요.${retroQuote}\n\n잠깐 함께 들여다볼까요? 가장 인상 깊었던 한 가지는 뭐였어요?`,
         };
         setMessages([openingMessage]);
         setLoadingContext(false);
@@ -335,17 +422,53 @@ function CoachContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
+  // ── Path C: 정서 위기 — 추출·저장 스킵, 안내 모달만 노출 ──
+  // v1.8: 회고는 주차 UPSERT라 재도 가능 + coaching_insights가 홈 타임라인 UI를 구동하므로
+  //   위기 세션의 메타 행은 남기지 않는다(커리어 career_interview_results 메타 INSERT와 다름).
+  //   안전(모달 노출) > 기록.
+  const triggerCrisisFinalize = useCallback(() => {
+    setShowCrisisModal(true);
+  }, []);
+
   // ── 메시지 전송 ───────────────────────────────────────────
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isSending || !context || !userId) return;
+  // v1.7(2026-05-25): typing lag fix를 위해 input state를 자식 MessageInput으로 분리.
+  //   handleSend는 text 인자를 받는 형태로 변경. 부모는 input 변경 시마다 재렌더링되지
+  //   않으므로 한글 IME composition이 안 깨짐.
+  const handleSend = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isSending || !context || !userId) return;
+
+    // Path C 판정은 가장 먼저 — 정서 위기는 모든 종료 경로보다 우선한다.
+    //   한 발화에 이탈 표현 + 위기 표현이 같이 와도 Path B로 새지 않고 위기 모달로 가도록,
+    //   아래 Path B 조건에 !isCrisis를 건다. (위기는 chat 호출 흐름을 타고 Path C 인터셉트로)
+    const isCrisis = detectCrisisRed(trimmed);
+
+    // Path B: 사용자 주도 종료 — chat 호출 생략, 코치 클로징 멘트 + '회고 완료하기' 버튼 노출.
+    //   재협의(isRenegotiate) 모드에서는 무시 — 그땐 이미 요약이 떠 있고, 액션 합의는
+    //   isConfirmation/3턴 초과로 자체 종료되므로 Path B는 메인 대화에서만 동작.
+    //   자동 finalize 하지 않음(커리어 Path B와 동일) — readyToFinalize=true로만 끝냄.
+    if (!isRenegotiate && detectUserExit(trimmed) && !isCrisis) {
+      const exitMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: trimmed,
+      };
+      const closingMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'coach',
+        content: '네, 여기까지 나눈 것만으로도 충분해요. 위로 올려 대화를 다시 보실 수 있고, 준비되시면 아래 ‘회고 완료하기’를 눌러주세요. 🌱',
+      };
+      setMessages([...messages, exitMessage, closingMessage]);
+      setReadyToFinalize(true);
+      return;
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content: trimmed,
     };
-    const inputCopy = input.trim();
-    setInput('');
+    const inputCopy = trimmed;
     setIsSending(true);
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
@@ -376,19 +499,18 @@ function CoachContent() {
       setMessages((prev) => [...prev, coachMessage]);
       setQuestionIndex(response.nextQuestionIndex);
 
+      // Path C: 위기 감지 시 finalize 경로 가로채기 — readyToFinalize를 세우지 않고 모달만.
+      //   (서버 redirect 멘트로 response.isComplete=true가 와도 아래 블록을 타지 않게 먼저 처리.)
+      if (isCrisis) {
+        triggerCrisisFinalize();
+        return;
+      }
+
       if (response.isComplete && !isRenegotiate) {
-        // finalize → coaching_insights + action_items INSERT → 요약 화면 전환
-        setIsFinalizing(true);
-        try {
-          const result = await finalizeCoaching([...nextMessages, coachMessage], context, userId);
-          setSummary(result);
-          setIsComplete(true);
-        } catch (e) {
-          console.error('[13] finalize:', e);
-          setError('저장에 실패했어요. 다시 시도해주세요.');
-        } finally {
-          setIsFinalizing(false);
-        }
+        // v1.6: 자동 finalize 폐기 — 코치 종료 발화 후 '회고 완료하기' 버튼을 노출하고,
+        //   사용자가 직접 눌렀을 때만 추출·저장 진행 (handleFinalize).
+        //   재협의 확정 경로(위 isConfirmation 분기)는 이 흐름을 타지 않음.
+        setReadyToFinalize(true);
       }
     } catch (e) {
       console.error('[13] send:', e);
@@ -403,7 +525,27 @@ function CoachContent() {
     } finally {
       setIsSending(false);
     }
-  }, [input, isSending, context, userId, messages, questionIndex, isRenegotiate]);
+  }, [isSending, context, userId, messages, questionIndex, isRenegotiate, triggerCrisisFinalize]);
+
+  // ── 회고 완료하기 (사용자가 직접 누름) → 추출·저장 → 요약 화면 ──
+  // v1.6: 자동 finalize를 대체. 중복 클릭 가드(isFinalizing), 실패 시 readyToFinalize
+  //   유지하여 재시도 가능, 성공 시에만 해제하고 요약(summary) 노출.
+  const handleFinalize = useCallback(async () => {
+    if (!context || !userId || isFinalizing) return;
+    setError(null);
+    setIsFinalizing(true);
+    try {
+      const result = await finalizeCoaching(messages, context, userId);
+      setSummary(result);
+      setIsComplete(true);
+      setReadyToFinalize(false);
+    } catch (e) {
+      console.error('[13] finalize:', e);
+      setError('저장에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setIsFinalizing(false);
+    }
+  }, [context, userId, messages, isFinalizing]);
 
   // ── 재협의 시작 ───────────────────────────────────────────
   const handleRenegotiate = useCallback(() => {
@@ -468,51 +610,26 @@ function CoachContent() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* 입력창 */}
+          {/* 입력창 또는 완료 버튼 — v1.6: 코치 종료 후엔 '회고 완료하기' 버튼으로 교체 */}
           {!isFinalizing && (
-            <div style={inputAreaStyle}>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="답변을 입력해주세요"
-                rows={1}
-                style={inputTextareaStyle}
-                aria-label="코치에게 답변 입력"
-              />
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!input.trim() || isSending}
-                style={{
-                  ...sendBtnStyle,
-                  opacity: !input.trim() || isSending ? 0.4 : 1,
-                  cursor: !input.trim() || isSending ? 'not-allowed' : 'pointer',
-                }}
-                aria-label="메시지 전송"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
-                </svg>
-              </button>
-            </div>
+            readyToFinalize ? (
+              <FinalizeBar onFinalize={handleFinalize} />
+            ) : (
+              <MessageInput onSend={handleSend} isSending={isSending} />
+            )
           )}
         </>
       )}
+
+      {/* Path C 정서 위기 모달 — v1.8. 위기 시 isComplete를 세우지 않아 showSummary=false 유지,
+          채팅 위에 모달이 오버레이된다. 닫으면 홈으로(회고는 세션 저장이 없어 clear 불필요). */}
+      <CrisisModal
+        open={showCrisisModal}
+        onClose={() => {
+          setShowCrisisModal(false);
+          router.push('/home');
+        }}
+      />
     </div>
   );
 }
@@ -520,6 +637,158 @@ function CoachContent() {
 // ────────────────────────────────────────────────────────────
 // 서브 컴포넌트
 // ────────────────────────────────────────────────────────────
+
+/**
+ * 메시지 입력창 (v1.7 — 2026-05-25 신설)
+ *
+ * input state를 부모(CoachContent)에서 분리한 이유:
+ *  - 부모는 messages 배열·AI fetch 상태 등 큰 state를 가짐
+ *  - 매 keystroke마다 부모 전체가 재렌더링되면 한글 IME composition이
+ *    깨져서 "한 글자씩 끊김" 증상 발생
+ *  - input을 자식의 로컬 state로 두고 React.memo로 감싸면, 부모의 messages
+ *    변경에 영향받지 않고 textarea만 가볍게 재렌더링
+ *
+ * 한글 IME 안전 처리:
+ *  - onCompositionStart/End로 조합 중인지 추적
+ *  - Enter로 전송할 때 composition 중이면 무시 (한글 조합 마지막 Enter가
+ *    의도와 다르게 전송 트리거하는 것 방지)
+ */
+const MessageInput = memo(function MessageInput({
+  onSend,
+  isSending,
+}: {
+  onSend: (text: string) => void;
+  isSending: boolean;
+}) {
+  const [input, setInput] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
+
+  const submit = () => {
+    const trimmed = input.trim();
+    if (!trimmed || isSending) return;
+    onSend(trimmed);
+    setInput('');
+  };
+
+  const canSubmit = !!input.trim() && !isSending;
+
+  return (
+    <div style={inputAreaStyle}>
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={() => setIsComposing(false)}
+        onKeyDown={(e) => {
+          // 한글 조합 중 Enter 무시 (IME 안전)
+          if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="답변을 입력해주세요"
+        rows={1}
+        style={inputTextareaStyle}
+        aria-label="코치에게 답변 입력"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!canSubmit}
+        style={{
+          ...sendBtnStyle,
+          opacity: canSubmit ? 1 : 0.4,
+          cursor: canSubmit ? 'pointer' : 'not-allowed',
+        }}
+        aria-label="메시지 전송"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 19-7z" />
+        </svg>
+      </button>
+    </div>
+  );
+});
+
+// 완료 버튼 바 (v1.6) — 코치 종료 후 입력창 자리에 노출.
+//   누르면 handleFinalize 실행(추출·저장 → 요약). 누르기 전까진 위로 스크롤해 대화 재확인 가능.
+function FinalizeBar({ onFinalize }: { onFinalize: () => void }) {
+  return (
+    <div style={finalizeBarStyle}>
+      <button type="button" onClick={onFinalize} style={finalizeBtnStyle}>
+        회고 완료하기 →
+      </button>
+    </div>
+  );
+}
+
+// ── Path C 정서 위기 모달 (v1.8) ──
+//   커리어 career-interview CrisisModal과 동일 구조·문구. 단 reflect 디자인 토큰 사용:
+//   --border→--line, --text-primary→--ink, 버튼은 finalizeBtnStyle(accent) 재사용.
+function CrisisModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        background: 'rgba(0,0,0,.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--surface)',
+          borderRadius: '20px',
+          padding: '28px 24px',
+          maxWidth: '340px',
+          width: '100%',
+          boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+        }}
+      >
+        <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '10px', color: 'var(--ink)' }}>
+          잠시 멈추고 알려드릴 게 있어요
+        </div>
+        <p style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--ink)', opacity: 0.7, marginBottom: '16px' }}>
+          지금 말씀해주신 마음은 혼자 견디지 않으셔도 됩니다. 아래 번호로 연결해보시는 걸 권해드려요.
+        </p>
+        <ul
+          style={{
+            fontSize: '14px',
+            listStyle: 'none',
+            padding: 0,
+            margin: '0 0 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            color: 'var(--ink)',
+          }}
+        >
+          <li>📞 <b>자살예방상담전화 1393</b> (24시간 무료)</li>
+          <li>📞 <b>정신건강 위기상담전화 1577-0199</b> (24시간)</li>
+        </ul>
+        <button type="button" onClick={onClose} style={finalizeBtnStyle}>
+          닫고 홈으로
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user';
@@ -790,6 +1059,29 @@ const sendBtnStyle: CSSProperties = {
   flexShrink: 0,
   transition: 'opacity .2s',
   boxShadow: '0 2px 8px -2px rgba(45,91,255,.4)',
+};
+
+// 완료 버튼 바 (v1.6) — inputArea와 동일한 하단 영역 레이아웃
+const finalizeBarStyle: CSSProperties = {
+  padding: '14px 16px',
+  paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+  background: 'var(--surface)',
+  borderTop: '1px solid var(--line)',
+  flexShrink: 0,
+};
+
+const finalizeBtnStyle: CSSProperties = {
+  width: '100%',
+  padding: '15px',
+  borderRadius: '14px',
+  border: 'none',
+  background: 'var(--accent)',
+  color: '#fff',
+  fontFamily: 'inherit',
+  fontWeight: 700,
+  fontSize: '15px',
+  cursor: 'pointer',
+  boxShadow: '0 4px 16px rgba(45,91,255,.3)',
 };
 
 const errorAlertStyle: CSSProperties = {

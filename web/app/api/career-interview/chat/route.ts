@@ -50,14 +50,34 @@ export async function POST(req: Request) {
       strengthsEn: context.strengths.map((s) => s.name_en),
     });
 
-    const history = messages.map((m) => ({ role: m.role, content: m.content }));
+    // 히스토리 캐시 breakpoint: 현재 user 입력 직전 메시지에 cache_control을 달아
+    // 이전 누적 대화도 캐시 히트 시키기. 시스템 프롬프트와 함께 TTL 1h 적용.
+    const history = messages.map((m, i) => {
+      if (i === messages.length - 2 && messages.length >= 2) {
+        return {
+          role: m.role,
+          content: [
+            {
+              type: 'text' as const,
+              text: m.content,
+              cache_control: { type: 'ephemeral' as const, ttl: '1h' as const },
+            },
+          ],
+        };
+      }
+      return { role: m.role, content: m.content };
+    });
 
     const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 500,           // 평시 2~3문장 + 🔴 정서 위기 redirect 멘트(다중 줄 + 자원 번호) 여유 포함
       temperature: 0.7,          // 명세 §4.6.A
       system: [
-        { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
+        {
+          type: 'text',
+          text: system,
+          cache_control: { type: 'ephemeral', ttl: '1h' },
+        },
       ],
       messages: history,
     });

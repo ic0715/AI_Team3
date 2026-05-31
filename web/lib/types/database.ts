@@ -28,8 +28,10 @@ export interface CareerInterviewKeyInsights {
     dream?: string;
   };
 
-  // 역량 추출 (기존 로직 유지)
-  mentioned_competencies?: string[]; // T-1 ~ E-3, 0~3개
+  // 기르고 싶은 역량 (의도 신호) — 우선순위 순
+  // 사용자가 명시적으로 기르고 싶다고 했거나, 답답함·부족(gap)으로 드러난 영역에 대응하는 역량.
+  // 이미 잘하는 강점은 제외. 가장 강하게 드러난 순서대로 0~5개. T-1 ~ E-3.
+  growth_competencies?: string[];
 }
 
 /** career_interview_results 테이블 Row 타입 */

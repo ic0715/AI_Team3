@@ -383,7 +383,8 @@ function CareerInterviewContent() {
     const trimmed = input.trim();
     const userMsgCountBefore = messages.filter((m) => m.role === 'user').length;
 
-    // Path B: 사용자 주도 종료 키워드 감지 시 chat 호출 생략하고 즉시 finalize
+    // Path B: 사용자 주도 종료 키워드 감지 시 chat 호출 생략하고 완료 상태로 전환
+    //   (자동 finalize 하지 않음 — 사용자가 대화를 다시 보고 '진단 완료하기'를 눌러야 진행)
     if (detectUserExit(trimmed)) {
       const exitMessage: Message = {
         id: crypto.randomUUID(),
@@ -392,10 +393,17 @@ function CareerInterviewContent() {
         displayContent: trimmed,
         timestamp: new Date(),
       };
-      const next = [...messages, exitMessage];
+      const closingMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '네, 여기까지 이야기 나눈 것만으로도 충분해요. 위로 올려 대화를 다시 보실 수 있고, 준비되시면 아래 ‘진단 완료하기’를 눌러주세요. 😊',
+        timestamp: new Date(),
+      };
+      const next = [...messages, exitMessage, closingMessage];
       setMessages(next);
       setInput('');
-      await triggerFinalize(next);
+      setIsComplete(true);
+      saveSession(next);
       return;
     }
 
@@ -461,11 +469,11 @@ function CareerInterviewContent() {
         setAgreedFocus(next.agreedFocus);
       }
 
-      // Path A: 코치 자연 종료 발화 감지 시 자동 finalize
+      // Path A: 코치 자연 종료 발화 감지 시 완료 상태로 전환
+      //   (자동 finalize 하지 않음 — 사용자가 대화를 다시 보고 '진단 완료하기'를 눌러야 진행)
       if (detectCoachClosing(response.content)) {
         setIsComplete(true);
-        clearSession();
-        await triggerFinalize(updatedMessages);
+        saveSession(updatedMessages);
         return;
       }
 
@@ -799,22 +807,32 @@ function CareerInterviewContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── 분석 로딩 오버레이 ───────────────────────────── */}
+      {/* ── 분석 로딩 오버레이 (인사이트 3 대응: 시간 현실화 + 변동 안내) ─── */}
       {isFinalizing && (
         <div style={{
           position: 'absolute', inset: 0, top: 0, left: '50%',
           transform: 'translateX(-50%)', width: 'min(430px, 100vw)',
           background: 'rgba(255,255,255,.95)',
           display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '16px',
+          alignItems: 'center', justifyContent: 'center', gap: '14px',
           zIndex: 50,
+          padding: '0 24px',
         }}>
           <div style={{ fontSize: '36px' }}>🔍</div>
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
             커리어 방향을 분석 중이에요
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            약 5~12초 정도 걸려요
+          <div style={{
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            textAlign: 'center',
+            lineHeight: 1.55,
+          }}>
+            약 20초 정도 걸려요
+            <br />
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              상황에 따라 조금 더 걸릴 수 있어요
+            </span>
           </div>
           <LoadingDots />
         </div>

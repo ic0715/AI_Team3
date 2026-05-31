@@ -112,7 +112,10 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 **future (미래 주차)**
 - dot: 흰색 배경, 점선 보더, line-strong 글씨
 - 카드: 투명 배경, 점선 보더, ink-mute 글씨
-- 모든 future 주차: `"🌱 코치와 함께 정해요"` (13px) — W6/W12 마일스톤 별도 표기 없음 (v1.4에서 통일)
+- future 주차 카드 (v1.5 동작 분기):
+  - **코칭이 이미 정해둔 액션이 있으면** (예: W2에서 코치와 W3 액션 결정 후): `"📋 코치와 정한 액션"` 레이블 (11px, accent, weight 700) + 해당 `action_items.title` (13px) 표시
+  - **아직 정해진 것 없음**: `"🌱 코치와 함께 정해요"` (13px, ink-mute) — 기본
+- 모든 future 주차 동일 처리 (v1.4에서 W6/W12 마일스톤 별도 표기 제거됨)
 
 ### 3.7 탭바
 
@@ -152,6 +155,7 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 | `action_completions` (이번 주) | `completed_date` | 7일 그리드, doneCount, 타임라인 current 체크 인디케이터 |
 | `coaching_insights` (goal_id, week_number < current_week) | `week_number`, `next_action_title`, `strength_link`, **`badge`**, **`comment`** (schema v0.8) | 타임라인 done 카드 액션명·강점chip·이모지 배지·코멘트 |
 | `action_items` (week_number=current_week) | **`strength_link`** (schema v0.8) | 오늘의 액션 카드 "강점 「○○」을 발휘하는 시간" 표시 |
+| `action_items` (week_number > current_week, ≤ 12) | `week_number`, `title` | **v1.5 신규** — 12주 타임라인 future 카드에 코칭이 이미 정해둔 액션 제목 표시 |
 | ~~`daily_memos` (이번 주)~~ | ~~`content`, `memo_date`~~ | **v1.2 제거** — 타임라인 current 카드 메모 요약 미노출에 따라 홈 화면에서 읽기 불필요 |
 
 ### 5.2 쓰기
@@ -171,7 +175,7 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 | --- | --- |
 | done | `coaching_insights` (해당 week_number) — next_action_title, strength_link, 완료율(completion_count/target_count) |
 | current | `action_items` (current_week) + `action_completions` + `daily_memos` |
-| future | 정적 ("🌱 코치와 함께 정해요") — 모든 future 주차 동일 (v1.4에서 W6/W12 마일스톤 표기 제거) |
+| future | `action_items` (week_number > current_week) 조회 결과로 분기: 액션 있으면 제목 표시, 없으면 "🌱 코치와 함께 정해요". 같은 주차에 중복 row면 `created_at` 최신 우선 (코칭 UPSERT로 보통 1개씩만 유지됨) |
 
 **done 카드 badge 로직 (앱 상수 기준):**
 
@@ -218,4 +222,5 @@ accent-tint 배경, accent 2px 보더, 18px radius.
 | v1.1 | 2026-05-20 | **[HTML 미반영 항목 반영]** **3.4** 메모 유도 카드 내 "회고하기 →" 버튼 존재 및 동작 명시. **3.5(→3.5)** 메모 유도 카드 상세 UI(배경색, 보더, 버튼 스타일) 추가. **3.6** 타임라인 done 카드 badge 형식(이모지 + comment 문구) 상세 정의. 마일스톤 주차(W6·W12) 전체 설명 문구 명시. current 카드 메모 요약 "+N개 더 보기 →" 동작 명시. **5.1** coaching_insights 읽기 항목 추가(completion_count, target_count). **6.** done 카드 badge 로직 테이블 신규 추가. **7.** done 주차 coaching_insights 없는 경우 예외 처리 추가. |
 | v1.3 | 2026-05-22 | **[TodayCard 레이아웃 변경 + GNB 고정 구조 변경]** **3.4** 완료 토글 큰 버튼 제거 → 요일 그리드 하단 작은 안내 문구로 대체. 레이아웃 순서: 액션 텍스트 → 7일 그리드 → 체크 안내 문구. 미완료: `"실행한 요일에 체크해주세요 ✅"` / 완료: `"🎉 오늘 완료했어요!"`. **3.7** 탭바 구현 방식: `sticky bottom` → `flexShrink: 0` (flex column 구조). 회고·프로필 페이지도 동일 구조 적용. wrapper `height: 100dvh + overflow: hidden`, 콘텐츠 영역 `flex: 1 + overflow-y: auto`. |
 | v1.4 | 2026-05-23 | **[UI 단순화]** **3.3 커리어 방향 카드** 설명 문구("하나의 역량은 단기간에 만들어지지 않아요...") 제거 — 시각적 노이즈 감소. **3.6 12주 타임라인** W6 "🎯 중간 회고", W12 "🏆 12주 통합 회고" 마일스톤 표기 제거 → 모든 future 주차가 동일하게 "🌱 코치와 함께 정해요"로 표시. 6번 타임라인 데이터 구조 표도 마일스톤 분기 제거. 마일스톤 컨셉은 13 코칭 자체로 충분히 다뤄짐. |
+| v1.5 | 2026-05-25 | **[코칭이 정한 미래 액션을 타임라인 future 카드에 표시]** **3.6 12주 타임라인** future 카드를 분기 처리: 코칭이 이미 정해둔 `action_items` (week_number > current_week)가 있으면 `"📋 코치와 정한 액션"` + 제목 표시, 없으면 기본 `"🌱 코치와 함께 정해요"`. 사용자가 W2에서 W3 액션 결정 → 즉시 W3 future 카드에 표시. **5.1 읽기** 항목에 미래 주차 `action_items` 조회 추가. **6번 타임라인 데이터 구조** future 분기 명시. 같은 주차에 중복 row면 `created_at` 최신 우선 (13 코칭 UPSERT 패턴으로 보통 1개씩만 유지). |
 | v1.2 | 2026-05-21 | **[feature/12 구현 반영 + 디자인 통일 + schema v0.8 정합]** **3.3** 커리어 방향 카드 배경 그라데이션 → **solid `var(--accent)`** 변경 (14 프로필 히어로 카드와 동일 톤, 디자인 일관성 ↑). **3.6** 타임라인 current 카드의 ~~메모 요약~~ + ~~회고하기 버튼~~ 제거 — 회고 진입은 3.5 메모 유도 카드 [회고하기 →]로 일원화. **5.1** 데이터 — `coaching_insights.badge`/`comment`, `action_items.strength_link` 컬럼 명시 (schema v0.8). `daily_memos` 읽기 항목 제거 (current 카드 메모 미노출에 따라 불필요). |
