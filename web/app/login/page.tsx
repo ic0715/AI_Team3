@@ -27,7 +27,13 @@ function isOver14(birthdate: string): boolean {
 }
 
 type TabType = 'login' | 'signup';
-type PanelType = 'tabs' | 'reset' | 'verify-email';
+type PanelType = 'tabs' | 'reset' | 'verify-email' | 'resume';
+
+interface ResumeRoute {
+  to: string;
+  nextStep: string;
+  completedSteps: string[];
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -99,6 +105,9 @@ export default function LoginPage() {
   const [pendingEmail, setPendingEmail] = useState('');
   const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
+  // 이어서 하기 라우팅 정보
+  const [pendingRoute, setPendingRoute] = useState<ResumeRoute | null>(null);
+
   // 비밀번호 재설정
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -157,7 +166,7 @@ export default function LoginPage() {
     if (!isOver14(signupBirthdate)) { setSignupError('만 14세 이상만 가입할 수 있어요'); return; }
     if (!consentPrivacy || !consentTerms || !consentAge) { setSignupError('필수 항목에 동의해주세요'); return; }
     setSignupLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signupData, error } = await supabase.auth.signUp({
       email: signupEmail,
       password: signupPassword,
       options: {
@@ -181,13 +190,17 @@ export default function LoginPage() {
       } else if (msg.includes('password') && msg.includes('weak')) {
         setSignupError('비밀번호가 너무 간단해요. 영문+숫자 조합으로 바꿔주세요');
       } else {
-        // 개발 중 실제 에러 확인용 (나중에 제거해도 됨)
         console.error('[Signup error]', error.message);
         setSignupError('가입에 실패했어요. 잠시 후 다시 시도해주세요');
       }
       return;
     }
-    // 가입 성공 → 이메일 인증 안내 패널로 전환 (페이지 이동 없음)
+    // 이메일 인증 OFF: 세션이 바로 생성됨 → 온보딩으로 이동
+    // 이메일 인증 ON: 세션 없음 → 인증 안내 패널 표시
+    if (signupData.session) {
+      await handlePostAuthRouting();
+      return;
+    }
     setPendingEmail(signupEmail);
     setPanel('verify-email');
   };
@@ -228,7 +241,10 @@ export default function LoginPage() {
       .eq('id', user.id)
       .single();
 
-    if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
+    if (!profile?.profile_completed) {
+      setPendingRoute({ to: '/onboarding/profile', nextStep: '기본정보 입력', completedSteps: [] });
+      setPanel('resume'); return;
+    }
 
     const { data: strengths } = await supabase
       .from('strength_analyses')
@@ -237,7 +253,10 @@ export default function LoginPage() {
       .eq('is_latest', true)
       .limit(1);
 
-    if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
+    if (!strengths?.length) {
+      setPendingRoute({ to: '/onboarding/strengths', nextStep: '강점 선택', completedSteps: ['기본정보 입력'] });
+      setPanel('resume'); return;
+    }
 
     const { data: interviews } = await supabase
       .from('career_interview_results')
@@ -245,8 +264,15 @@ export default function LoginPage() {
       .eq('user_id', user.id)
       .limit(1);
 
-    if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
-    if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
+    if (!interviews?.length) {
+      setPendingRoute({ to: '/onboarding/career-intro', nextStep: 'AI 커리어 인터뷰', completedSteps: ['기본정보 입력', '강점 선택'] });
+      setPanel('resume'); return;
+    }
+
+    if (!interviews[0].recommended_competencies) {
+      setPendingRoute({ to: '/onboarding/career-result', nextStep: '커리어 목표 선택', completedSteps: ['기본정보 입력', '강점 선택', 'AI 커리어 인터뷰'] });
+      setPanel('resume'); return;
+    }
 
     // 3. 온보딩 완료 → goals 상태 확인
     const { data: goals } = await supabase
@@ -265,7 +291,8 @@ export default function LoginPage() {
     if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
 
     // 4. 온보딩은 끝났지만 아직 goal 없음 → 액션 아이템 선택
-    router.push('/onboarding/action-items');
+    setPendingRoute({ to: '/onboarding/action-items', nextStep: '액션 아이템 선택', completedSteps: ['기본정보 입력', '강점 선택', 'AI 커리어 인터뷰', '커리어 목표 선택'] });
+    setPanel('resume');
   };
 
   return (
@@ -385,6 +412,96 @@ export default function LoginPage() {
             style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', padding: '12px', fontFamily: 'inherit' }}
           >
             ← 로그인으로 돌아가기
+          </button>
+        </div>
+      )}
+
+      {/* 이어서 하기 패널 */}
+      {panel === 'resume' && pendingRoute && (
+        <div style={{ flex: 1, padding: '0 24px 40px', display: 'flex', flexDirection: 'column' }}>
+          {/* 아이콘 */}
+          <div style={{
+            width: '56px', height: '56px', borderRadius: '50%',
+            background: 'var(--accent-light)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', marginBottom: '20px',
+          }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/>
+              <path d="M12 8v4l3 3"/>
+            </svg>
+          </div>
+
+          <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', letterSpacing: '-.03em' }}>
+            이어서 하시겠어요?
+          </div>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: '28px' }}>
+            지난번에 여기까지 진행하셨어요.
+          </div>
+
+          {/* 진행 현황 */}
+          <div style={{
+            border: '1px solid var(--border)', borderRadius: '14px',
+            padding: '16px 18px', marginBottom: '24px',
+            display: 'flex', flexDirection: 'column', gap: '10px',
+          }}>
+            {/* 완료된 단계 */}
+            {pendingRoute.completedSteps.map((step) => (
+              <div key={step} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="2 6 5 9 10 3"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)' }}>{step}</span>
+              </div>
+            ))}
+
+            {/* 다음 단계 (미완료) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '20px', height: '20px', borderRadius: '50%',
+                background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 2 9 6 4 10"/>
+                </svg>
+              </div>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>{pendingRoute.nextStep}</span>
+              <span style={{
+                marginLeft: 'auto', fontSize: '11px', fontWeight: 700,
+                color: 'var(--accent)', background: 'var(--accent-light)',
+                padding: '2px 8px', borderRadius: '999px', letterSpacing: '.01em',
+              }}>다음</span>
+            </div>
+          </div>
+
+          {/* 이어서 하기 버튼 */}
+          <button
+            onClick={() => router.push(pendingRoute.to)}
+            style={{
+              width: '100%', minHeight: '50px', borderRadius: '12px', border: 'none',
+              background: 'var(--accent)', color: '#fff',
+              fontSize: '15px', fontWeight: 800, letterSpacing: '-.02em',
+              cursor: 'pointer', fontFamily: 'inherit',
+              boxShadow: '0 4px 16px rgba(45,91,255,.3)', marginBottom: '10px',
+            }}
+          >
+            이어서 하기 →
+          </button>
+
+          {/* 처음부터 버튼 — 랜딩으로 이동 */}
+          <button
+            onClick={() => { setPanel('tabs'); setActiveTab('login'); }}
+            style={{
+              width: '100%', background: 'none', border: 'none',
+              color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500,
+              cursor: 'pointer', padding: '12px', fontFamily: 'inherit',
+            }}
+          >
+            나중에 할게요
           </button>
         </div>
       )}

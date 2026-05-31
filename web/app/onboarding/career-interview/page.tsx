@@ -182,12 +182,28 @@ function CareerInterviewContent() {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const savedSessionRef = useRef<{ messages: Message[] } | null>(null);
 
+  // 인터뷰 이미 완료 여부 (뒤로가기 진입 시)
+  const [interviewDone, setInterviewDone] = useState(false);
+
   // ── 컨텍스트 로드 (프로필 + 강점) ──────────────────────────
   useEffect(() => {
     const loadContext = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
+
+      // 인터뷰 이미 완료된 경우 — 뒤로가기로 진입했을 때 새 인터뷰 시작 방지
+      const { data: existingInterview } = await supabase
+        .from('career_interview_results')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (existingInterview?.length) {
+        setInterviewDone(true);
+        setLoadingContext(false);
+        return;
+      }
 
       const [{ data: profile }, { data: strengthData }] = await Promise.all([
         supabase.from('profiles').select('nickname, job_field, career_level, main_concern').eq('id', user.id).single(),
@@ -500,6 +516,49 @@ function CareerInterviewContent() {
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
+
+  // ── 인터뷰 이미 완료 (뒤로가기 진입) ─────────────────────
+  if (interviewDone) {
+    return (
+      <div style={{
+        position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)',
+        width: 'min(430px, 100vw)', height: '100dvh',
+        background: 'var(--surface)', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '0 28px', boxShadow: '0 0 40px rgba(0,0,0,.18)',
+      }}>
+        <div style={{
+          width: '60px', height: '60px', borderRadius: '50%',
+          background: 'var(--accent-light)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', marginBottom: '20px',
+        }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+            stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '10px', letterSpacing: '-.03em', textAlign: 'center' }}>
+          인터뷰를 완료하셨어요!
+        </div>
+        <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, textAlign: 'center', marginBottom: '32px' }}>
+          AI 커리어 인터뷰가 이미 완료됐어요.<br />
+          결과를 확인하거나 다음 단계로 이동해요.
+        </div>
+        <button
+          onClick={() => router.push('/onboarding/career-result')}
+          style={{
+            width: '100%', minHeight: '50px', borderRadius: '12px', border: 'none',
+            background: 'var(--accent)', color: '#fff',
+            fontSize: '15px', fontWeight: 800, letterSpacing: '-.02em',
+            cursor: 'pointer', fontFamily: 'inherit',
+            boxShadow: '0 4px 16px rgba(45,91,255,.3)',
+          }}
+        >
+          결과 보기 →
+        </button>
+      </div>
+    );
+  }
 
   // ── 로딩 상태 ────────────────────────────────────────────
   if (loadingContext) {
