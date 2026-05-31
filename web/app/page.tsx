@@ -1,6 +1,6 @@
 'use client';
 // p01 랜딩 — swipe deck 5장 (spec 01_landing.md v1.7)
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
@@ -86,14 +86,24 @@ export default function LandingPage() {
     if (!deck) return;
     let t: number | undefined;
     const onScroll = () => {
-      clearTimeout(t);
+      if (t !== undefined) clearTimeout(t);
       t = window.setTimeout(() => {
         const i = Math.round(deck.scrollLeft / deck.clientWidth);
         setCur(Math.max(0, Math.min(TOTAL_CARDS - 1, i)));
       }, 60);
     };
     deck.addEventListener('scroll', onScroll, { passive: true });
-    return () => deck.removeEventListener('scroll', onScroll);
+    return () => {
+      deck.removeEventListener('scroll', onScroll);
+      if (t !== undefined) clearTimeout(t); // unmount 시 pending timeout 정리
+    };
+  }, []);
+
+  const goTo = useCallback((i: number) => {
+    const deck = deckRef.current;
+    if (!deck) return;
+    const clamped = Math.max(0, Math.min(TOTAL_CARDS - 1, i));
+    deck.scrollTo({ left: clamped * deck.clientWidth, behavior: 'smooth' });
   }, []);
 
   // ── 키보드 ← → ───────────────────────────────────────────
@@ -104,15 +114,7 @@ export default function LandingPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cur]);
-
-  const goTo = (i: number) => {
-    const deck = deckRef.current;
-    if (!deck) return;
-    const clamped = Math.max(0, Math.min(TOTAL_CARDS - 1, i));
-    deck.scrollTo({ left: clamped * deck.clientWidth, behavior: 'smooth' });
-  };
+  }, [cur, goTo]);
 
   return (
     <div style={shellStyle}>
@@ -167,12 +169,12 @@ export default function LandingPage() {
             AI는 <span style={hlStyle}>아니에요</span> 🙅
           </h2>
           <div style={trustListStyle}>
-            {TRUST_POINTS.map((tp, i) => (
-              <div key={i} style={trustItemStyle}>
+            {TRUST_POINTS.map((tp) => (
+              <div key={tp.id} style={trustItemStyle}>
                 <span style={trustChkStyle}>
                   <CheckSvg color="var(--accent)" size={11} />
                 </span>
-                <div style={trustTxStyle} dangerouslySetInnerHTML={{ __html: tp }} />
+                <div style={trustTxStyle}>{tp.body}</div>
               </div>
             ))}
           </div>
@@ -261,10 +263,37 @@ export default function LandingPage() {
 }
 
 // ── 데이터 ────────────────────────────────────────────────
-const TRUST_POINTS = [
-  '<strong>갤럽 인증 강점코치</strong>와 <strong>글로벌 코치</strong>가 함께 만들었어요',
-  'AI 코치는 <strong>MCC급 코치</strong>의 코칭 방식을 학습했어요',
-  '설계 전 과정에서 <strong>전문 코치진의 자문</strong>을 받았어요',
+// TRUST 카드 — JSX 구조로 (dangerouslySetInnerHTML 제거)
+const TRUST_POINTS: { id: string; body: ReactNode }[] = [
+  {
+    id: 'cert',
+    body: (
+      <>
+        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>갤럽 인증 강점코치</strong>와{' '}
+        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>글로벌 코치</strong>가 함께 만들었어요
+      </>
+    ),
+  },
+  {
+    id: 'mcc',
+    body: (
+      <>
+        AI 코치는{' '}
+        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>MCC급 코치</strong>의 코칭 방식을
+        학습했어요
+      </>
+    ),
+  },
+  {
+    id: 'advisory',
+    body: (
+      <>
+        설계 전 과정에서{' '}
+        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>전문 코치진의 자문</strong>을
+        받았어요
+      </>
+    ),
+  },
 ];
 
 const JOURNEY_STEPS = [

@@ -46,14 +46,17 @@ export default function CareerIntroPage() {
     if (!deck) return;
     let t: number | undefined;
     const onScroll = () => {
-      clearTimeout(t);
+      if (t !== undefined) clearTimeout(t);
       t = window.setTimeout(() => {
         const i = Math.round(deck.scrollLeft / deck.clientWidth);
         setCur(Math.max(0, Math.min(TOTAL_CARDS - 1, i)));
       }, 60);
     };
     deck.addEventListener('scroll', onScroll, { passive: true });
-    return () => deck.removeEventListener('scroll', onScroll);
+    return () => {
+      deck.removeEventListener('scroll', onScroll);
+      if (t !== undefined) clearTimeout(t); // unmount 시 pending timeout 정리
+    };
   }, []);
 
   const goTo = useCallback((i: number) => {
