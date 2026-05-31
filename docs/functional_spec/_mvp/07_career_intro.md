@@ -114,7 +114,8 @@ deck 위에 항상 보이는 영역. 사용자가 어느 카드에 있든 *지�
 
 | 동작 | 결과 |
 | --- | --- |
-| 카드 1·2·3의 "이해했어요" 클릭 | 버튼 토글 (→ "✓ 확인했어요") + confirmedCount 갱신 |
+| 카드 1·2·3의 "이해했어요" 클릭 (처음 확인) | 버튼 토글 (→ "✓ 확인했어요") + confirmedCount 갱신 + **250ms 후 자동으로 다음 카드 이동** *(v1.9 — 사용자가 직접 swipe할 필요 없이 매끄러운 진행)* |
+| 카드 1·2·3의 버튼 재클릭 (확인 해제) | "✓ 확인했어요" → "이해했어요"로 되돌림, 자동 이동 **없음** (사용자가 의도적으로 머무름) |
 | confirmedCount = 3 도달 | 카드 4의 시작 버튼 disabled 해제 + accent 색 활성화 |
 | 시작 버튼 클릭 (활성화 상태) | 08 진입 (sessionStorage 이어하기 다이얼로그 정책 §4 참조) |
 | 시작 버튼 클릭 (disabled 상태) | "아직 확인하지 않은 카드가 있어요" 힌트 표시 |
@@ -166,6 +167,7 @@ deck 위에 항상 보이는 영역. 사용자가 어느 카드에 있든 *지�
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.9 | 2026-05-31 | **§3.5 gating — '이해했어요' 클릭 시 자동 다음 카드 이동**. 사용자가 매번 직접 swipe하거나 → 버튼 누를 필요 없이, 확인 즉시 250ms 후 다음 카드로 자동 advance. 250ms는 "✓ 확인 완료" 토글 애니메이션이 보일 시간 확보용. 재클릭으로 확인 해제하는 경우엔 이동 안 함(사용자가 의도적으로 머무르는 경우). 카드 3 확인 → 자동으로 카드 4(FINAL) 도착 → 시작 버튼 활성화 상태. 마찰 제거. |
 | v1.8 | 2026-05-31 | **구현 컨벤션 통일 — Tailwind → inline style 전면 변환** (코드만 변경, 사용자 경험 동일). 다른 온보딩 페이지(03 profile, 04 strengths, 10 action-items, 09 career-result 등)는 전부 `style={...}` + 하단 `const xxxStyle: CSSProperties` 패턴인데 07만 Tailwind className 63개 사용해 시각적으로 따로 노는 문제 해결. (1) 모든 className → inline style 객체로 변환(`className` 0개, `style` 62개). (2) 컨테이너 폭 `w-[390px]` → `width: min(430px, 100vw)` (모든 페이지 표준). (3) 외부 회색 wrapper(`min-h-screen ... bg-[#e8eaee]`) 제거 — 페이지 자체가 컨테이너 (다른 페이지와 동일). (4) Top bar / 카드 보더 / radius / 패딩 모두 action-items의 `wrapStyle`·`headerStyle`·`cardStyle` 패턴 따름. 발견성 보강(eyebrow / hint / glow / progress chip), gating, swipe deck 로직 등 v1.5~v1.7 변경 사항 모두 보존. 디자인 토큰 100% 사용 (`var(--accent)`, `var(--danger)`, `var(--border-strong)`, `var(--radius-md)` 등). |
 | v1.7 | 2026-05-31 | **UX/UI 조정 — 휴대폰 한 화면 fit + 디자인 시스템 정합**. (1) **§3.2 강점 카드 가운데 정렬** — 헤더·chip 모두 `text-center`+`justify-center`. (2) **§3.3 swipe deck "스크롤 없음" 제약 명시 + 압축 사이즈 표** — 카드 `overflow-y: hidden`, h2 23→19px, body 14.5→13px, 패딩·하단 nav 높이 일관 축소. 발견성 보강(eyebrow / hint / glow / progress chip)은 v1.6 그대로 유지. (3) **디자인 토큰 정렬** — 하드코딩 컬러 제거: `#e0524f` → `var(--danger)`, `#c9c9d2` → `var(--border-strong)`, 시작 버튼 radius `13px` → `var(--radius-md)` (12px). eyebrow pill 10.5→11.5px, CompareRow ✕✓ 배지 10→11px로 다른 화면 패턴(11~12.5)과 정합. globals.css 토큰 사용 표 §3.3 신설. |
 | v1.6 | 2026-05-31 | **§3.3 / §3.5 gating 발견성(discoverability) 보강 — 3개 변경**. (1) **카드 1·2·3 상단에 "확인 eyebrow" 신설**: 미확인 시 "확인이 필요해요 · N / 3" 라벨(accent pill), 확인 시 "✓ 확인 완료" 라벨로 토글. 카드 진입 즉시 "이 카드는 확인이 필요하다"는 사실 인지. (2) **카드 1·2·3 버튼 위 안내 라인** "👇 이해되셨다면 아래 버튼을 눌러주세요" 추가(미확인 상태에서만 노출). 버튼 자체에도 부드러운 외부 글로우 추가하여 발견성 보강. (3) **카드 4 진행 표시 재설계**: 단순 "N / 3 확인" 텍스트 → 클릭 가능한 mini chip 3개 ("1 ✓ / 2 ✓ / 3 ✓"). 미확인 카드는 빨간 보더 + "N ✗"로 강조, chip 클릭 시 해당 카드로 즉시 이동. 안 한 카드를 한눈에 보고 바로 점프 가능. **§7 분석 이벤트** `interview_intro_progress_chip_clicked` 신규(어떤 chip 클릭으로 이동했는지 추적, 발견성 효과 측정용). |

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 
-const TOTAL_CARDS = 5;
+const TOTAL_CARDS = 6;
 
 export default function LandingPage() {
   const router = useRouter();
@@ -180,7 +180,24 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 4. JOURNEY */}
+        {/* 4. 왜 코칭? (v1.7.2 신규 — careerpt-slide-coaching 시안 반영) */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <h2 style={h2Style}>
+            왜 컨설팅이 아닌<br />
+            <span style={hlStyle}>12주 코칭</span>일까요?
+          </h2>
+          <p style={subStyle}>
+            답을 주고 끝내는 컨설팅이 아니라,<br />
+            내 안에서 답을 찾아 <strong style={subBStyle}>지속가능한 성장</strong>을 만들어요.
+          </p>
+          <p style={subStyle}>
+            마치 PT를 받는 것처럼,<br />
+            아는 것을 진짜로 해내는{' '}
+            <strong style={{ ...subBStyle, color: 'var(--accent)' }}>‘실천 근육’</strong>을 12주간 길러나가요.
+          </p>
+        </section>
+
+        {/* 5. JOURNEY */}
         <section style={{ ...cardStyle, justifyContent: 'center' }}>
           <div style={kickerStyle}>이렇게 진행돼요</div>
           <h2 style={{ ...h2Style, marginTop: '10px' }}>
@@ -204,7 +221,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 5. OUTCOME + CTA */}
+        {/* 6. OUTCOME + CTA */}
         <section style={{ ...cardStyle, justifyContent: 'center' }}>
           <div style={emojiStyle}>🚀</div>
           <h2 style={h2Style}>
@@ -226,61 +243,50 @@ export default function LandingPage() {
         </section>
       </div>
 
-      {/* ── Bottom 네비게이션 (prev / dots / next) ── */}
-      <nav style={navStyle} aria-label="카드 네비게이션">
+      {/* ── Floating 화살표 (vertical center, v1.7.2) ── */}
+      {cur > 0 && (
         <button
           type="button"
           onClick={() => goTo(cur - 1)}
-          disabled={cur === 0}
           aria-label="이전 카드"
-          style={{ ...arrowStyle, ...(cur === 0 ? arrowDisabledStyle : null) }}
+          style={floatingPrevStyle}
         >
           ‹
         </button>
-        <div style={dotsStyle}>
-          {Array.from({ length: TOTAL_CARDS }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => goTo(i)}
-              aria-label={`카드 ${i + 1}로 이동`}
-              style={i === cur ? dotActiveStyle : dotStyle}
-            />
-          ))}
-        </div>
+      )}
+      {cur < TOTAL_CARDS - 1 && (
         <button
           type="button"
           onClick={() => goTo(cur + 1)}
-          disabled={cur === TOTAL_CARDS - 1}
           aria-label="다음 카드"
-          style={{ ...arrowStyle, ...(cur === TOTAL_CARDS - 1 ? arrowDisabledStyle : null) }}
+          style={floatingNextStyle}
         >
           ›
         </button>
-      </nav>
+      )}
     </div>
   );
 }
 
 // ── 데이터 ────────────────────────────────────────────────
-// TRUST 카드 — JSX 구조로 (dangerouslySetInnerHTML 제거)
+// TRUST 카드 — JSX 구조 (dangerouslySetInnerHTML 미사용)
+const trustBoldStyle: CSSProperties = { fontWeight: 700, color: 'var(--text-primary)' };
+
 const TRUST_POINTS: { id: string; body: ReactNode }[] = [
   {
     id: 'cert',
     body: (
       <>
-        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>갤럽 인증 강점코치</strong>와{' '}
-        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>글로벌 코치</strong>가 함께 만들었어요
+        <strong style={trustBoldStyle}>Gallup 인증 강점 코치</strong> ·{' '}
+        <strong style={trustBoldStyle}>ICF 인증 코치</strong>가 함께 만들었어요
       </>
     ),
   },
   {
-    id: 'mcc',
+    id: 'icf',
     body: (
       <>
-        AI 코치는{' '}
-        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>MCC급 코치</strong>의 코칭 방식을
-        학습했어요
+        AI 코치는 <strong style={trustBoldStyle}>ICF 최고 등급 코치</strong>의 코칭 방식을 학습했어요
       </>
     ),
   },
@@ -288,9 +294,7 @@ const TRUST_POINTS: { id: string; body: ReactNode }[] = [
     id: 'advisory',
     body: (
       <>
-        설계 전 과정에서{' '}
-        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>전문 코치진의 자문</strong>을
-        받았어요
+        설계 전 과정에서 <strong style={trustBoldStyle}>전문 코치진의 자문</strong>을 받았어요
       </>
     ),
   },
@@ -329,6 +333,7 @@ const shellStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
+  position: 'relative', // v1.7.2: floating 화살표 absolute 기준
 };
 
 const brandbarStyle: CSSProperties = {
@@ -577,55 +582,36 @@ const ctaStyle: CSSProperties = {
   boxShadow: '0 6px 20px rgba(45,91,235,.38)',
 };
 
-const navStyle: CSSProperties = {
-  flex: 'none',
-  height: '60px',
-  borderTop: '1px solid var(--border)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '0 20px',
-  background: 'var(--surface)',
-};
-
-const arrowStyle: CSSProperties = {
-  width: '38px',
-  height: '38px',
+// v1.7.2: Floating 화살표 — 화면 vertical center, 카드 위에 떠 있음
+const floatingArrowBaseStyle: CSSProperties = {
+  position: 'absolute',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: '40px',
+  height: '40px',
   borderRadius: '50%',
   border: 'none',
-  background: 'var(--bg)',
+  background: 'rgba(255, 255, 255, 0.92)',
   color: 'var(--text-primary)',
-  fontSize: '18px',
+  fontSize: '22px',
+  fontWeight: 700,
   cursor: 'pointer',
   display: 'grid',
   placeItems: 'center',
   fontFamily: 'inherit',
+  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
+  zIndex: 10,
+  lineHeight: 1,
+  paddingBottom: '3px', // 화살표 ‹› 시각적 가운데 보정
+  backdropFilter: 'blur(4px)',
 };
 
-const arrowDisabledStyle: CSSProperties = {
-  opacity: 0.35,
-  cursor: 'default',
+const floatingPrevStyle: CSSProperties = {
+  ...floatingArrowBaseStyle,
+  left: '8px',
 };
 
-const dotsStyle: CSSProperties = {
-  display: 'flex',
-  gap: '7px',
-};
-
-const dotStyle: CSSProperties = {
-  width: '7px',
-  height: '7px',
-  borderRadius: '50%',
-  background: 'var(--border)',
-  border: 'none',
-  padding: 0,
-  cursor: 'pointer',
-  transition: 'all .25s',
-};
-
-const dotActiveStyle: CSSProperties = {
-  ...dotStyle,
-  width: '20px',
-  borderRadius: '999px',
-  background: 'var(--accent)',
+const floatingNextStyle: CSSProperties = {
+  ...floatingArrowBaseStyle,
+  right: '8px',
 };

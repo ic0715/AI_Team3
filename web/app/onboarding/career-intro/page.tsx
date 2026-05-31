@@ -76,7 +76,10 @@ export default function CareerIntroPage() {
   }, [cur, goTo]);
 
   // ── 확인 토글 (gating) ────────────────────────────────────
+  // v1.9: 처음 확인했을 때 자동으로 다음 카드로 이동 (사용자 경험 매끄럽게).
+  //   재클릭으로 확인 해제하는 경우엔 이동 안 함 (사용자가 의도적으로 머무름).
   const toggleConfirm = (cardIndex: number) => {
+    const wasConfirmed = confirmed.has(cardIndex);
     setConfirmed((prev) => {
       const next = new Set(prev);
       if (next.has(cardIndex)) next.delete(cardIndex);
@@ -84,6 +87,10 @@ export default function CareerIntroPage() {
       return next;
     });
     if (hintShown) setHintShown(false);
+    if (!wasConfirmed) {
+      // 250ms 후 다음 카드로 — "✓ 확인 완료" 토글 애니메이션 보일 시간 확보
+      window.setTimeout(() => goTo(cardIndex + 1), 250);
+    }
   };
 
   const allConfirmed = confirmed.size >= REQUIRED_CONFIRMS;
