@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { calculateCurrentWeek } from '@/lib/utils/week';
+import { isConfirmation } from '@/lib/coach/confirmation';
+import { computeBadgeAndComment, nextCoachingWeek } from '@/lib/coach/weeklyOutcome';
 
 // ────────────────────────────────────────────────────────────
 // 13 회고 AI 코칭 — 채팅 + 다음 주 액션 정하기 (스펙 v1.1)
@@ -39,14 +41,7 @@ interface CoachContext {
   doneCountWeek: number;
 }
 
-// v0.8: 11 홈 12주 타임라인 done 카드의 badge/comment 산출 (완료율 기반)
-// 스펙 _post_mvp_v2/11_home.md §6 참조
-function computeBadgeAndComment(doneCount: number): { badge: string; comment: string } {
-  if (doneCount >= 7) return { badge: '🔥', comment: '완벽한 한 주!' };
-  if (doneCount >= 5) return { badge: '👍', comment: '꾸준함이 쌓이고 있어요' };
-  if (doneCount >= 3) return { badge: '😊', comment: '절반을 해냈어요' };
-  return { badge: '🌱', comment: '다음 주를 기대해요' };
-}
+// computeBadgeAndComment / nextCoachingWeek는 @/lib/coach/weeklyOutcome으로 분리 (단위 테스트 대상).
 
 interface CoachMessageParams {
   history: Message[];
@@ -116,8 +111,7 @@ async function finalizeCoaching(
   // 2) v0.8: 완료율 기반 badge/comment (11 홈 타임라인 done 카드용)
   const { badge, comment } = computeBadgeAndComment(context.doneCountWeek);
 
-  const TOTAL_WEEKS = 12;
-  const nextWeek = Math.min(context.goal.current_week + 1, TOTAL_WEEKS);
+  const nextWeek = nextCoachingWeek(context.goal.current_week);
 
   // ───── 3) coaching_insights — UPSERT 패턴 ─────
   // schema 제약: (user_id, goal_id, week_number) UNIQUE → 같은 주에 다시 코칭하면
@@ -216,12 +210,7 @@ async function finalizeCoaching(
 }
 // ─────────────────────────────────────────────────────────────
 
-const CONFIRM_WORDS = ['확정', '좋아요', '네', '응', '맞아', 'OK', 'ok', '괜찮', '이걸로'];
-
-function isConfirmation(text: string): boolean {
-  const t = text.trim();
-  return CONFIRM_WORDS.some((w) => t.includes(w));
-}
+// CONFIRM_WORDS / isConfirmation은 @/lib/coach/confirmation으로 분리 (단위 테스트 대상).
 
 // Path B — 사용자 주도 종료 키워드 (커리어 career-interview.ts USER_EXIT_KEYWORDS와 동일 세트).
 //   감지 시 chat 호출 없이 코치 클로징 멘트를 띄우고 '회고 완료하기' 버튼을 노출(readyToFinalize).
