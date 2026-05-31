@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { COMPETENCIES, COMPETENCY_BY_ID, COMPETENCY_BY_CODE } from '@/lib/constants/competencies';
-import type { Domain } from '@/lib/constants/strengths';
 import {
   deterministicMatch,
   getCompetencyCode,
@@ -16,6 +15,12 @@ import {
   type UserStrength,
   type MatchedSlot,
 } from '@/lib/competency/match';
+import { localISODate } from '@/lib/utils/localDate';
+import {
+  domainToCode,
+  extractGrowthCompetencies,
+  hasStoredSlots,
+} from '@/lib/career/resultMapping';
 
 // ─────────────────────────────────────────────────────────────
 // 🤖 AI 연동 인터페이스 (AI 개발자가 여기만 수정하면 됩니다)
@@ -40,9 +45,6 @@ import {
 // 자세한 인계 내용은 docs/HANDOFF_AI.md 참조.
 // ─────────────────────────────────────────────────────────────
 
-// 12역량의 id (slug). lib/constants/competencies.ts에서 정의됨.
-type CompetencyId = string;
-
 interface UserProfileLite {
   nickname: string;
   jobField: string;
@@ -64,23 +66,6 @@ interface PersonalizationParams {
 
 interface PersonalizationResult {
   slots: RecommendedSlot[];
-}
-
-// domain 컬럼도 T/I/R/E 단일 문자 CHECK. 갤럽 도메인명 → 코드 매핑.
-const DOMAIN_CODE_BY_NAME: Record<Domain, string> = {
-  strategic:    'T',
-  influencing:  'I',
-  relationship: 'R',
-  executing:    'E',
-};
-
-// 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
-function todayLocalISO(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 // ── 🤖 AI 개인화 함수 (Claude API) ─────────────────────────────
@@ -176,7 +161,7 @@ function CareerResultContent() {
         // 새로고침 복원: recommended_competencies 이미 저장돼 있으면 그대로 사용
         const existing = interviewRes.data
           .recommended_competencies as RecommendedSlot[] | null;
-        if (existing && Array.isArray(existing) && existing.length > 0) {
+        if (hasStoredSlots(existing)) {
           if (!cancelled) {
             setSlots(existing);
             setLoadingMatch(false);
@@ -187,10 +172,7 @@ function CareerResultContent() {
         // Step1: 결정적 매칭
         const userStrengths: UserStrength[] =
           (strengthRes.data?.strengths as UserStrength[] | undefined) ?? [];
-        const growthCodes: CompetencyId[] =
-          (interviewRes.data.key_insights as {
-            growth_competencies?: CompetencyId[];
-          } | null)?.growth_competencies ?? [];
+        const growthCodes = extractGrowthCompetencies(interviewRes.data.key_insights);
         const matched = deterministicMatch(userStrengths, growthCodes);
 
         // Step2: AI 개인화 (mock — TODO: Claude API)
@@ -265,7 +247,7 @@ function CareerResultContent() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
-      const today = todayLocalISO(); // YYYY-MM-DD (로컬 timezone 기준)
+      const today = localISODate(); // YYYY-MM-DD (로컬 timezone 기준)
 
       // 재시작 안전망: 기존 active goal abandoned 처리
       await supabase
@@ -277,7 +259,7 @@ function CareerResultContent() {
       const { error: insertError } = await supabase.from('goals').insert({
         user_id: user.id,
         competency_code: getCompetencyCode(chosen.competencyId),
-        domain: DOMAIN_CODE_BY_NAME[chosen.domain] ?? chosen.domain,
+        domain: domainToCode(chosen.domain),
         goal_title: chosen.goalTitle,
         career_interview_id: interviewId,
         status: 'active',

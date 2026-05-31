@@ -17,18 +17,10 @@ import {
   competencyCodeToSlug,
   mergeAiActions,
 } from '@/lib/actionItems/seedMapping';
+import { localISODate } from '@/lib/utils/localDate';
 
 // 커스텀 액션 선택 상태를 표현하는 sentinel id (시드 id와 구분)
 const CUSTOM_SELECTED_ID = '__custom__';
-
-// 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
-function todayLocalISO(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 // 시드 5개 표시용 타입
 interface DisplaySeed extends ActionItem {
@@ -340,7 +332,7 @@ function ActionItemsContent() {
 
       // 시작 날짜 = "시작하기 🚀" 클릭 시점 (스펙 10 4번)
       // 이전 cycle/테스트의 stale started_at을 오늘로 갱신
-      const today = todayLocalISO();
+      const today = localISODate();
       const { error: updateError } = await supabase
         .from('goals')
         .update({ started_at: today })
