@@ -148,12 +148,12 @@ export default function LoginPage() {
     e.preventDefault();
     setSignupError('');
     if (!signupEmail) { setSignupError('이메일을 입력해주세요'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupError('올바른 이메일 형식이 아니에요'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupError('유효하지 않은 이메일 주소예요 (@가 포함된 올바른 형식으로 입력해주세요)'); return; }
     if (signupPassword.length < 8) { setSignupError('비밀번호는 최소 8자 이상이어야 해요'); return; }
     if (!isOver14(signupBirthdate)) { setSignupError('만 14세 이상만 가입할 수 있어요'); return; }
     if (!consentPrivacy || !consentTerms || !consentAge) { setSignupError('필수 항목에 동의해주세요'); return; }
     setSignupLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signupData, error } = await supabase.auth.signUp({
       email: signupEmail,
       password: signupPassword,
       options: {
@@ -169,20 +169,27 @@ export default function LoginPage() {
       const msg = error.message.toLowerCase();
       if (msg.includes('already registered') || msg.includes('already been registered')) {
         setSignupError('이미 가입된 이메일이에요. 로그인을 시도해보세요');
-        setShowSignupModal(false);
       } else if (msg.includes('rate limit') || msg.includes('only request this once') || msg.includes('too many')) {
         setSignupError('잠시 후 다시 시도해주세요 (이메일 발송 횟수 제한)');
       } else if (msg.includes('invalid email') || msg.includes('unable to validate')) {
-        setSignupError('올바른 이메일 형식이 아니에요');
+        setSignupError('유효하지 않은 이메일 주소예요');
       } else if (msg.includes('password') && msg.includes('weak')) {
         setSignupError('비밀번호가 너무 간단해요. 영문+숫자 조합으로 바꿔주세요');
       } else {
-        // 개발 중 실제 에러 확인용 (나중에 제거해도 됨)
         console.error('[Signup error]', error.message);
         setSignupError('가입에 실패했어요. 잠시 후 다시 시도해주세요');
       }
       return;
     }
+
+    // 이메일 인증 OFF 환경에서 중복 이메일은 error 없이 identities=[] 로 반환됨
+    if (!signupData.user?.identities?.length) {
+      // 중복 이메일로 인해 기존 유저로 자동 로그인된 상태 → 즉시 로그아웃
+      await supabase.auth.signOut();
+      setSignupError('이미 가입된 이메일이에요. 로그인을 시도해보세요');
+      return;
+    }
+
     // 가입 성공 — 세션이 바로 오면(이메일 인증 OFF) 완료 메시지, 없으면 인증 대기 패널
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
