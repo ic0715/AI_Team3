@@ -307,43 +307,69 @@ function HomeContent() {
   );
 
   // ── 렌더 분기 ─────────────────────────────────────────────
-  // 온보딩 미완료 → 홈 빈 화면 (모달 대신 홈 레이아웃 안에 안내)
+  // 온보딩 미완료 → 홈 레이아웃 유지하면서 빈 카드로 안내
   if (pendingRedirect) return (
     <div style={wrapStyle}>
       <header style={topbarStyle}>
         <div style={brandStyle}>CareerPT<sup style={brandDotStyle}>·</sup></div>
         <span style={stepPillStyle}>홈</span>
       </header>
-      <main style={{ ...screenStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-        {/* 일러스트 */}
+      <main style={screenStyle}>
+        {/* 인사 영역 */}
+        <section style={greetingStyle}>
+          <div style={greetingTitleStyle}>안녕하세요 👋</div>
+          <div style={greetingSubStyle}>코칭을 시작하면 여기에 현황이 표시돼요</div>
+        </section>
+
+        {/* 커리어 방향 카드 (빈 상태) */}
+        <div style={{ ...themeCardStyle, display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.75, letterSpacing: '.06em' }}>
+            커리어 방향
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 800, lineHeight: 1.4, opacity: 0.55 }}>
+            목표를 설정하면<br />여기에 표시돼요
+          </div>
+          <div style={{
+            marginTop: '4px', height: '1px',
+            background: 'rgba(255,255,255,0.2)',
+          }} />
+          <div style={{ fontSize: '13px', opacity: 0.6, fontWeight: 500 }}>
+            온보딩을 완료하고 시작해보세요 ✨
+          </div>
+        </div>
+
+        {/* 오늘의 액션 카드 (빈 상태) */}
         <div style={{
-          width: '64px', height: '64px', borderRadius: '50%',
-          background: 'var(--accent-light)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', marginBottom: '20px',
+          border: '1.5px dashed var(--border)', borderRadius: '18px',
+          padding: '20px', marginBottom: '20px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: '8px', textAlign: 'center',
         }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-            stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12 H7 L9.5 6 L12.5 18 L15 12 H21"/>
-          </svg>
+          <div style={{ fontSize: '24px' }}>📋</div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            오늘의 액션
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            액션 아이템을 선택하면<br />매일 여기서 확인할 수 있어요
+          </div>
         </div>
-        <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-.03em', marginBottom: '10px', textAlign: 'center' }}>
-          아직 코칭이 시작되지 않았어요
-        </div>
-        <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, textAlign: 'center', marginBottom: '32px' }}>
-          {pendingRedirect.message}
-        </div>
+
+        {/* 이어서 하기 CTA */}
         <button
           onClick={confirmRedirect}
           style={{
-            width: '100%', minHeight: '50px', borderRadius: '12px', border: 'none',
+            width: '100%', minHeight: '50px', borderRadius: '14px', border: 'none',
             background: 'var(--accent)', color: '#fff',
             fontSize: '15px', fontWeight: 800, letterSpacing: '-.02em',
             cursor: 'pointer', fontFamily: 'inherit',
-            boxShadow: '0 4px 16px rgba(45,91,255,.3)',
+            boxShadow: '0 4px 16px rgba(45,91,255,.28)',
           }}
         >
-          {pendingRedirect.title.replace('필요해요', '하러 가기')} →
+          온보딩 이어서 하기 →
         </button>
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
+          {pendingRedirect.title}
+        </p>
       </main>
       <TabBar active="home" />
     </div>
