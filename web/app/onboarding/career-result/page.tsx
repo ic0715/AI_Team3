@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { COMPETENCIES, COMPETENCY_BY_ID, COMPETENCY_BY_CODE } from '@/lib/constants/competencies';
 import type { Domain } from '@/lib/constants/strengths';
 
@@ -265,7 +266,7 @@ export default function CareerResultPage() {
 
 function CareerResultContent() {
   const router = useRouter();
-  const { ready } = useOnboardingGuard('career-result');
+  const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('career-result');
 
   const [slots, setSlots] = useState<RecommendedSlot[] | null>(null);
   const [loadingMatch, setLoadingMatch] = useState(true);
@@ -462,6 +463,7 @@ function CareerResultContent() {
     router.push('/onboarding/career-interview');
   }, [router]);
 
+  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
   if (!ready) return <LoadingScreen text="확인 중..." />;
 
   return (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
 import { calculateCurrentWeek } from '@/lib/utils/week';
 
@@ -74,7 +75,7 @@ export default function ReflectPage() {
 
 function ReflectContent() {
   const router = useRouter();
-  const { ready } = useOnboardingGuard('complete');
+  const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('complete');
 
   const [goal, setGoal] = useState<ActiveGoal | null>(null);
   const [actionTitle, setActionTitle] = useState<string>('');
@@ -254,6 +255,7 @@ function ReflectContent() {
   // weekly_retros INSERT 없이도 AI 코치 CTA 진입 가능 (13 페이지의 weekly_retros 의존성은 nullable로 처리됨).
 
   // ── 렌더 분기 ─────────────────────────────────────────────
+  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
   if (!ready || loading) return <LoadingScreen text="회고를 준비하고 있어요..." />;
   if (!goal) return <LoadingScreen text={error ?? '활성 목표가 없어요.'} />;
 

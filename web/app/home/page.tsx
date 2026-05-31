@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
 import { calculateCurrentWeek } from '@/lib/utils/week';
 
@@ -106,7 +107,7 @@ export default function HomePage() {
 
 function HomeContent() {
   const router = useRouter();
-  const { ready } = useOnboardingGuard('complete');
+  const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('complete');
 
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -306,6 +307,7 @@ function HomeContent() {
   );
 
   // ── 렌더 분기 ─────────────────────────────────────────────
+  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
   if (!ready || loading) return <LoadingScreen text="홈을 준비하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 
