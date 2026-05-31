@@ -3,18 +3,14 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { STRENGTHS_BY_DOMAIN, type Strength, type Domain } from '@/lib/constants/strengths';
-
-// ── 로컬스토리지 키 ───────────────────────────────────────────
-const LS_KEY = 'selectedStrengths';
-
-// ── 선택된 강점 타입 ──────────────────────────────────────────
-interface SelectedStrength {
-  id: string;
-  name: string;
-  nameEn: string;
-  domain: Domain;
-}
+import { STRENGTHS_BY_DOMAIN, type Strength } from '@/lib/constants/strengths';
+import {
+  STRENGTHS_LS_KEY as LS_KEY,
+  buildStrengthsPayload,
+  parseStoredStrengths,
+  toggleStrength,
+  type SelectedStrength,
+} from '@/lib/strengths/selection';
 
 // ── 도메인 색상 매핑 ──────────────────────────────────────────
 const DOMAIN_STYLES: Record<string, { color: string; bg: string; border: string }> = {
@@ -64,20 +60,18 @@ function StrengthsContent() {
       }
       userIdRef.current = user.id;
 
-      // localStorage에서 이전 선택 복원 — 현재 유저 것만 허용
+      // localStorage에서 이전 선택 복원 — 현재 유저 것만 허용 + shape 검증
       try {
         const saved = localStorage.getItem(LS_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved) as { userId: string; strengths: SelectedStrength[] };
-          if (parsed.userId !== user.id) {
-            // 다른 계정 데이터 → 삭제 후 빈 상태로 시작
-            localStorage.removeItem(LS_KEY);
-          } else if (Array.isArray(parsed.strengths) && parsed.strengths.length <= 5) {
-            setSelected(parsed.strengths);
-          }
+        const restored = parseStoredStrengths(saved, user.id);
+        if (restored) {
+          setSelected(restored);
+        } else if (saved) {
+          // 타계정/손상/형식 불일치 데이터 → 정리 후 빈 상태로 시작
+          localStorage.removeItem(LS_KEY);
         }
       } catch {
-        // localStorage 파싱 실패는 무시
+        // localStorage 접근 실패는 무시
       }
     };
 
@@ -92,23 +86,11 @@ function StrengthsContent() {
   // 칩 토글 핸들러
   const handleToggle = useCallback((strength: Strength) => {
     setSelected((prev) => {
-      const alreadySelected = prev.some((s) => s.id === strength.id);
-
-      if (alreadySelected) {
-        // 선택 해제
-        const next = prev.filter((s) => s.id !== strength.id);
+      const next = toggleStrength(prev, strength);
+      // cap 도달 시 toggleStrength는 동일 참조를 반환 → 변경 없으면 저장 스킵
+      if (next !== prev) {
         scheduleLocalSave(next, userIdRef.current ?? '', saveTimerRef);
-        return next;
       }
-
-      // 5개 이미 선택 → 추가 불가
-      if (prev.length >= 5) return prev;
-
-      const next = [
-        ...prev,
-        { id: strength.id, name: strength.name, nameEn: strength.nameEn, domain: strength.domain },
-      ];
-      scheduleLocalSave(next, userIdRef.current ?? '', saveTimerRef);
       return next;
     });
   }, []);
@@ -123,12 +105,7 @@ function StrengthsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
-      const strengthsPayload = selected.map((s, idx) => ({
-        rank: idx + 1,
-        name_ko: s.name,
-        name_en: s.nameEn,
-        domain: s.domain,
-      }));
+      const strengthsPayload = buildStrengthsPayload(selected);
 
       // 기존 최신 레코드를 is_latest: false로 변경 (재진단 대비)
       await supabase
