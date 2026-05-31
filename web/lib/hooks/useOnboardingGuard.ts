@@ -146,6 +146,24 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
         return;
       }
 
+      // goal 존재 여부 확인 — recommended_competencies만 있고 goal이 없으면
+      // action-items 대신 career-result로 보냄 (goal 선택이 선행 필요)
+      const { data: goals } = await supabase
+        .from("goals")
+        .select("id")
+        .eq("user_id", user.id)
+        .in("status", ["active", "paused"])
+        .limit(1);
+
+      if (!goals?.length) {
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/career-result",
+          title: "커리어 목표 선택이 필요해요",
+          message: "이 단계를 이용하려면 커리어 목표 방향을 먼저 선택해야 해요.\n목표 선택 화면으로 이동할게요.",
+        });
+        return;
+      }
+
       if (step === "action-items") {
         if (!cancelled) setReady(true);
         return;

@@ -290,8 +290,9 @@ export default function LoginPage() {
     if (activeGoal || pausedGoal) { router.push('/home'); return; }
     if (completedGoal && !activeGoal) { router.push('/cycle-complete'); return; }
 
-    // 4. 온보딩은 끝났지만 아직 goal 없음 → 액션 아이템 선택
-    setPendingRoute({ to: '/onboarding/action-items', nextStep: '액션 아이템 선택', completedSteps: ['기본정보 입력', '강점 선택', 'AI 커리어 인터뷰', '커리어 목표 선택'] });
+    // 4. recommended_competencies는 있지만 goal이 없음 → career-result에서 목표 선택 필요
+    // (action-items는 goal이 있어야 동작하므로 career-result로 먼저 보냄)
+    setPendingRoute({ to: '/onboarding/career-result', nextStep: '커리어 목표 선택', completedSteps: ['기본정보 입력', '강점 선택', 'AI 커리어 인터뷰'] });
     setPanel('resume');
   };
 
