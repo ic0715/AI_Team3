@@ -9,6 +9,8 @@ import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
+import { buildFutureActionsByWeek, type FutureActionRow } from '@/lib/utils/futureActions';
+import { canToggleDate } from '@/lib/utils/dateGuard';
 
 // ────────────────────────────────────────────────────────────
 // 11 홈 — 12주 코칭 대시보드 (스펙 v1.2)
@@ -237,13 +239,10 @@ function HomeContent() {
         if (cancelled) return;
         logErr('action_completions', completionRes.error);
 
-        // 미래 주차 액션 맵 만들기 (같은 주차에 여러 row면 최신 created_at 우선)
-        const futureActionsByWeek = new Map<number, string>();
-        (futureActionRes.data ?? []).forEach((row: { week_number: number; title: string }) => {
-          if (!futureActionsByWeek.has(row.week_number)) {
-            futureActionsByWeek.set(row.week_number, row.title);
-          }
-        });
+        // 미래 주차 액션 맵 — 추출된 buildFutureActionsByWeek 사용 (단위 테스트 대상)
+        const futureActionsByWeek = buildFutureActionsByWeek(
+          futureActionRes.data as FutureActionRow[] | null,
+        );
 
         setData({
           nickname: profileRes.data?.nickname ?? '',
@@ -280,12 +279,8 @@ function HomeContent() {
   const handleToggleDay = useCallback(
     async (date: Date) => {
       if (!data || !data.currentAction) return;
-      // 미래 날짜만 차단 (오늘·과거 모두 허용)
-      const todayOnly = new Date(today);
-      todayOnly.setHours(0, 0, 0, 0);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-      if (dateOnly.getTime() > todayOnly.getTime()) return;
+      // 미래 날짜만 차단 (오늘·과거 모두 허용) — canToggleDate에 정책 격리
+      if (!canToggleDate(date, today)) return;
 
       const dateISO = formatLocalISO(date);
       const wasCompleted = completedDates.has(dateISO);
