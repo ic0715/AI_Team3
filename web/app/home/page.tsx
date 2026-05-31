@@ -327,7 +327,7 @@ function HomeContent() {
             커리어 방향
           </div>
           <div style={{ fontSize: '16px', fontWeight: 800, lineHeight: 1.4, opacity: 0.55 }}>
-            목표를 설정하면<br />여기에 표시돼요
+            목표를 설정하면 여기에 표시돼요
           </div>
           <div style={{
             marginTop: '4px', height: '1px',

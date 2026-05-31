@@ -255,7 +255,72 @@ function ReflectContent() {
   // weekly_retros INSERT 없이도 AI 코치 CTA 진입 가능 (13 페이지의 weekly_retros 의존성은 nullable로 처리됨).
 
   // ── 렌더 분기 ─────────────────────────────────────────────
-  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
+  // 온보딩 미완료 → 회고 레이아웃 유지하면서 빈 카드로 안내
+  if (pendingRedirect) return (
+    <div style={wrapStyle}>
+      <header style={topbarStyle}>
+        <div style={brandStyle}>CareerPT<sup style={brandDotStyle}>·</sup></div>
+        <span style={stepPillStyle}>회고</span>
+      </header>
+      <main style={screenStyle}>
+        {/* 날짜 영역 */}
+        <div style={{ padding: '8px 0 18px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--ink)', marginBottom: '4px' }}>
+            오늘의 회고
+          </div>
+          <div style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-.03em', color: 'var(--text-primary)', opacity: 0.25 }}>
+            - - 월 - -일
+          </div>
+        </div>
+
+        {/* 데일리 메모 카드 (빈 상태) */}
+        <div style={{
+          border: '1.5px dashed var(--border)', borderRadius: '18px',
+          padding: '20px', marginBottom: '14px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: '8px', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '22px' }}>✏️</div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>데일리 메모</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            코칭을 시작하면<br />매일 여기에 메모를 남길 수 있어요
+          </div>
+        </div>
+
+        {/* AI 코치 카드 (빈 상태) */}
+        <div style={{
+          border: '1.5px dashed var(--border)', borderRadius: '18px',
+          padding: '20px', marginBottom: '24px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: '8px', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '22px' }}>🤖</div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>AI 코치</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            목표 설정 후 AI 코치와<br />회고 대화를 나눌 수 있어요
+          </div>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={confirmRedirect}
+          style={{
+            width: '100%', minHeight: '50px', borderRadius: '14px', border: 'none',
+            background: 'var(--accent)', color: '#fff',
+            fontSize: '15px', fontWeight: 800, letterSpacing: '-.02em',
+            cursor: 'pointer', fontFamily: 'inherit',
+            boxShadow: '0 4px 16px rgba(45,91,255,.28)',
+          }}
+        >
+          온보딩 이어서 하기 →
+        </button>
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
+          {pendingRedirect.title}
+        </p>
+      </main>
+      <TabBar active="reflect" />
+    </div>
+  );
   if (!ready || loading) return <LoadingScreen text="회고를 준비하고 있어요..." />;
   if (!goal) return <LoadingScreen text={error ?? '활성 목표가 없어요.'} />;
 
