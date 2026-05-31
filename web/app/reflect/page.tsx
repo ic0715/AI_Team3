@@ -8,6 +8,14 @@ import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
 import { calculateCurrentWeek } from '@/lib/utils/week';
+import { localISODate } from '@/lib/utils/localDate';
+import {
+  type DailyMemo,
+  formatMemoTime,
+  insertMemoSorted,
+  weekdayKo,
+  weekRangeISO,
+} from '@/lib/reflect/weekMemos';
 
 // ────────────────────────────────────────────────────────────
 // 12 회고 — 단일 회고 화면 (스펙 v1.5)
@@ -16,6 +24,9 @@ import { calculateCurrentWeek } from '@/lib/utils/week';
 // 구성: 데일리 메모(다중 누적, schema v0.8) + AI 코치 CTA 카드 (항상 노출)
 // v1.5: 주간 회고 입력 영역 제거. weekly_retros 저장 없이도
 //        AI 코치와 다음 주 액션 정하기 진입 가능.
+//
+// 주(week) 범위 계산 / 메모 정렬·삽입 / 시각 포맷은
+// @/lib/reflect/weekMemos 로 분리(단위 테스트 + 무효 입력 하드닝).
 // ────────────────────────────────────────────────────────────
 
 interface ActiveGoal {
@@ -23,42 +34,6 @@ interface ActiveGoal {
   /** v1.5: started_at 기준 계산된 현재 주차 */
   current_week: number;
   started_at: string | null;
-}
-
-// 데일리 메모 — schema v0.8 다중 누적 정책 (UNIQUE 제거)
-interface DailyMemo {
-  id?: string;
-  memo_date: string;        // YYYY-MM-DD
-  content: string;
-  created_at?: string;       // 시간 정렬용
-}
-
-const WEEKDAY_KO_FULL = ['일', '월', '화', '수', '목', '금', '토'];
-
-// ────────────────────────────────────────────────────────────
-// 유틸
-// ────────────────────────────────────────────────────────────
-
-function formatLocalISO(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function startOfWeekMonday(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -92,9 +67,7 @@ function ReflectContent() {
   // AI 코치 CTA를 항상 노출. weekly_retros 관련 state/handler 모두 삭제.
 
   const today = new Date();
-  const monday = startOfWeekMonday(today);
-  const sundayISO = formatLocalISO(addDays(monday, 6));
-  const mondayISO = formatLocalISO(monday);
+  const { mondayISO, sundayISO } = weekRangeISO(today);
 
   // ── 데이터 로드 ────────────────────────────────────────────
   useEffect(() => {
@@ -210,7 +183,7 @@ function ReflectContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
-      const todayISO = formatLocalISO(today);
+      const todayISO = localISODate(today);
       const { data: inserted, error: insErr } = await supabase
         .from('daily_memos')
         .insert({
@@ -231,15 +204,7 @@ function ReflectContent() {
         content: trimmed,
         created_at: nowISO,
       };
-      setMemos((prev) => {
-        const next = [...prev, newMemo];
-        next.sort((a, b) => {
-          const dateDiff = a.memo_date.localeCompare(b.memo_date);
-          if (dateDiff !== 0) return dateDiff;
-          return (a.created_at ?? '').localeCompare(b.created_at ?? '');
-        });
-        return next;
-      });
+      setMemos((prev) => insertMemoSorted(prev, newMemo));
       setMemoText('');
     } catch (e) {
       console.error('[12] save memo:', e);
@@ -389,7 +354,7 @@ function ReflectScreen({
   return (
     <div>
       <div style={subtitleStyle}>
-        Week {goal.current_week} 회고 · {WEEKDAY_KO_FULL[today.getDay()]}요일
+        Week {goal.current_week} 회고 · {weekdayKo(today)}요일
       </div>
       <h1 style={titleStyle}>
         한 주를 <em style={emAccent}>돌아봐요</em> 🌙
@@ -497,14 +462,11 @@ function ReflectScreen({
 
 function MemoRow({ memo }: { memo: DailyMemo }) {
   const date = new Date(memo.memo_date);
-  const created = memo.created_at ? new Date(memo.created_at) : null;
-  const timeStr = created
-    ? `${String(created.getHours()).padStart(2, '0')}:${String(created.getMinutes()).padStart(2, '0')}`
-    : '';
+  const timeStr = formatMemoTime(memo.created_at);
   return (
     <div style={memoRowStyle}>
       <div style={memoDayColStyle}>
-        <div style={memoDayLabelStyle}>{WEEKDAY_KO_FULL[date.getDay()]}</div>
+        <div style={memoDayLabelStyle}>{weekdayKo(date)}</div>
         <div style={memoDateStyle}>
           {date.getMonth() + 1}.{date.getDate()}
         </div>

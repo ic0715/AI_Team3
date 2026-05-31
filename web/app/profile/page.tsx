@@ -7,26 +7,28 @@ import { supabase } from '@/lib/supabase/client';
 import { TabBar } from '@/components/ui/TabBar';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
+import {
+  buildProfileUpdate,
+  canSaveProfile,
+  careerLabel,
+  CAREER_OPTIONS,
+  displayStrengths,
+  JOB_OPTIONS,
+  mapProfileRow,
+  normalizeStrengths,
+  type ProfileData,
+  type StrengthItem,
+} from '@/lib/profile/myProfile';
 
 // ────────────────────────────────────────────────────────────
 // 14 프로필 (스펙 v1.2)
 //
 // 진입: 탭바 [프로필]
 // 기능: 정보 조회/인라인 수정 + 강점 + 커리어 방향 재설정 + 비밀번호 변경 + 로그아웃/탈퇴
+//
+// 순수 로직(라벨 매핑 / 행 매핑 / 강점 정규화 / 저장 게이팅·페이로드)은
+// @/lib/profile/myProfile 로 분리(단위 테스트 + JSONB 하드닝).
 // ────────────────────────────────────────────────────────────
-
-interface ProfileData {
-  nickname: string;
-  email: string;
-  jobField: string;
-  careerLevel: string;
-}
-
-interface Strength {
-  name_ko: string;
-  name_en: string;
-  domain?: string;
-}
 
 interface ActiveGoal {
   id: string;
@@ -34,23 +36,6 @@ interface ActiveGoal {
   /** v1.5: started_at 기준 계산된 현재 주차 */
   current_week: number;
   started_at: string | null;
-}
-
-// 03 페이지와 동일한 옵션 set (DB-level values)
-const JOB_OPTIONS = [
-  'IT/개발', '디자인', '기획/PM', '마케팅/영업', 'HR/인사',
-  '재무/회계', '교육', '의료/보건', '제조/생산', '학생', '기타',
-];
-
-const CAREER_OPTIONS = [
-  { value: 'junior_new', label: '신입 (0년)' },
-  { value: 'junior',     label: '주니어 (1~3년)' },
-  { value: 'senior_mid', label: '미드 (4~7년)' },
-  { value: 'senior',     label: '시니어 (8년+)' },
-];
-
-function careerLabel(value: string): string {
-  return CAREER_OPTIONS.find((c) => c.value === value)?.label ?? value;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -69,7 +54,7 @@ function ProfileContent() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [strengths, setStrengths] = useState<Strength[]>([]);
+  const [strengths, setStrengths] = useState<StrengthItem[]>([]);
   const [goal, setGoal] = useState<ActiveGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,18 +116,14 @@ function ProfileContent() {
         if (strengthRes.error) console.error('[14] strength_analyses:', strengthRes.error);
         if (goalRes.error) console.error('[14] goals:', goalRes.error);
 
-        const p: ProfileData = {
-          nickname: profileRes.data?.nickname ?? '',
-          email: user.email ?? '',
-          jobField: profileRes.data?.job_field ?? '',
-          careerLevel: profileRes.data?.career_level ?? '',
-        };
+        const p: ProfileData = mapProfileRow(profileRes.data, user.email);
         setProfile(p);
         setEditNickname(p.nickname);
         setEditJobField(p.jobField);
         setEditCareerLevel(p.careerLevel);
 
-        setStrengths((strengthRes.data?.strengths as Strength[] | undefined) ?? []);
+        // JSONB 하드닝: 손상 원소(name_ko/name_en 누락)는 걸러냄
+        setStrengths(normalizeStrengths(strengthRes.data?.strengths));
         // v1.5: DB의 current_week 무시하고 started_at 기준 계산
         const goalRow = goalRes.data as ActiveGoal | undefined;
         const goalWithCalcWeek: ActiveGoal | null = goalRow
@@ -177,8 +158,7 @@ function ProfileContent() {
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
-    if (!profile || saving) return;
-    if (!editNickname.trim()) return;
+    if (!profile || !canSaveProfile(editNickname, saving)) return;
 
     setSaving(true);
     setError(null);
@@ -188,11 +168,7 @@ function ProfileContent() {
 
       const { error: upErr } = await supabase
         .from('profiles')
-        .update({
-          nickname: editNickname.trim(),
-          job_field: editJobField,
-          career_level: editCareerLevel,
-        })
+        .update(buildProfileUpdate(editNickname, editJobField, editCareerLevel))
         .eq('id', user.id);
       if (upErr) throw upErr;
 
@@ -304,7 +280,7 @@ function ProfileContent() {
                 아직 분석된 강점이 없어요
               </span>
             ) : (
-              strengths.slice(0, 5).map((s, i) => (
+              displayStrengths(strengths).map((s, i) => (
                 <span key={`${s.name_en}-${i}`} style={strengthChipStyle}>
                   {s.name_ko}
                 </span>
@@ -434,11 +410,11 @@ function ProfileContent() {
                 <button
                   type="button"
                   onClick={handleSaveEdit}
-                  disabled={saving || !editNickname.trim()}
+                  disabled={!canSaveProfile(editNickname, saving)}
                   style={{
                     ...formBtnStyle,
                     ...formBtnPrimaryStyle,
-                    opacity: saving || !editNickname.trim() ? 0.5 : 1,
+                    opacity: canSaveProfile(editNickname, saving) ? 1 : 0.5,
                   }}
                 >
                   {saving ? '저장 중...' : '저장하기'}

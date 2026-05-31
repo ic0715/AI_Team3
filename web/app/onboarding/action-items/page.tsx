@@ -6,37 +6,21 @@ import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { ACTION_SEEDS_BY_COMPETENCY, type ActionItem } from '@/lib/constants/seeds';
+import {
+  CUSTOM_MAX,
+  CUSTOM_MIN,
+  isCustomActionReady,
+  validateCustomAction,
+} from '@/lib/actionItems/customAction';
+import {
+  buildSourceSeedId,
+  competencyCodeToSlug,
+  mergeAiActions,
+} from '@/lib/actionItems/seedMapping';
+import { localISODate } from '@/lib/utils/localDate';
 
-// 커스텀 입력 길이 제한 (스펙 3.5)
-const CUSTOM_MIN = 5;
-const CUSTOM_MAX = 50;
+// 커스텀 액션 선택 상태를 표현하는 sentinel id (시드 id와 구분)
 const CUSTOM_SELECTED_ID = '__custom__';
-
-// DB는 competency_code를 T-1 등 스펙 형식으로 저장. 시드 lookup은 슬러그(constants) 기준이라 역매핑 필요.
-// 12역량 모두 매핑. seeds.ts에 시드 데이터가 없는 역량은 빈 배열 → AI가 fallback으로 처리.
-const CODE_TO_SLUG: Record<string, string> = {
-  'T-1': 'critical-thinking',
-  'T-2': 'data-analysis',
-  'T-3': 'planning',
-  'I-1': 'communication',
-  'I-2': 'leadership',
-  'I-3': 'persuasion',
-  'R-1': 'collaboration',
-  'R-2': 'mentoring',
-  'R-3': 'empathy-comm',
-  'E-1': 'execution',
-  'E-2': 'problem-solving',
-  'E-3': 'self-management',
-};
-
-// 로컬 timezone 기준 오늘 날짜 (KST 새벽에 UTC 변환으로 어제 표기되는 버그 회피)
-function todayLocalISO(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 // 시드 5개 표시용 타입
 interface DisplaySeed extends ActionItem {
@@ -171,7 +155,7 @@ function ActionItemsContent() {
   // ── 시드 5개 매핑 ───────────────────────────────────────
   // DB의 competency_code(T-1 등) → 슬러그로 변환 후 시드 lookup
   const seedSlug = useMemo(
-    () => (goal ? CODE_TO_SLUG[goal.competency_code] ?? goal.competency_code : null),
+    () => (goal ? competencyCodeToSlug(goal.competency_code) : null),
     [goal],
   );
 
@@ -185,7 +169,7 @@ function ActionItemsContent() {
       return items.map((item, idx) => ({
         ...item,
         // source_seed_id 형식은 스펙 코드 그대로 유지 (예: "T-1-junior-1")
-        sourceSeedId: `${goal.competency_code}-${careerLevel}-${idx + 1}`,
+        sourceSeedId: buildSourceSeedId(goal.competency_code, careerLevel, idx),
       }));
     }
     // 시드 데이터 없는 역량 — AI가 처음부터 생성하도록 빈 placeholder 5개
@@ -194,7 +178,7 @@ function ActionItemsContent() {
       title: '',
       description: '',
       tags: [],
-      sourceSeedId: `${goal.competency_code}-${careerLevel}-${idx + 1}`,
+      sourceSeedId: buildSourceSeedId(goal.competency_code, careerLevel, idx),
     }));
   }, [goal, seedSlug, careerLevel]);
 
@@ -235,18 +219,8 @@ function ActionItemsContent() {
           actions: Array<{ sourceSeedId: string; title: string; description: string; tags: string[]; isAiModified: boolean }>;
         };
         if (cancelled) return;
-        // baseSeeds 형식에 맞춰 id 보존
-        const merged: DisplaySeed[] = baseSeeds.map((seed) => {
-          const aiItem = data.actions.find((a) => a.sourceSeedId === seed.sourceSeedId);
-          if (!aiItem) return seed;
-          return {
-            ...seed,
-            title: aiItem.title,
-            description: aiItem.description,
-            tags: aiItem.tags,
-          };
-        });
-        setAiActions(merged);
+        // baseSeeds 형식에 맞춰 id 보존 (sourceSeedId 기준 병합)
+        setAiActions(mergeAiActions(baseSeeds, data.actions));
       } catch (e) {
         console.error('[10 AI personalize] failed, falling back to seeds:', e);
         // 폴백: 시드 그대로 사용 (사용자에게는 AI 실패가 안 보임)
@@ -274,17 +248,13 @@ function ActionItemsContent() {
   }, []);
 
   const handleAddCustom = useCallback(() => {
-    const trimmed = customText.trim();
-    if (trimmed.length < CUSTOM_MIN) {
-      setCustomError(`${CUSTOM_MIN}자 이상 입력해주세요.`);
-      return;
-    }
-    if (trimmed.length > CUSTOM_MAX) {
-      setCustomError(`${CUSTOM_MAX}자 이하로 입력해주세요.`);
+    const result = validateCustomAction(customText);
+    if (!result.ok) {
+      setCustomError(result.error);
       return;
     }
     setCustomError(null);
-    setCustomAdded(trimmed);
+    setCustomAdded(result.value);
     setCustomText('');
     // 추가 시 자동 선택, 추천 선택 자동 해제 (스펙 4번)
     setSelectedId(CUSTOM_SELECTED_ID);
@@ -362,7 +332,7 @@ function ActionItemsContent() {
 
       // 시작 날짜 = "시작하기 🚀" 클릭 시점 (스펙 10 4번)
       // 이전 cycle/테스트의 stale started_at을 오늘로 갱신
-      const today = todayLocalISO();
+      const today = localISODate();
       const { error: updateError } = await supabase
         .from('goals')
         .update({ started_at: today })
@@ -584,10 +554,9 @@ function ActionItemsContent() {
                 style={{
                   marginTop: '6px',
                   fontSize: '11.5px',
-                  color:
-                    customText.trim().length >= CUSTOM_MIN
-                      ? 'var(--accent)'
-                      : 'var(--text-muted)',
+                  color: isCustomActionReady(customText)
+                    ? 'var(--accent)'
+                    : 'var(--text-muted)',
                   textAlign: 'right',
                   minHeight: '14px',
                 }}
@@ -603,11 +572,11 @@ function ActionItemsContent() {
               <button
                 type="button"
                 onClick={handleAddCustom}
-                disabled={customText.trim().length < CUSTOM_MIN}
+                disabled={!isCustomActionReady(customText)}
                 style={{
                   ...customAddBtnStyle,
-                  opacity: customText.trim().length >= CUSTOM_MIN ? 1 : 0.5,
-                  cursor: customText.trim().length >= CUSTOM_MIN ? 'pointer' : 'not-allowed',
+                  opacity: isCustomActionReady(customText) ? 1 : 0.5,
+                  cursor: isCustomActionReady(customText) ? 'pointer' : 'not-allowed',
                 }}
               >
                 추가
