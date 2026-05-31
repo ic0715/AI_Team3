@@ -492,9 +492,9 @@ export default function LoginPage() {
             이어서 하기 →
           </button>
 
-          {/* 처음부터 버튼 — 랜딩으로 이동 */}
+          {/* 나중에 하기 — 홈으로 이동 */}
           <button
-            onClick={() => { setPanel('tabs'); setActiveTab('login'); }}
+            onClick={() => router.push('/home')}
             style={{
               width: '100%', background: 'none', border: 'none',
               color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500,

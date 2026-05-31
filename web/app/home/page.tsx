@@ -307,7 +307,47 @@ function HomeContent() {
   );
 
   // ── 렌더 분기 ─────────────────────────────────────────────
-  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
+  // 온보딩 미완료 → 홈 빈 화면 (모달 대신 홈 레이아웃 안에 안내)
+  if (pendingRedirect) return (
+    <div style={wrapStyle}>
+      <header style={topbarStyle}>
+        <div style={brandStyle}>CareerPT<sup style={brandDotStyle}>·</sup></div>
+        <span style={stepPillStyle}>홈</span>
+      </header>
+      <main style={{ ...screenStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        {/* 일러스트 */}
+        <div style={{
+          width: '64px', height: '64px', borderRadius: '50%',
+          background: 'var(--accent-light)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', marginBottom: '20px',
+        }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+            stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12 H7 L9.5 6 L12.5 18 L15 12 H21"/>
+          </svg>
+        </div>
+        <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-.03em', marginBottom: '10px', textAlign: 'center' }}>
+          아직 코칭이 시작되지 않았어요
+        </div>
+        <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, textAlign: 'center', marginBottom: '32px' }}>
+          {pendingRedirect.message}
+        </div>
+        <button
+          onClick={confirmRedirect}
+          style={{
+            width: '100%', minHeight: '50px', borderRadius: '12px', border: 'none',
+            background: 'var(--accent)', color: '#fff',
+            fontSize: '15px', fontWeight: 800, letterSpacing: '-.02em',
+            cursor: 'pointer', fontFamily: 'inherit',
+            boxShadow: '0 4px 16px rgba(45,91,255,.3)',
+          }}
+        >
+          {pendingRedirect.title.replace('필요해요', '하러 가기')} →
+        </button>
+      </main>
+      <TabBar active="home" />
+    </div>
+  );
   if (!ready || loading) return <LoadingScreen text="홈을 준비하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 
