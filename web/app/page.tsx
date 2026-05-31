@@ -525,36 +525,38 @@ const ctaStyle: CSSProperties = {
   boxShadow: '0 6px 20px rgba(45,91,235,.38)',
 };
 
-// v1.7.2: Floating 화살표 — 화면 vertical center, 카드 위에 떠 있음
+// v1.8: Floating 화살표 — 하단 band (텍스트 안 가림)
+//   이전 v1.7.2의 `top: 50%`는 세로 가운데 정렬된 카드 콘텐츠와 겹치는 문제로
+//   `bottom: max(32px, env(safe-area-inset-bottom)+16px)` 위치로 이동.
+//   원래 nav bar(60px)보다는 위, 카드 본문보다는 아래.
 const floatingArrowBaseStyle: CSSProperties = {
   position: 'absolute',
-  top: '50%',
-  transform: 'translateY(-50%)',
-  width: '40px',
-  height: '40px',
+  bottom: 'max(28px, calc(env(safe-area-inset-bottom) + 16px))',
+  width: '38px',
+  height: '38px',
   borderRadius: '50%',
   border: 'none',
-  background: 'rgba(255, 255, 255, 0.92)',
+  background: 'rgba(255, 255, 255, 0.85)',
   color: 'var(--text-primary)',
-  fontSize: '22px',
+  fontSize: '20px',
   fontWeight: 700,
   cursor: 'pointer',
   display: 'grid',
   placeItems: 'center',
   fontFamily: 'inherit',
-  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
+  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.18)',
   zIndex: 10,
   lineHeight: 1,
-  paddingBottom: '3px', // 화살표 ‹› 시각적 가운데 보정
+  paddingBottom: '3px', // ‹› 시각적 가운데 보정
   backdropFilter: 'blur(4px)',
 };
 
 const floatingPrevStyle: CSSProperties = {
   ...floatingArrowBaseStyle,
-  left: '8px',
+  left: '12px',
 };
 
 const floatingNextStyle: CSSProperties = {
   ...floatingArrowBaseStyle,
-  right: '8px',
+  right: '12px',
 };
