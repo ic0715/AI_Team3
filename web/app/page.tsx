@@ -1,256 +1,562 @@
 'use client';
-// p01 랜딩 페이지
-import { useEffect } from 'react';
+// p01 랜딩 — swipe deck 6장 (spec 01_landing.md v1.8)
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
+import type { CSSProperties } from 'react';
 
-// ── 코칭 원칙 카드 데이터 (spec 01_landing.md 3.3 기준) ──────────
-const principles = [
-  {
-    step: 'STEP 1',
-    title: '강점에서 시작해요',
-    text: '갤럽 클리프턴 스트렝스 34테마 중 나의 Top 5 강점을 직접 선택해요. 이미 갤럽 리포트가 있다면 그 결과를, 없다면 스스로 느끼는 강점을 골라주세요.',
-  },
-  {
-    step: 'STEP 2',
-    title: '방향을 함께 찾아요',
-    text: 'AI 코치가 먼저 결론을 내리지 않아요. 지금의 상황, 고민, 방향에 대해 자유롭게 이야기하다 보면 본인에 대해 스스로도 알아가게 됩니다.',
-  },
-  {
-    step: 'STEP 3',
-    title: '목표와 첫 번째 액션 선택까지',
-    text: '인터뷰 결과를 바탕으로 목표로 삼으면 좋을 5가지 방향이 제안돼요. 그 중 하나를 선택하고, 지금 바로 시작할 수 있는 액션 아이템을 고릅니다.',
-  },
-];
+const TOTAL_CARDS = 6;
 
 export default function LandingPage() {
   const router = useRouter();
+  const deckRef = useRef<HTMLDivElement>(null);
+  const [cur, setCur] = useState(0);
 
-  // 로그인 페이지 미리 로드 — 클릭 즉시 이동하도록
+  // ── 로그인 페이지 미리 로드 ─────────────────────────────────
   useEffect(() => {
     router.prefetch('/login');
   }, [router]);
 
-  // 이미 로그인된 사용자 → 상태 기반 자동 리다이렉트 (spec 01_landing.md 2번)
+  // v1.8: 로그인 상태 auto-redirect 제거.
+  //   팀 결정 — 랜딩 페이지는 모든 사용자에게 항상 노출 (게스트도 로그인 사용자도).
+  //   로그인 사용자가 자기 상태(홈/온보딩)로 가려면 CTA(`/login?tab=signup`)를
+  //   거치거나 직접 URL 입력. 이전에 있던 상태 기반 자동 리다이렉트 useEffect는
+  //   삭제됨 (spec 01_landing.md §2 참조).
+
+  // ── deck 스크롤 → 현재 카드 추적 ──────────────────────────
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return; // GUEST → 랜딩 그대로 표시
-
-      // 이메일 미인증 → 로그인 화면 (verify-email 패널)
-      if (!user.email_confirmed_at) {
-        router.push('/login');
-        return;
-      }
-
-      // goals 상태 확인
-      const { data: goals } = await supabase
-        .from('goals')
-        .select('status, current_week, total_weeks')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      const activeGoal  = goals?.find((g) => g.status === 'active');
-      const pausedGoal  = goals?.find((g) => g.status === 'paused');
-      const completedGoal = goals?.find(
-        (g) => g.status === 'completed' && g.current_week >= g.total_weeks
-      );
-
-      // ACTIVE / PAUSED → 홈
-      if (activeGoal || pausedGoal) { router.push('/home'); return; }
-      // COMPLETED (active 없음) → 12주 완료
-      if (completedGoal) { router.push('/cycle-complete'); return; }
-
-      // ONBOARDING → 마지막 완료 단계 다음 화면으로 (spec 2.1)
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('profile_completed')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
-
-      const { data: strengths } = await supabase
-        .from('strength_analyses')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_latest', true)
-        .limit(1);
-
-      if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
-
-      const { data: interviews } = await supabase
-        .from('career_interview_results')
-        .select('id, recommended_competencies')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
-      if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
-
-      // active 목표가 없으면 career-result로 돌려보냄
-      // (recommended_competencies는 있지만 goals INSERT가 안 된 경우 대비)
-      if (!activeGoal) { router.push('/onboarding/career-result'); return; }
-
-      // 온보딩 마지막 단계 → 액션 아이템 선택
-      router.push('/onboarding/action-items');
+    const deck = deckRef.current;
+    if (!deck) return;
+    let t: number | undefined;
+    const onScroll = () => {
+      if (t !== undefined) clearTimeout(t);
+      t = window.setTimeout(() => {
+        const i = Math.round(deck.scrollLeft / deck.clientWidth);
+        setCur(Math.max(0, Math.min(TOTAL_CARDS - 1, i)));
+      }, 60);
     };
-
-    checkAuth();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    deck.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      deck.removeEventListener('scroll', onScroll);
+      if (t !== undefined) clearTimeout(t); // unmount 시 pending timeout 정리
+    };
   }, []);
 
-  return (
-    <div style={{
-      width: 'min(430px, 100vw)',
-      background: 'var(--surface)',
-      margin: '0 auto',
-      boxShadow: '0 0 40px rgba(0,0,0,.18)',
-    }}>
+  const goTo = useCallback((i: number) => {
+    const deck = deckRef.current;
+    if (!deck) return;
+    const clamped = Math.max(0, Math.min(TOTAL_CARDS - 1, i));
+    deck.scrollTo({ left: clamped * deck.clientWidth, behavior: 'smooth' });
+  }, []);
 
-      {/* ── 헤더 ── */}
-      <header style={{
-        padding: '18px 22px 16px',
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            aria-hidden="true"
-            style={{
-              width: '44px', height: '44px', borderRadius: '24%',
-              background: 'var(--accent)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, boxShadow: '0 6px 16px -4px rgba(45,91,255,.4)',
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12 H7 L9.5 6 L12.5 18 L15 12 H21" />
-            </svg>
-          </div>
-          <div>
-            <div style={{
-              fontSize: '20px', fontWeight: 900, lineHeight: 1.1,
-              letterSpacing: '-.04em', color: 'var(--text-primary)',
-            }}>
-              CareerPT
-            </div>
-            <div style={{
-              marginTop: '2px', fontSize: '12px', fontWeight: 500,
-              color: 'var(--text-muted)', letterSpacing: '-.01em',
-            }}>
-              내 강점으로 커리어 방향을 찾는 AI 코치
-            </div>
-          </div>
+  // ── 키보드 ← → ───────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goTo(cur - 1);
+      else if (e.key === 'ArrowRight') goTo(cur + 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [cur, goTo]);
+
+  return (
+    <div style={shellStyle}>
+      {/* ── 브랜드 헤더 (고정) ── */}
+      <header style={brandbarStyle}>
+        <div aria-hidden="true" style={logoStyle}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="2,12 7,12 9.5,6 13,18 15.5,12 22,12" />
+          </svg>
+        </div>
+        <div>
+          <div style={brandTitleStyle}>CareerPT</div>
+          <div style={brandSubStyle}>내 강점으로 커리어 방향을 찾는 AI 코치</div>
         </div>
       </header>
 
-      {/* ── 메인 콘텐츠 + 버튼 ── */}
-      <main style={{
-        padding: '20px 22px',
-        paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
-      }}>
+      {/* ── Swipe Deck (5장) ── */}
+      <div ref={deckRef} style={deckStyle}>
+        {/* 1. HERO 캐치프레이즈 */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <h2 style={heroH2Style}>
+            검색해도<br />
+            안 나오는 답은,<br />
+            <span style={hlStyle}>당신 안에</span> 있어요.
+          </h2>
+          <p style={subStyle}>
+            막막한 커리어,<br />
+            정답 대신 <strong style={subBStyle}>좋은 질문</strong>으로 함께 찾아요.
+          </p>
+        </section>
 
-        {/* 아이브로우 태그 */}
-        <div style={{
-          display: 'inline-block', marginBottom: '12px',
-          padding: '5px 13px', background: 'var(--accent-light)',
-          color: 'var(--accent)', borderRadius: '999px',
-          fontSize: '12px', fontWeight: 700, letterSpacing: '-.005em',
-        }}>
-          📋 코칭 합의
-        </div>
+        {/* 2. 강점에서 시작 */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <div style={emojiStyle}>👀</div>
+          <h2 style={h2Style}>
+            거창할 필요 없어요.<br />
+            <span style={hlStyle}>강점 5가지</span>부터<br />
+            시작해요.
+          </h2>
+          <p style={subStyle}>
+            어려운 검사 용어는 없어요.<br />
+            잘하는 것에서 출발하면 돼요.
+          </p>
+        </section>
 
-        {/* 메인 타이틀 */}
-        <h1 style={{
-          margin: '0 0 12px', color: 'var(--text-primary)',
-          fontSize: '24px', fontWeight: 800,
-          lineHeight: 1.35, letterSpacing: '-.035em',
-        }}>
-          강점 진단 그 다음,<br />
-          <em style={{ fontStyle: 'normal', color: 'var(--accent)', fontWeight: 800 }}>
-            커리어 방향까지
-          </em>{' '}
-          이어드립니다.
-        </h1>
-
-        {/* 설명 */}
-        <p style={{
-          margin: '0 0 20px', color: 'var(--text-secondary)',
-          fontSize: '14px', fontWeight: 500, lineHeight: 1.7,
-          letterSpacing: '-.005em',
-        }}>
-          코칭을 시작하기 전에 이 서비스가 무엇을 하는지 짧게 안내드려요.{' '}
-          방향, 액션, 성공 기준은 모두{' '}
-          <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-            당신이 직접 선택
-          </strong>
-          합니다. 🙌
-        </p>
-
-        {/* 코칭 원칙 카드 3장 */}
-        {principles.map((p) => (
-          <section
-            key={p.title}
-            style={{
-              padding: '16px 18px', marginBottom: '10px',
-              border: '1px solid var(--border)', borderRadius: '16px',
-              background: 'var(--bg)',
-            }}
-          >
-            {/* STEP 배지 + 제목 한 줄 */}
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              gap: '10px', marginBottom: '8px',
-            }}>
-              <div style={{
-                flexShrink: 0,
-                padding: '3px 10px', background: 'var(--accent-light)',
-                color: 'var(--accent)', borderRadius: '999px',
-                fontSize: '11px', fontWeight: 800, letterSpacing: '.06em',
-              }}>
-                {p.step}
+        {/* 3. TRUST */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <div style={kickerStyle}>그런데, 믿을 만해요</div>
+          <h2 style={{ ...h2Style, marginTop: '10px' }}>
+            아무 말이나 하는<br />
+            AI는 <span style={hlStyle}>아니에요</span> 🙅
+          </h2>
+          <div style={trustListStyle}>
+            {TRUST_POINTS.map((tp) => (
+              <div key={tp.id} style={trustItemStyle}>
+                <span style={trustChkStyle}>
+                  <CheckSvg color="var(--accent)" size={11} />
+                </span>
+                <div style={trustTxStyle}>{tp.body}</div>
               </div>
-              <h2 style={{
-                margin: 0, color: 'var(--text-primary)',
-                fontSize: '15px', fontWeight: 800,
-                lineHeight: 1.3, letterSpacing: '-.025em',
-              }}>
-                {p.title}
-              </h2>
-            </div>
-            {/* 설명 텍스트 (전체 너비) */}
-            <p style={{
-              color: 'var(--text-secondary)', fontSize: '13px',
-              fontWeight: 500, lineHeight: 1.65,
-              letterSpacing: '-.005em', margin: 0,
-            }}>
-              {p.text}
-            </p>
-          </section>
-        ))}
+            ))}
+          </div>
+        </section>
 
-        {/* ── CTA 버튼 (본문 하단 인라인) ── */}
-        <div style={{ marginTop: '24px' }}>
-          <Link
-            href="/login?tab=signup"
-            prefetch={true}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '100%', minHeight: '52px', padding: '14px 18px',
-              borderRadius: '12px', background: 'var(--accent)',
-              color: '#fff', textDecoration: 'none', fontFamily: 'inherit',
-              fontSize: '15.5px', fontWeight: 800, letterSpacing: '-.02em',
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(45,91,255,.3)',
-            }}
-          >
-            동의하고 시작하기 →
+        {/* 4. 왜 코칭? (v1.7.2 신규 — careerpt-slide-coaching 시안 반영) */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <h2 style={h2Style}>
+            왜 컨설팅이 아닌<br />
+            <span style={hlStyle}>12주 코칭</span>일까요?
+          </h2>
+          <p style={subStyle}>
+            답을 주고 끝내는 컨설팅이 아니라,<br />
+            내 안에서 답을 찾아 <strong style={subBStyle}>지속가능한 성장</strong>을 만들어요.
+          </p>
+          <p style={subStyle}>
+            마치 PT를 받는 것처럼,<br />
+            아는 것을 진짜로 해내는{' '}
+            <strong style={{ ...subBStyle, color: 'var(--accent)' }}>‘실천 근육’</strong>을 12주간 길러나가요.
+          </p>
+        </section>
+
+        {/* 5. JOURNEY */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <div style={kickerStyle}>이렇게 진행돼요</div>
+          <h2 style={{ ...h2Style, marginTop: '10px' }}>
+            강점에서 시작해,<br />
+            <span style={hlStyle}>12주 뒤</span>엔<br />
+            달라져 있어요.
+          </h2>
+          <div style={flowStyle}>
+            {JOURNEY_STEPS.map((step, i) => (
+              <div key={i}>
+                <div style={i === 3 ? flowItemHiStyle : flowItemStyle}>
+                  <span style={i === 3 ? flowNumHiStyle : flowNumStyle}>{i + 1}</span>
+                  <div>
+                    <div style={flowTitleStyle}>{step.title}</div>
+                    <div style={flowDescStyle}>{step.desc}</div>
+                  </div>
+                </div>
+                {i < JOURNEY_STEPS.length - 1 && <div style={flowArrowStyle}>↓</div>}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 6. OUTCOME + CTA */}
+        <section style={{ ...cardStyle, justifyContent: 'center' }}>
+          <div style={emojiStyle}>🚀</div>
+          <h2 style={h2Style}>
+            이제 <span style={hlStyle}>시작</span>해볼까요?
+          </h2>
+          <div style={outListStyle}>
+            {OUTCOMES.map((txt, i) => (
+              <div key={i} style={outItemStyle}>
+                <span style={outChkStyle}>
+                  <CheckSvg color="#fff" size={13} />
+                </span>
+                {txt}
+              </div>
+            ))}
+          </div>
+          <Link href="/login?tab=signup" prefetch={true} style={ctaStyle}>
+            로그인하고 시작하기 →
           </Link>
-        </div>
-      </main>
+        </section>
+      </div>
+
+      {/* ── Floating 화살표 (vertical center, v1.7.2) ── */}
+      {cur > 0 && (
+        <button
+          type="button"
+          onClick={() => goTo(cur - 1)}
+          aria-label="이전 카드"
+          style={floatingPrevStyle}
+        >
+          ‹
+        </button>
+      )}
+      {cur < TOTAL_CARDS - 1 && (
+        <button
+          type="button"
+          onClick={() => goTo(cur + 1)}
+          aria-label="다음 카드"
+          style={floatingNextStyle}
+        >
+          ›
+        </button>
+      )}
     </div>
   );
 }
+
+// ── 데이터 ────────────────────────────────────────────────
+// TRUST 카드 — JSX 구조 (dangerouslySetInnerHTML 미사용)
+const trustBoldStyle: CSSProperties = { fontWeight: 700, color: 'var(--text-primary)' };
+
+const TRUST_POINTS: { id: string; body: ReactNode }[] = [
+  {
+    id: 'cert',
+    body: (
+      <>
+        <strong style={trustBoldStyle}>Gallup 인증 강점 코치</strong> ·{' '}
+        <strong style={trustBoldStyle}>ICF 인증 코치</strong>가 함께 만들었어요
+      </>
+    ),
+  },
+  {
+    id: 'icf',
+    body: (
+      <>
+        AI 코치는 <strong style={trustBoldStyle}>ICF 최고 등급 코치</strong>의 코칭 방식을 학습했어요
+      </>
+    ),
+  },
+  {
+    id: 'advisory',
+    body: (
+      <>
+        설계 전 과정에서 <strong style={trustBoldStyle}>전문 코치진의 자문</strong>을 받았어요
+      </>
+    ),
+  },
+];
+
+const JOURNEY_STEPS = [
+  { title: '강점 고르기', desc: '내가 가진 것에서 출발' },
+  { title: '코치와 대화', desc: '스스로 답을 꺼내는 과정' },
+  { title: '방향 & 액션 아이템 제안', desc: '나에 대한 이해 기반' },
+  { title: '12주 실천 & 회고', desc: '매주 행동하고 돌아보며 진짜 변화로' },
+];
+
+const OUTCOMES = [
+  '내 고민에 맞춘 목표 5가지',
+  '바로 할 수 있는 첫 액션 1개',
+  '12주 실천 & 회고 루틴',
+];
+
+// ── 작은 SVG 컴포넌트 ─────────────────────────────────────
+function CheckSvg({ color, size }: { color: string; size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <title>체크</title>
+      <path d="M5 13l4 4L19 7" stroke={color} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ── 스타일 ────────────────────────────────────────────────
+const shellStyle: CSSProperties = {
+  width: 'min(430px, 100vw)',
+  minHeight: '100dvh',
+  background: 'var(--surface)',
+  margin: '0 auto',
+  boxShadow: '0 0 40px rgba(0,0,0,.18)',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  position: 'relative', // v1.7.2: floating 화살표 absolute 기준
+};
+
+const brandbarStyle: CSSProperties = {
+  flex: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  padding: '18px 22px',
+  borderBottom: '1px solid var(--border)',
+  background: 'var(--surface)',
+};
+
+const logoStyle: CSSProperties = {
+  width: '44px',
+  height: '44px',
+  borderRadius: '13px',
+  background: 'var(--accent)',
+  display: 'grid',
+  placeItems: 'center',
+  flexShrink: 0,
+  boxShadow: '0 5px 14px rgba(45,91,255,.32)',
+};
+
+const brandTitleStyle: CSSProperties = {
+  fontSize: '19px',
+  fontWeight: 800,
+  lineHeight: 1.15,
+  letterSpacing: '-.01em',
+  color: 'var(--text-primary)',
+};
+
+const brandSubStyle: CSSProperties = {
+  marginTop: '3px',
+  fontSize: '12px',
+  color: 'var(--text-muted)',
+};
+
+const deckStyle: CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  scrollSnapType: 'x mandatory',
+  scrollBehavior: 'smooth',
+  WebkitOverflowScrolling: 'touch',
+  scrollbarWidth: 'none',
+  minHeight: 0,
+};
+
+const cardStyle: CSSProperties = {
+  flex: 'none',
+  width: '100%',
+  scrollSnapAlign: 'center',
+  padding: '30px 28px 22px',
+  display: 'flex',
+  flexDirection: 'column',
+  overflowY: 'auto',
+  scrollbarWidth: 'none',
+};
+
+const heroH2Style: CSSProperties = {
+  fontSize: '32px',
+  fontWeight: 800,
+  letterSpacing: '-.025em',
+  lineHeight: 1.26,
+  color: 'var(--text-primary)',
+  marginTop: '14px',
+};
+
+const h2Style: CSSProperties = {
+  fontSize: '27px',
+  fontWeight: 800,
+  letterSpacing: '-.025em',
+  lineHeight: 1.3,
+  color: 'var(--text-primary)',
+  marginTop: '14px',
+};
+
+const hlStyle: CSSProperties = {
+  color: 'var(--accent)',
+};
+
+const subStyle: CSSProperties = {
+  marginTop: '18px',
+  color: 'var(--text-secondary)',
+  fontSize: '15.5px',
+  lineHeight: 1.6,
+};
+
+const subBStyle: CSSProperties = {
+  color: 'var(--text-primary)',
+  fontWeight: 700,
+};
+
+const emojiStyle: CSSProperties = {
+  fontSize: '44px',
+  lineHeight: 1,
+};
+
+const kickerStyle: CSSProperties = {
+  fontSize: '13px',
+  fontWeight: 800,
+  color: 'var(--accent)',
+  letterSpacing: '.04em',
+};
+
+const trustListStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '12px',
+  marginTop: '22px',
+};
+
+const trustItemStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '9px',
+  background: 'var(--bg)',
+  borderRadius: '12px',
+  padding: '10px 12px',
+};
+
+const trustChkStyle: CSSProperties = {
+  flex: 'none',
+  width: '16px',
+  height: '16px',
+  borderRadius: '50%',
+  background: 'var(--accent-light)',
+  display: 'grid',
+  placeItems: 'center',
+};
+
+const trustTxStyle: CSSProperties = {
+  fontSize: '12.5px',
+  color: 'var(--text-secondary)',
+  lineHeight: 1.45,
+  flex: 1,
+  minWidth: 0,
+};
+
+const flowStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  marginTop: '20px',
+};
+
+const flowItemStyle: CSSProperties = {
+  background: 'var(--bg)',
+  borderRadius: '14px',
+  padding: '14px 16px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '13px',
+};
+
+const flowItemHiStyle: CSSProperties = {
+  ...flowItemStyle,
+  background: 'var(--accent-light)',
+  boxShadow: 'inset 0 0 0 1.5px var(--accent)',
+};
+
+const flowNumStyle: CSSProperties = {
+  flex: 'none',
+  width: '26px',
+  height: '26px',
+  borderRadius: '8px',
+  background: 'var(--accent-light)',
+  color: 'var(--accent)',
+  fontWeight: 800,
+  fontSize: '13px',
+  display: 'grid',
+  placeItems: 'center',
+};
+
+const flowNumHiStyle: CSSProperties = {
+  ...flowNumStyle,
+  background: 'var(--accent)',
+  color: '#fff',
+};
+
+const flowTitleStyle: CSSProperties = {
+  fontWeight: 700,
+  fontSize: '15px',
+  color: 'var(--text-primary)',
+};
+
+const flowDescStyle: CSSProperties = {
+  color: 'var(--text-muted)',
+  fontSize: '12.5px',
+  marginTop: '2px',
+};
+
+const flowArrowStyle: CSSProperties = {
+  alignSelf: 'center',
+  color: 'var(--accent-light)',
+  fontSize: '15px',
+  fontWeight: 800,
+  margin: '-3px 0',
+};
+
+const outListStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+  marginTop: '22px',
+};
+
+const outItemStyle: CSSProperties = {
+  background: 'var(--accent-light)',
+  borderRadius: '14px',
+  padding: '15px 17px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px',
+  fontSize: '15.5px',
+  fontWeight: 700,
+  color: 'var(--text-primary)',
+  boxShadow: 'inset 0 0 0 1.5px var(--accent)',
+};
+
+const outChkStyle: CSSProperties = {
+  flex: 'none',
+  width: '23px',
+  height: '23px',
+  borderRadius: '50%',
+  background: '#15a861',
+  display: 'grid',
+  placeItems: 'center',
+};
+
+const ctaStyle: CSSProperties = {
+  marginTop: '24px',
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  textDecoration: 'none',
+  borderRadius: '14px',
+  background: 'var(--accent)',
+  color: '#fff',
+  fontFamily: 'inherit',
+  fontSize: '17px',
+  fontWeight: 700,
+  padding: '18px',
+  boxShadow: '0 6px 20px rgba(45,91,235,.38)',
+};
+
+// v1.8: Floating 화살표 — 하단 band (텍스트 안 가림)
+//   이전 v1.7.2의 `top: 50%`는 세로 가운데 정렬된 카드 콘텐츠와 겹치는 문제로
+//   `bottom: max(32px, env(safe-area-inset-bottom)+16px)` 위치로 이동.
+//   원래 nav bar(60px)보다는 위, 카드 본문보다는 아래.
+const floatingArrowBaseStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: 'max(28px, calc(env(safe-area-inset-bottom) + 16px))',
+  width: '38px',
+  height: '38px',
+  borderRadius: '50%',
+  border: 'none',
+  background: 'rgba(255, 255, 255, 0.85)',
+  color: 'var(--text-primary)',
+  fontSize: '20px',
+  fontWeight: 700,
+  cursor: 'pointer',
+  display: 'grid',
+  placeItems: 'center',
+  fontFamily: 'inherit',
+  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.18)',
+  zIndex: 10,
+  lineHeight: 1,
+  paddingBottom: '3px', // ‹› 시각적 가운데 보정
+  backdropFilter: 'blur(4px)',
+};
+
+const floatingPrevStyle: CSSProperties = {
+  ...floatingArrowBaseStyle,
+  left: '12px',
+};
+
+const floatingNextStyle: CSSProperties = {
+  ...floatingArrowBaseStyle,
+  right: '12px',
+};
