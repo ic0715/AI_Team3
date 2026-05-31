@@ -92,6 +92,9 @@ export default function LoginPage() {
   const [pendingEmail, setPendingEmail] = useState('');
   const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
+  // 회원가입 즉시 완료 (이메일 인증 OFF 환경)
+  const [signupSuccess, setSignupSuccess] = useState(false);
+
   // 비밀번호 재설정
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -180,9 +183,17 @@ export default function LoginPage() {
       }
       return;
     }
-    // 가입 성공 → 이메일 인증 안내 패널로 전환 (페이지 이동 없음)
-    setPendingEmail(signupEmail);
-    setPanel('verify-email');
+    // 가입 성공 — 세션이 바로 오면(이메일 인증 OFF) 완료 메시지, 없으면 인증 대기 패널
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      // 이메일 인증 OFF: 즉시 가입 완료
+      setSignupSuccess(true);
+    } else {
+      // 이메일 인증 ON: 인증 메일 발송 안내
+      setPendingEmail(signupEmail);
+      setPanel('verify-email');
+      setShowSignupModal(false);
+    }
   };
 
   // 비밀번호 재설정 처리
@@ -512,7 +523,36 @@ export default function LoginPage() {
 
             {/* 모달 본문 (스크롤 가능) */}
             <div style={{ overflowY: 'auto', padding: '20px 24px 40px' }}>
-              <form onSubmit={handleSignup}>
+
+              {/* 가입 완료 화면 (이메일 인증 OFF 환경) */}
+              {signupSuccess && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '16px 0 8px' }}>
+                  <div style={{
+                    width: '64px', height: '64px', borderRadius: '50%',
+                    background: '#ecfdf5', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', marginBottom: '20px',
+                  }}>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '10px', color: 'var(--text-primary)' }}>
+                    회원가입이 완료되었습니다!
+                  </div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: '32px' }}>
+                    CareerPT에 오신 걸 환영해요.<br />
+                    지금 바로 커리어 코칭을 시작해보세요.
+                  </div>
+                  <button
+                    onClick={() => { setShowSignupModal(false); handlePostAuthRouting(); }}
+                    style={{ ...primaryBtnStyle, width: '100%' }}
+                  >
+                    시작하기 →
+                  </button>
+                </div>
+              )}
+
+              {!signupSuccess && <form onSubmit={handleSignup}>
                 {signupError && <ErrorBox message={signupError} />}
 
                 <FieldRow label="이메일">
@@ -626,7 +666,7 @@ export default function LoginPage() {
                 <Divider />
 
                 <GoogleButton label="Google로 시작하기" />
-              </form>
+              </form>}
             </div>
           </div>
         </div>
