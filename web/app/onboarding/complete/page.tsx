@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 
 const MVP_COMPLETED_KEY = 'mvp_completed';
 
@@ -26,7 +27,7 @@ export default function CompletePage() {
 
 function CompleteContent() {
   const router = useRouter();
-  const { ready } = useOnboardingGuard('complete');
+  const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('complete');
 
   const [data, setData] = useState<CompleteData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,7 @@ function CompleteContent() {
     router.push('/home');
   };
 
+  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
   if (!ready || loading) return <LoadingScreen text="정리하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 

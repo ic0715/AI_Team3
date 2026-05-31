@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
@@ -109,7 +110,7 @@ export default function HomePage() {
 
 function HomeContent() {
   const router = useRouter();
-  const { ready } = useOnboardingGuard('complete');
+  const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('complete');
 
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -329,6 +330,73 @@ function HomeContent() {
   );
 
   // ── 렌더 분기 ─────────────────────────────────────────────
+  // 온보딩 미완료 → 홈 레이아웃 유지하면서 빈 카드로 안내
+  if (pendingRedirect) return (
+    <div style={wrapStyle}>
+      <header style={topbarStyle}>
+        <div style={brandStyle}>CareerPT<sup style={brandDotStyle}>·</sup></div>
+        <span style={stepPillStyle}>홈</span>
+      </header>
+      <main style={screenStyle}>
+        {/* 인사 영역 */}
+        <section style={greetingStyle}>
+          <div style={greetingTitleStyle}>안녕하세요 👋</div>
+          <div style={greetingSubStyle}>코칭을 시작하면 여기에 현황이 표시돼요</div>
+        </section>
+
+        {/* 커리어 방향 카드 (빈 상태) */}
+        <div style={{ ...themeCardStyle, display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.75, letterSpacing: '.06em' }}>
+            커리어 방향
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 800, lineHeight: 1.4, opacity: 0.55 }}>
+            목표를 설정하면 여기에 표시돼요
+          </div>
+          <div style={{
+            marginTop: '4px', height: '1px',
+            background: 'rgba(255,255,255,0.2)',
+          }} />
+          <div style={{ fontSize: '13px', opacity: 0.6, fontWeight: 500 }}>
+            온보딩을 완료하고 시작해보세요 ✨
+          </div>
+        </div>
+
+        {/* 오늘의 액션 카드 (빈 상태) */}
+        <div style={{
+          border: '1.5px dashed var(--border)', borderRadius: '18px',
+          padding: '20px', marginBottom: '20px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: '8px', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '24px' }}>📋</div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            오늘의 액션
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            액션 아이템을 선택하면<br />매일 여기서 확인할 수 있어요
+          </div>
+        </div>
+
+        {/* 이어서 하기 CTA */}
+        <button
+          onClick={confirmRedirect}
+          style={{
+            width: '100%', minHeight: '50px', borderRadius: '14px', border: 'none',
+            background: 'var(--accent)', color: '#fff',
+            fontSize: '15px', fontWeight: 800, letterSpacing: '-.02em',
+            cursor: 'pointer', fontFamily: 'inherit',
+            boxShadow: '0 4px 16px rgba(45,91,255,.28)',
+          }}
+        >
+          온보딩 이어서 하기 →
+        </button>
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
+          {pendingRedirect.title}
+        </p>
+      </main>
+      <TabBar active="home" />
+    </div>
+  );
   if (!ready || loading) return <LoadingScreen text="홈을 준비하고 있어요..." />;
   if (!data) return <LoadingScreen text={error ?? '데이터를 찾을 수 없어요.'} />;
 

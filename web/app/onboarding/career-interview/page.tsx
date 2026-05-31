@@ -182,12 +182,28 @@ function CareerInterviewContent() {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const savedSessionRef = useRef<{ messages: Message[] } | null>(null);
 
+  // 인터뷰 이미 완료 여부 (뒤로가기 진입 시)
+  const [interviewDone, setInterviewDone] = useState(false);
+
   // ── 컨텍스트 로드 (프로필 + 강점) ──────────────────────────
   useEffect(() => {
     const loadContext = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
+
+      // 인터뷰 이미 완료된 경우 — 뒤로가기로 진입했을 때 새 인터뷰 시작 방지
+      const { data: existingInterview } = await supabase
+        .from('career_interview_results')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (existingInterview?.length) {
+        setInterviewDone(true);
+        setLoadingContext(false);
+        return;
+      }
 
       const [{ data: profile }, { data: strengthData }] = await Promise.all([
         supabase.from('profiles').select('nickname, job_field, career_level, main_concern').eq('id', user.id).single(),
@@ -508,6 +524,151 @@ function CareerInterviewContent() {
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
+
+  // ── 인터뷰 이미 완료 — 다시하기 핸들러 ─────────────────────
+  const [isRedoing, setIsRedoing] = useState(false);
+
+  const handleRedo = useCallback(async () => {
+    if (!userId || isRedoing) return;
+    setIsRedoing(true);
+    try {
+      // 기존 인터뷰 결과 삭제 (새 인터뷰를 위해)
+      await supabase
+        .from('career_interview_results')
+        .delete()
+        .eq('user_id', userId);
+
+      // 컨텍스트 다시 로드 (profile + 강점)
+      const [{ data: profile }, { data: strengthData }] = await Promise.all([
+        supabase.from('profiles').select('nickname, job_field, career_level, main_concern').eq('id', userId).single(),
+        supabase.from('strength_analyses').select('strengths').eq('user_id', userId).eq('is_latest', true).limit(1),
+      ]);
+
+      const ctx: UserContext = {
+        nickname: profile?.nickname ?? '친구',
+        jobField: profile?.job_field ?? '',
+        careerLevel: profile?.career_level ?? '',
+        mainConcern: profile?.main_concern ?? '',
+        strengths: strengthData?.[0]?.strengths ?? [],
+      };
+
+      setContext(ctx);
+      setInterviewDone(false);
+      startNewInterview(ctx);
+    } finally {
+      setIsRedoing(false);
+    }
+  }, [userId, isRedoing, startNewInterview]);
+
+  // ── 인터뷰 이미 완료 (뒤로가기 진입) ─────────────────────
+  if (interviewDone) {
+    return (
+      <div style={{
+        position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)',
+        width: 'min(430px, 100vw)', height: '100dvh',
+        background: 'var(--surface)',
+        boxShadow: '0 0 40px rgba(0,0,0,.18)',
+        overflow: 'hidden',
+      }}>
+        {/* ── 배경: 채팅 UI 목업 ────────────────────────────── */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.45,
+          pointerEvents: 'none', display: 'flex', flexDirection: 'column',
+        }}>
+          {/* 헤더 */}
+          <div style={{ padding: '8px 16px 6px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
+              <div style={{ width: '44px', height: '28px', borderRadius: '6px', background: 'var(--border)' }} />
+              <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', flex: 1, textAlign: 'center' }}>커리어 인터뷰</span>
+              <div style={{ width: '44px' }} />
+            </div>
+          </div>
+          {/* 메시지 영역 */}
+          <div style={{ flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+              <div style={{ maxWidth: '78%', padding: '12px 16px', borderRadius: '18px 18px 18px 4px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '14px', lineHeight: 1.65, color: 'var(--text-primary)' }}>
+                안녕하세요! 강점을 바탕으로 커리어 방향을 함께 찾아볼게요. 오늘 시간은 어느 정도 되세요?
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{ maxWidth: '78%', padding: '12px 16px', borderRadius: '18px 18px 4px 18px', background: 'var(--accent)', fontSize: '14px', lineHeight: 1.65, color: '#fff' }}>
+                30분 정도 여유 있어요!
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+              <div style={{ maxWidth: '78%', padding: '12px 16px', borderRadius: '18px 18px 18px 4px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '14px', lineHeight: 1.65, color: 'var(--text-primary)' }}>
+                좋아요! 요즘 커리어에서 가장 마음에 걸리는 게 있다면 어떤 건가요?
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{ maxWidth: '78%', padding: '12px 16px', borderRadius: '18px 18px 4px 18px', background: 'var(--accent)', fontSize: '14px', lineHeight: 1.65, color: '#fff' }}>
+                성장 방향을 잘 모르겠어서요. 뭘 더 해야 할지...
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+              <div style={{ maxWidth: '78%', padding: '12px 16px', borderRadius: '18px 18px 18px 4px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '14px', lineHeight: 1.65, color: 'var(--text-primary)' }}>
+                그 막막함, 정말 잘 공감돼요. 지금 하시는 일 중에서 유독 에너지가 생기는 순간이 있으신가요?
+              </div>
+            </div>
+          </div>
+          {/* 입력창 */}
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ flex: 1, height: '44px', borderRadius: '12px', border: '1.5px solid var(--border)', background: 'var(--surface)' }} />
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'var(--border)' }} />
+          </div>
+        </div>
+
+        {/* ── 흰색 오버레이 + 완료 안내 패널 ──────────────────── */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(255,255,255,0.82)',
+          backdropFilter: 'blur(3px)',
+          WebkitBackdropFilter: 'blur(3px)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          padding: '0 32px',
+        }}>
+          <div style={{
+            width: '64px', height: '64px', borderRadius: '50%',
+            background: 'var(--accent-light)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', marginBottom: '20px',
+          }}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none"
+              stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div style={{ fontSize: '21px', fontWeight: 800, marginBottom: '10px', letterSpacing: '-.03em', textAlign: 'center', color: 'var(--text-primary)' }}>
+            인터뷰를 완료하셨어요!
+          </div>
+          <div style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65, textAlign: 'center', marginBottom: '36px' }}>
+            AI 커리어 인터뷰가 이미 완료됐어요.<br />
+            결과를 확인하거나 다시 진행할 수 있어요.
+          </div>
+          <button
+            onClick={() => router.push('/onboarding/career-result')}
+            style={{ ...btnPrimary, marginBottom: '12px' }}
+          >
+            결과 보기 →
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={isRedoing}
+            style={{
+              ...btnOutline,
+              opacity: isRedoing ? 0.6 : 1,
+              cursor: isRedoing ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isRedoing ? '준비 중...' : '커리어 인터뷰 다시하기'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── 로딩 상태 ────────────────────────────────────────────
   if (loadingContext) {

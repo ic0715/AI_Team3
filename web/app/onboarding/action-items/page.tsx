@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
+import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { ACTION_SEEDS_BY_COMPETENCY, type ActionItem } from '@/lib/constants/seeds';
 
 // 커스텀 입력 길이 제한 (스펙 3.5)
@@ -71,7 +72,7 @@ interface UserContextForAI {
 
 function ActionItemsContent() {
   const router = useRouter();
-  const { ready } = useOnboardingGuard('action-items');
+  const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('action-items');
 
   const [goal, setGoal] = useState<ActiveGoal | null>(null);
   const [careerLevel, setCareerLevel] = useState<string>('junior');
@@ -383,6 +384,7 @@ function ActionItemsContent() {
     }
   }, [selectedId, saving, goal, customAdded, seeds, router]);
 
+  if (pendingRedirect) return <OnboardingRedirectModal title={pendingRedirect.title} message={pendingRedirect.message} onConfirm={confirmRedirect} />;
   if (!ready || loadingData) return <LoadingScreen text="액션 아이템을 준비 중이에요..." />;
   if (!goal) {
     if (error === 'NO_ACTIVE_GOAL') {

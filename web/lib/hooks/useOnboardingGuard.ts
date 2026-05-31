@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 /**
  * 온보딩 각 단계 진입 전 이전 단계 완료 여부를 확인하고,
- * 미완료 시 해당 단계로 리다이렉트한다.
+ * 미완료 시 사용자에게 안내 후 해당 단계로 이동한다.
  *
  * 사용 예:
- *   const { ready } = useOnboardingGuard("strengths");
+ *   const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard("strengths");
+ *   if (pendingRedirect) return <OnboardingRedirectModal {...pendingRedirect} onConfirm={confirmRedirect} />;
  *   if (!ready) return null;
  */
 
@@ -22,19 +23,34 @@ export type OnboardingStep =
   | "action-items"     // p10: 역량(recommended_competencies) 선택 필요
   | "complete";        // NEW02: 액션 아이템 선택 완료 필요
 
+export interface PendingRedirect {
+  to: string;
+  title: string;
+  message: string;
+}
+
 interface GuardResult {
-  ready: boolean; // true이면 현재 페이지 렌더링 허용
+  ready: boolean;
+  pendingRedirect: PendingRedirect | null;
+  confirmRedirect: () => void;
 }
 
 export function useOnboardingGuard(step: OnboardingStep): GuardResult {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [pendingRedirect, setPendingRedirect] = useState<PendingRedirect | null>(null);
+
+  const confirmRedirect = useCallback(() => {
+    if (pendingRedirect) {
+      router.replace(pendingRedirect.to);
+    }
+  }, [pendingRedirect, router]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function check() {
-      // 1. 세션 확인
+      // 1. 세션 확인 — 보안 리다이렉트는 바로 이동 (확인 불필요)
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -44,7 +60,7 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
         return;
       }
 
-      // 2. 이메일 인증 확인
+      // 2. 이메일 인증 확인 — 보안 리다이렉트
       if (!user.email_confirmed_at) {
         router.replace("/login");
         return;
@@ -52,7 +68,6 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
 
       // 3. 단계별 이전 완료 조건 확인
       if (step === "profile") {
-        // 로그인 + 이메일 인증만 필요 → 통과
         if (!cancelled) setReady(true);
         return;
       }
@@ -65,7 +80,11 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
         .single();
 
       if (!profile?.profile_completed) {
-        router.replace("/onboarding/profile");
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/profile",
+          title: "기본정보 입력이 필요해요",
+          message: "이 단계를 이용하려면 기본정보 입력을 먼저 완료해야 해요.\n기본정보 입력 화면으로 이동할게요.",
+        });
         return;
       }
 
@@ -83,7 +102,11 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
         .limit(1);
 
       if (!strengths?.length) {
-        router.replace("/onboarding/strengths");
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/strengths",
+          title: "강점 선택이 필요해요",
+          message: "이 단계를 이용하려면 나의 Top 5 강점 선택을 먼저 완료해야 해요.\n강점 선택 화면으로 이동할게요.",
+        });
         return;
       }
 
@@ -100,7 +123,11 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
         .limit(1);
 
       if (!interviews?.length) {
-        router.replace("/onboarding/career-intro");
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/career-intro",
+          title: "커리어 인터뷰가 필요해요",
+          message: "이 단계를 이용하려면 AI 커리어 인터뷰를 먼저 완료해야 해요.\n인터뷰 시작 화면으로 이동할게요.",
+        });
         return;
       }
 
@@ -111,7 +138,29 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
 
       // recommended_competencies 선택 여부 확인
       if (!interviews[0].recommended_competencies) {
-        router.replace("/onboarding/career-result");
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/career-result",
+          title: "목표 방향 선택이 필요해요",
+          message: "이 단계를 이용하려면 커리어 목표 방향 선택을 먼저 완료해야 해요.\n목표 선택 화면으로 이동할게요.",
+        });
+        return;
+      }
+
+      // goal 존재 여부 확인 — recommended_competencies만 있고 goal이 없으면
+      // action-items 대신 career-result로 보냄 (goal 선택이 선행 필요)
+      const { data: goals } = await supabase
+        .from("goals")
+        .select("id")
+        .eq("user_id", user.id)
+        .in("status", ["active", "paused"])
+        .limit(1);
+
+      if (!goals?.length) {
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/career-result",
+          title: "커리어 목표 선택이 필요해요",
+          message: "이 단계를 이용하려면 커리어 목표 방향을 먼저 선택해야 해요.\n목표 선택 화면으로 이동할게요.",
+        });
         return;
       }
 
@@ -129,7 +178,11 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
         .limit(1);
 
       if (!actions?.length) {
-        router.replace("/onboarding/action-items");
+        if (!cancelled) setPendingRedirect({
+          to: "/onboarding/action-items",
+          title: "액션 아이템 선택이 필요해요",
+          message: "이 단계를 이용하려면 첫 번째 액션 아이템 선택을 먼저 완료해야 해요.\n액션 아이템 선택 화면으로 이동할게요.",
+        });
         return;
       }
 
@@ -144,5 +197,5 @@ export function useOnboardingGuard(step: OnboardingStep): GuardResult {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { ready };
+  return { ready, pendingRedirect, confirmRedirect };
 }
