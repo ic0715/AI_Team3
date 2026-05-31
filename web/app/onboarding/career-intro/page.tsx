@@ -15,29 +15,41 @@ export default function CareerIntroPage() {
   const router = useRouter();
   const deckRef = useRef<HTMLDivElement>(null);
   const [strengths, setStrengths] = useState<string[]>([]);
+  const [nickname, setNickname] = useState<string>(''); // v1.10: 카드 1 본문 개인화용
   const [cur, setCur] = useState(0);
   const [confirmed, setConfirmed] = useState<Set<number>>(new Set());
   const [hintShown, setHintShown] = useState(false);
 
-  // ── 강점 fetch ────────────────────────────────────────────
+  // ── 강점 + 닉네임 fetch ──────────────────────────────────
   useEffect(() => {
-    const fetchStrengths = async () => {
+    const fetchUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
-        .from('strength_analyses')
-        .select('strengths')
-        .eq('user_id', user.id)
-        .eq('is_latest', true)
-        .single();
+      // 강점과 닉네임 병렬 fetch
+      const [strengthRes, profileRes] = await Promise.all([
+        supabase
+          .from('strength_analyses')
+          .select('strengths')
+          .eq('user_id', user.id)
+          .eq('is_latest', true)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('nickname')
+          .eq('id', user.id)
+          .single(),
+      ]);
 
-      if (data?.strengths) {
-        const names = (data.strengths as { name_ko: string }[]).map((s) => s.name_ko);
+      if (strengthRes.data?.strengths) {
+        const names = (strengthRes.data.strengths as { name_ko: string }[]).map((s) => s.name_ko);
         setStrengths(names);
       }
+      if (profileRes.data?.nickname) {
+        setNickname(profileRes.data.nickname as string);
+      }
     };
-    fetchStrengths();
+    fetchUserData();
   }, []);
 
   // ── deck 스크롤 → 현재 카드 추적 ──────────────────────────
@@ -148,7 +160,10 @@ export default function CareerIntroPage() {
           </h2>
           <p style={cardBodyStyle}>
             코치는 정답 대신 질문을 던져요.{' '}
-            <strong style={bodyStrongStyle}>답은 이미 당신 안에</strong> 있어요.
+            <strong style={bodyStrongStyle}>
+              답은 이미 {nickname ? `${nickname}님` : '당신'} 안에
+            </strong>{' '}
+            있어요.
           </p>
           <div style={compareListStyle}>
             <CompareRow type="no" who="컨설팅" say={'"이렇게 하세요"'} />

@@ -67,7 +67,7 @@ deck 위에 항상 보이는 영역. 사용자가 어느 카드에 있든 *지�
 | --- | --- |
 | 확인 eyebrow `v1.6` | 카드 상단 좌측에 pill 형태 라벨 — 미확인 시 **"확인이 필요해요 · 1 / 3"** (accent-light/accent), 확인 시 "✓ 확인 완료" (accent fill/흰 글씨) |
 | h2 | "잠깐, 이건 **코칭**이에요" |
-| 본문 | "코치는 정답 대신 질문을 던져요. **답은 이미 당신 안에** 있어요." |
+| 본문 `v1.10 개인화` | "코치는 정답 대신 질문을 던져요. **답은 이미 {nickname}님 안에** 있어요." — `profiles.nickname` 동적 삽입. 닉네임 없으면 "당신" fallback. |
 | 비교 표 | 컨설팅 ✕ "이렇게 하세요" / 멘토링 ✕ "제 경험으로는…" / **코칭 ✓ "어떻게 생각하세요?"** (강조 행 — accent 보더) |
 | 버튼 안내 라인 `v1.6` | 확인 안 한 상태에서 버튼 위에 표시: "👇 이해되셨다면 아래 버튼을 눌러주세요" |
 | 확인 버튼 | "이해했어요" (미확인 시 accent 보더 + 부드러운 외부 글로우, 발견성 보강) → 클릭 시 "✓ 확인했어요" (accent fill)로 토글, gating 카운트 +1 |
@@ -134,6 +134,7 @@ deck 위에 항상 보이는 영역. 사용자가 어느 카드에 있든 *지�
 - 읽기: `strength_analyses` (is_latest=true, Top 5 표시 + AI 프롬프트 컨텍스트용)
   - 04 직접 선택 경로의 경우, 04에서 INSERT한 row(`method='direct_select'`)를 읽음
   - 06 AI 인터뷰 경로의 경우, 기존과 동일 (`method=ai_interview`)
+- 읽기: `profiles.nickname` `v1.10 신규` — 카드 1 본문 개인화 ("답은 이미 {nickname}님 안에 있어요")
 - 쓰기: 없음 (Static 전환 화면)
 
 > ⚠️ **schema 불일치 수정**:
@@ -167,6 +168,7 @@ deck 위에 항상 보이는 영역. 사용자가 어느 카드에 있든 *지�
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v1.10 | 2026-05-31 | **§3.3 카드 1 본문 개인화** — "답은 이미 **당신** 안에 있어요" → "답은 이미 **{nickname}님** 안에 있어요". `profiles.nickname` 추가 fetch (강점과 병렬). 닉네임 없으면 "당신" fallback (게스트 또는 닉네임 미설정 케이스). §5 데이터 읽기 목록에 `profiles.nickname` 추가. 사용자에게 "내 이름이 불린다"는 친밀감, 코칭 톤에 맞춤. |
 | v1.9 | 2026-05-31 | **§3.5 gating — '이해했어요' 클릭 시 자동 다음 카드 이동**. 사용자가 매번 직접 swipe하거나 → 버튼 누를 필요 없이, 확인 즉시 250ms 후 다음 카드로 자동 advance. 250ms는 "✓ 확인 완료" 토글 애니메이션이 보일 시간 확보용. 재클릭으로 확인 해제하는 경우엔 이동 안 함(사용자가 의도적으로 머무르는 경우). 카드 3 확인 → 자동으로 카드 4(FINAL) 도착 → 시작 버튼 활성화 상태. 마찰 제거. |
 | v1.8 | 2026-05-31 | **구현 컨벤션 통일 — Tailwind → inline style 전면 변환** (코드만 변경, 사용자 경험 동일). 다른 온보딩 페이지(03 profile, 04 strengths, 10 action-items, 09 career-result 등)는 전부 `style={...}` + 하단 `const xxxStyle: CSSProperties` 패턴인데 07만 Tailwind className 63개 사용해 시각적으로 따로 노는 문제 해결. (1) 모든 className → inline style 객체로 변환(`className` 0개, `style` 62개). (2) 컨테이너 폭 `w-[390px]` → `width: min(430px, 100vw)` (모든 페이지 표준). (3) 외부 회색 wrapper(`min-h-screen ... bg-[#e8eaee]`) 제거 — 페이지 자체가 컨테이너 (다른 페이지와 동일). (4) Top bar / 카드 보더 / radius / 패딩 모두 action-items의 `wrapStyle`·`headerStyle`·`cardStyle` 패턴 따름. 발견성 보강(eyebrow / hint / glow / progress chip), gating, swipe deck 로직 등 v1.5~v1.7 변경 사항 모두 보존. 디자인 토큰 100% 사용 (`var(--accent)`, `var(--danger)`, `var(--border-strong)`, `var(--radius-md)` 등). |
 | v1.7 | 2026-05-31 | **UX/UI 조정 — 휴대폰 한 화면 fit + 디자인 시스템 정합**. (1) **§3.2 강점 카드 가운데 정렬** — 헤더·chip 모두 `text-center`+`justify-center`. (2) **§3.3 swipe deck "스크롤 없음" 제약 명시 + 압축 사이즈 표** — 카드 `overflow-y: hidden`, h2 23→19px, body 14.5→13px, 패딩·하단 nav 높이 일관 축소. 발견성 보강(eyebrow / hint / glow / progress chip)은 v1.6 그대로 유지. (3) **디자인 토큰 정렬** — 하드코딩 컬러 제거: `#e0524f` → `var(--danger)`, `#c9c9d2` → `var(--border-strong)`, 시작 버튼 radius `13px` → `var(--radius-md)` (12px). eyebrow pill 10.5→11.5px, CompareRow ✕✓ 배지 10→11px로 다른 화면 패턴(11~12.5)과 정합. globals.css 토큰 사용 표 §3.3 신설. |
