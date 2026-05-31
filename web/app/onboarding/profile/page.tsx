@@ -3,6 +3,14 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import {
+  canSubmitBasicInfo,
+  hasBasicInfoErrors,
+  isBasicInfoChanged,
+  maxBirthdate,
+  parseRecentDraft,
+  validateBasicInfo,
+} from '@/lib/profile/basicInfo';
 
 // ── 상수 ──────────────────────────────────────────────────────
 const JOB_OPTIONS = [
@@ -23,13 +31,6 @@ const GENDER_OPTIONS = [
   { value: '기타', label: '기타' },
   { value: '응답 안 함', label: '응답 안 함' },
 ];
-
-// 만 14세 이상 기준 max 날짜 동적 계산
-function getMaxBirthdate(): string {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - 14);
-  return d.toISOString().split('T')[0];
-}
 
 // ── 컴포넌트 ──────────────────────────────────────────────────
 export default function BasicInfoPage() {
@@ -115,23 +116,18 @@ function BasicInfoContent() {
 
       // sessionStorage 임시 저장 복원 (새로고침 대비)
       // 1시간 이상 된 draft는 무시 (오래된 데이터가 최신 DB 값을 덮어쓰는 문제 방지)
-      const draft = sessionStorage.getItem('draft_basic_info');
-      if (draft && !isEditMode) {
-        try {
-          const parsed = JSON.parse(draft);
-          const ONE_HOUR = 60 * 60 * 1000;
-          const isRecentDraft = parsed.savedAt && (Date.now() - parsed.savedAt < ONE_HOUR);
-          if (isRecentDraft) {
-            if (parsed.nickname) setNickname(parsed.nickname);
-            if (parsed.gender)   setGender(parsed.gender);
-            if (parsed.jobField) setJobField(parsed.jobField);
-            if (parsed.careerLevel) setCareerLevel(parsed.careerLevel);
-            if (parsed.mainConcern) setMainConcern(parsed.mainConcern);
-          } else {
-            // 오래된 draft 삭제
-            sessionStorage.removeItem('draft_basic_info');
-          }
-        } catch { /* 무시 */ }
+      if (!isEditMode) {
+        const { apply, removeStale } = parseRecentDraft(
+          sessionStorage.getItem('draft_basic_info'),
+        );
+        if (removeStale) sessionStorage.removeItem('draft_basic_info');
+        if (apply) {
+          if (apply.nickname) setNickname(apply.nickname);
+          if (apply.gender) setGender(apply.gender);
+          if (apply.jobField) setJobField(apply.jobField);
+          if (apply.careerLevel) setCareerLevel(apply.careerLevel);
+          if (apply.mainConcern) setMainConcern(apply.mainConcern);
+        }
       }
 
       setInitialLoading(false);
@@ -154,29 +150,30 @@ function BasicInfoContent() {
   }, [nickname, gender, jobField, careerLevel, mainConcern, isEditMode, initialLoading]);
 
   // ── 버튼 활성화 조건 ───────────────────────────────────────
-  const isChanged = isEditMode && (
-    nickname !== originalValues.current.nickname ||
-    gender   !== originalValues.current.gender   ||
-    jobField !== originalValues.current.jobField  ||
-    careerLevel !== originalValues.current.careerLevel ||
-    mainConcern !== originalValues.current.mainConcern
+  const isChanged = isEditMode && isBasicInfoChanged(
+    { nickname, gender, jobField, careerLevel, mainConcern },
+    originalValues.current,
   );
-  const requiredFilled = nickname.trim() && jobField && careerLevel &&
-    (!isEditMode ? !!birthdate : true);
-  const btnEnabled = requiredFilled && (!isEditMode || isChanged);
+  const btnEnabled = canSubmitBasicInfo(
+    { nickname, birthdate, jobField, careerLevel },
+    isEditMode,
+    isChanged,
+  );
 
   // ── 저장 처리 ─────────────────────────────────────────────
   const handleSubmit = async () => {
     // 클라이언트 검증
-    let hasError = false;
-    if (!nickname.trim()) { setNicknameError('닉네임을 입력해주세요'); hasError = true; }
-    else if (nickname.trim().length > 10) { setNicknameError('닉네임은 10자 이하로 입력 가능합니다'); hasError = true; }
-    if (!isEditMode && !birthdate) { setBirthdateError('생년월일을 입력해주세요'); hasError = true; }
-    if (!jobField) { setJobError('직업/분야를 선택해주세요'); hasError = true; }
-    if (!careerLevel) { setCareerError('경력을 선택해주세요'); hasError = true; }
-    if (hasError) {
+    const errors = validateBasicInfo(
+      { nickname, birthdate, jobField, careerLevel },
+      isEditMode,
+    );
+    setNicknameError(errors.nickname ?? '');
+    setBirthdateError(errors.birthdate ?? '');
+    setJobError(errors.job ?? '');
+    setCareerError(errors.career ?? '');
+    if (hasBasicInfoErrors(errors)) {
       // 닉네임 에러가 있으면 해당 필드로 스크롤
-      if (!nickname.trim() || nickname.trim().length > 10) {
+      if (errors.nickname) {
         nicknameRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       return;
@@ -322,7 +319,7 @@ function BasicInfoContent() {
             type="date"
             value={birthdate}
             onChange={(e) => { setBirthdate(e.target.value); setBirthdateError(''); }}
-            max={getMaxBirthdate()}
+            max={maxBirthdate()}
             disabled={isEditMode}
             aria-readonly={isEditMode}
             aria-describedby={birthdateError ? 'birthdate-error' : undefined}
