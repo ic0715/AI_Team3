@@ -1,10 +1,9 @@
 'use client';
-// p01 랜딩 — swipe deck 5장 (spec 01_landing.md v1.7)
+// p01 랜딩 — swipe deck 6장 (spec 01_landing.md v1.8)
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { supabase } from '@/lib/supabase/client';
 
 const TOTAL_CARDS = 6;
 
@@ -18,67 +17,11 @@ export default function LandingPage() {
     router.prefetch('/login');
   }, [router]);
 
-  // ── 이미 로그인된 사용자 → 상태 기반 자동 리다이렉트 (spec 01_landing.md §2)
-  //
-  // 🚧 TEMP (2026-05-31): 랜딩 swipe deck UI 테스트를 위해 auto-redirect를
-  //   임시 비활성화. ?redirect=1 쿼리 파라미터를 붙이면 원래 동작 유지.
-  //   테스트 끝나면 아래 `if (!shouldRedirect) return;` 라인 제거.
-  useEffect(() => {
-    const shouldRedirect =
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('redirect') === '1';
-    if (!shouldRedirect) return; // 🚧 TEMP: 평소엔 redirect 안 함 (랜딩 deck 보여줌)
-
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      if (!user.email_confirmed_at) { router.push('/login'); return; }
-
-      const { data: goals } = await supabase
-        .from('goals')
-        .select('status, current_week, total_weeks')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      const activeGoal = goals?.find((g) => g.status === 'active');
-      const pausedGoal = goals?.find((g) => g.status === 'paused');
-      const completedGoal = goals?.find(
-        (g) => g.status === 'completed' && g.current_week >= g.total_weeks,
-      );
-
-      if (activeGoal || pausedGoal) { router.push('/home'); return; }
-      if (completedGoal) { router.push('/cycle-complete'); return; }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('profile_completed')
-        .eq('id', user.id)
-        .single();
-      if (!profile?.profile_completed) { router.push('/onboarding/profile'); return; }
-
-      const { data: strengths } = await supabase
-        .from('strength_analyses')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_latest', true)
-        .limit(1);
-      if (!strengths?.length) { router.push('/onboarding/strengths'); return; }
-
-      const { data: interviews } = await supabase
-        .from('career_interview_results')
-        .select('id, recommended_competencies')
-        .eq('user_id', user.id)
-        .limit(1);
-      if (!interviews?.length) { router.push('/onboarding/career-intro'); return; }
-      if (!interviews[0].recommended_competencies) { router.push('/onboarding/career-result'); return; }
-      if (!activeGoal) { router.push('/onboarding/career-result'); return; }
-
-      router.push('/onboarding/action-items');
-    };
-    checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // v1.8: 로그인 상태 auto-redirect 제거.
+  //   팀 결정 — 랜딩 페이지는 모든 사용자에게 항상 노출 (게스트도 로그인 사용자도).
+  //   로그인 사용자가 자기 상태(홈/온보딩)로 가려면 CTA(`/login?tab=signup`)를
+  //   거치거나 직접 URL 입력. 이전에 있던 상태 기반 자동 리다이렉트 useEffect는
+  //   삭제됨 (spec 01_landing.md §2 참조).
 
   // ── deck 스크롤 → 현재 카드 추적 ──────────────────────────
   useEffect(() => {
