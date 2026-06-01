@@ -283,12 +283,13 @@ function HomeContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, router]);
 
-  // 데이터 로드 완료 후 피드백 모달 1회 표시
+  // 데이터 로드 완료 후 피드백 모달 1회 표시 (홈이 먼저 보인 뒤 슬라이드업)
   useEffect(() => {
     if (!data) return;
     try {
       if (!localStorage.getItem('home_feedback_prompted')) {
-        setShowFeedback(true);
+        const timer = setTimeout(() => setShowFeedback(true), 800);
+        return () => clearTimeout(timer);
       }
     } catch { /* ignore */ }
   }, [data]);
