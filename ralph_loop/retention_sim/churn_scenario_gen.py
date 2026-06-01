@@ -20,10 +20,7 @@ if str(_RALPH_ROOT) not in sys.path:
 
 import anthropic
 from careerpt_sim.config import ANTHROPIC_API_KEY, COACH_MODEL, DATA_DIR, SIM_HOME
-from retention_sim.prompts.scenario_gen import (
-    SCENARIO_GEN_SYSTEM,
-    SCENARIO_GEN_USER_TEMPLATE,
-)
+from retention_sim.prompts.scenario_gen import SCENARIO_GEN_SYSTEM
 from retention_sim.simulate import _load_atypical_ids, _synthetic_scores
 
 AI_OUT_DIR = SIM_HOME / "churn_ai"
@@ -64,32 +61,28 @@ def _format_persona_user(
     scores: dict,
     is_atypical: bool,
 ) -> str:
-    """SCENARIO_GEN_USER_TEMPLATE을 채워 반환."""
+    """페르소나 데이터를 유저 메시지로 직렬화한다."""
     g = persona.get("selected_goal") or {}
     top5 = persona.get("top5_strengths", [])
     top5_str = " / ".join(top5) if top5 else "정보 없음"
+    emotional_tone = g.get("emotional_tone", persona.get("simulation_note", "neutral"))
 
-    # 역량 카드·액션은 스코어 데이터에 없으면 placeholder
-    top_cards = scores.get("top_cards", "데이터 없음 (합성 스코어 모드)")
-    action_items = scores.get("action_items", "데이터 없음 (합성 스코어 모드)")
-
-    return SCENARIO_GEN_USER_TEMPLATE.format(
-        nickname=persona.get("nickname", "unknown"),
-        job_field=persona.get("current_job_field", ""),
-        career_years=persona.get("career_years", ""),
-        concern=persona.get("current_concern", ""),
-        top5=top5_str,
-        strength_core=persona.get("strength_combo_core", ""),
-        trigger_type=persona.get("trigger_type", ""),
-        session_score=scores.get("session_score", "N/A"),
-        desire_to_return=scores.get("desire_to_return", "N/A"),
-        emotional_safety=scores.get("emotional_safety", "N/A"),
-        insight_novelty=scores.get("insight_novelty", "N/A"),
-        top_cards=top_cards,
-        action_items=action_items,
-        is_atypical="예 (단답·이탈 경향 있음)" if is_atypical else "아니오",
-        simulation_note=persona.get("simulation_note") or g.get("emotional_tone", ""),
-    )
+    lines = [
+        f"닉네임: {persona.get('nickname', 'unknown')}",
+        f"직업/분야: {persona.get('current_job_field', '')}  경력: {persona.get('career_years', '')}",
+        f"현재 고민: {persona.get('current_concern', '')}",
+        f"Top5 강점: {top5_str}",
+        f"강점 핵심: {persona.get('strength_combo_core', '')}",
+        f"Trigger 유형: {persona.get('trigger_type', '')}",
+        f"emotional_tone: {emotional_tone}",
+        f"비정형 페르소나: {'예' if is_atypical else '아니오'}",
+        "",
+        f"session_score: {scores.get('session_score', 'N/A')}/10",
+        f"desire_to_return: {scores.get('desire_to_return', 'N/A')}/10",
+        f"emotional_safety: {scores.get('emotional_safety', 'N/A')}/10",
+        f"insight_novelty: {scores.get('insight_novelty', 'N/A')}/10",
+    ]
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

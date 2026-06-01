@@ -23,11 +23,7 @@ if str(_RALPH_ROOT) not in sys.path:
 
 import anthropic
 from careerpt_sim.config import ANTHROPIC_API_KEY, COACH_MODEL, SIM_HOME
-from retention_sim.prompts.scenario_gen import (
-    HOOK_EVAL_SYSTEM,
-    HOOK_EVAL_USER_TEMPLATE,
-    HOOK_MESSAGES,
-)
+from retention_sim.prompts.scenario_gen import HOOK_EVAL_SYSTEM, HOOK_MESSAGES
 
 AI_OUT_DIR = SIM_HOME / "churn_ai"
 SCENARIOS_DIR = AI_OUT_DIR / "scenarios"
@@ -63,12 +59,12 @@ def _parse_eval(text: str) -> dict | None:
         return None
 
 
-def _build_hooks_block(nickname: str, streak: int = 3) -> str:
+def _build_hooks_block() -> str:
     """hook 목록을 유저 메시지용 텍스트로 포맷."""
     lines = []
-    for hook_id, msg_template in HOOK_MESSAGES.items():
-        msg = msg_template.format(nickname=nickname, streak=streak)
-        lines.append(f"- hook_id: {hook_id}\n  메시지: {msg}")
+    for hook_id, msg in HOOK_MESSAGES.items():
+        msg_str = msg if msg is not None else "(메시지 없음)"
+        lines.append(f"- hook_type: {hook_id}\n  메시지: {msg_str}")
     return "\n".join(lines)
 
 
@@ -122,16 +118,18 @@ def _call_hook_eval(
     nickname = persona_result.get("nickname", "unknown")
     scores = persona_result.get("scores", {})
 
-    hooks_block = _build_hooks_block(nickname)
-    user_msg = HOOK_EVAL_USER_TEMPLATE.format(
-        nickname=nickname,
-        churn_week=churn_ctx["churn_week"],
-        emotional_state=churn_ctx["emotional_state"],
-        churn_reason=churn_ctx["churn_reason"],
-        desire_to_return=scores.get("desire_to_return", "N/A"),
-        emotional_safety=scores.get("emotional_safety", "N/A"),
-        hooks_block=hooks_block,
-    )
+    hooks_block = _build_hooks_block()
+    user_msg = "\n".join([
+        f"닉네임: {nickname}",
+        f"이탈/위기 주차: Week {churn_ctx['churn_week']}",
+        f"이 시점의 감정 상태: {churn_ctx['emotional_state']}",
+        f"이탈 이유: {churn_ctx['churn_reason']}",
+        f"desire_to_return: {scores.get('desire_to_return', 'N/A')}/10",
+        f"emotional_safety: {scores.get('emotional_safety', 'N/A')}/10",
+        "",
+        "평가할 hook 목록:",
+        hooks_block,
+    ])
 
     response = client.messages.create(
         model=model,
