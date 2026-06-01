@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { FeedbackSheet } from '@/components/FeedbackSheet';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
 import { TabBar } from '@/components/ui/TabBar';
@@ -118,6 +119,14 @@ function HomeContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
+
+  // 피드백 모달 — 첫 홈 랜딩 시 1회만
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  const handleFeedbackClose = () => {
+    try { localStorage.setItem('home_feedback_prompted', '1'); } catch { /* ignore */ }
+    setShowFeedback(false);
+  };
 
   // 이번 주 월~일 7일
   const today = new Date();
@@ -272,6 +281,17 @@ function HomeContent() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, router]);
+
+  // 데이터 로드 완료 후 피드백 모달 1회 표시 (홈이 먼저 보인 뒤 슬라이드업)
+  useEffect(() => {
+    if (!data) return;
+    try {
+      if (!localStorage.getItem('home_feedback_prompted')) {
+        const timer = setTimeout(() => setShowFeedback(true), 800);
+        return () => clearTimeout(timer);
+      }
+    } catch { /* ignore */ }
+  }, [data]);
 
   // ── 오늘/특정 날짜 완료 토글 ───────────────────────────────
   // 미래 날짜만 차단. 오늘·과거 다 체크 가능.
@@ -470,6 +490,13 @@ function HomeContent() {
 
       {/* 탭바 — main 밖, 항상 하단 고정 */}
       <TabBar active="home" />
+
+      <FeedbackSheet
+        open={showFeedback}
+        onClose={handleFeedbackClose}
+        onSubmitted={handleFeedbackClose}
+        source="home_modal"
+      />
     </div>
   );
 }
