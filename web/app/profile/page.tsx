@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { FeedbackSheet } from '@/components/FeedbackSheet';
 import { TabBar } from '@/components/ui/TabBar';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
@@ -81,6 +82,9 @@ function ProfileContent() {
   const [editCareerLevel, setEditCareerLevel] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+
+  // 피드백 시트
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // 다이얼로그
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -463,6 +467,18 @@ function ProfileContent() {
             </div>
             <span style={{ color: 'var(--ink-mute)' }}>›</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setShowFeedback(true)}
+            style={menuItemStyle}
+          >
+            <span style={menuIconStyle}>💬</span>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={menuTitleStyle}>서비스 의견 보내기</div>
+              <div style={menuSubStyle}>개선 아이디어나 좋았던 점을 알려주세요</div>
+            </div>
+            <span style={{ color: 'var(--ink-mute)' }}>›</span>
+          </button>
         </section>
 
         {/* Danger Zone */}
@@ -535,6 +551,12 @@ function ProfileContent() {
           onCancel={() => setShowDeleteConfirm(null)}
         />
       )}
+
+      <FeedbackSheet
+        open={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        source="profile"
+      />
     </div>
   );
 }
