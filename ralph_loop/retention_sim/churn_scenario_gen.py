@@ -186,18 +186,18 @@ def main() -> None:
     scenarios = generate_scenarios(count)
     out_path = save(scenarios)
 
-    print(f"\n[churn_scenario_gen] {len(scenarios)}개 저장 → {out_path}")
-    print("\n── 결과 요약 ────────────────────────────────────")
+    print(f"\n[churn_scenario_gen] {len(scenarios)}개 저장: {out_path}")
+    print("\n-- 결과 요약 --")
     for sc in scenarios:
         if sc.get("parse_error") or sc.get("error"):
-            print(f"  ✗ {sc.get('persona_type','?')}  오류")
+            print(f"  [FAIL] {sc.get('persona_type','?')}  오류")
         else:
             print(
-                f"  ✓ {sc.get('persona_type','?'):<24}"
+                f"  [OK]   {sc.get('persona_type','?'):<24}"
                 f"  week={sc.get('week','?')}"
                 f"  churn_prob={sc.get('churn_probability','?')}"
             )
-    print("────────────────────────────────────────────────")
+    print("---------------")
 
 
 if __name__ == "__main__":
