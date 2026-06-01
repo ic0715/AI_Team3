@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 파란 배경 (rounded square) -->
+  <rect width="512" height="512" rx="112" fill="#2D5BFF"/>
+  <!-- 심박/활동 아이콘 (흰색) -->
+  <polyline
+    points="464,256 368,256 304,432 192,64 128,256 48,256"
+    fill="none"
+    stroke="white"
+    stroke-width="42"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
