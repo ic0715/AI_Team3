@@ -283,15 +283,42 @@ function HomeContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, router]);
 
-  // 데이터 로드 완료 후 피드백 모달 1회 표시 (홈이 먼저 보인 뒤 슬라이드업)
+  // 데이터 로드 완료 후 피드백 모달 표시 여부 결정
+  // 조건: localStorage 미표시 기록 AND DB에 제출 이력 없음
   useEffect(() => {
     if (!data) return;
-    try {
-      if (!localStorage.getItem('home_feedback_prompted')) {
+    let cancelled = false;
+
+    const checkAndShow = async () => {
+      try {
+        // 1차: localStorage 확인 (빠른 탈출)
+        if (localStorage.getItem('home_feedback_prompted')) return;
+
+        // 2차: DB에서 기존 피드백 제출 이력 확인
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+
+        const { count } = await supabase
+          .from('feedbacks')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        if (cancelled) return;
+
+        if (count && count > 0) {
+          // 이미 의견을 남긴 유저 → localStorage 동기화 후 스킵
+          localStorage.setItem('home_feedback_prompted', '1');
+          return;
+        }
+
+        // 조건 통과 → 0.8초 후 모달 표시
         const timer = setTimeout(() => setShowFeedback(true), 800);
         return () => clearTimeout(timer);
-      }
-    } catch { /* ignore */ }
+      } catch { /* ignore */ }
+    };
+
+    checkAndShow();
+    return () => { cancelled = true; };
   }, [data]);
 
   // ── 오늘/특정 날짜 완료 토글 ───────────────────────────────
