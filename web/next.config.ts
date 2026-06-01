@@ -14,4 +14,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const withPWA = require("next-pwa")({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development", // 개발 환경에서는 서비스워커 비활성화
+  register: true,
+  skipWaiting: true,
+});
+
+export default withPWA(nextConfig);
