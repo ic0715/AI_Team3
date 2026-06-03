@@ -175,6 +175,10 @@ function CareerInterviewContent() {
   const [isSending, setIsSending] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [finalizeError, setFinalizeError] = useState('');
+  // 채팅 전송 실패(자동 재시도 후에도) 여부 → '다시 보내기' 노출
+  const [sendError, setSendError] = useState(false);
+  // 마지막으로 실패한 턴 보존 (수동 재전송용; 사용자 메시지/입력 손실 방지)
+  const pendingTurnRef = useRef<{ msgs: Message[]; meta: { turnCount: number; isCrisis: boolean } } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);      // 전체 컨테이너 (높이 동적 제어)
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -380,6 +384,80 @@ function CareerInterviewContent() {
     setShowCrisisModal(true);
   }, [userId, sessionDuration]);
 
+  // ── 채팅 한 턴 실행 (네트워크 호출 + 응답 처리) ──────────────
+  //   일시적 네트워크 단절(클라이언트↔서버 연결 끊김 등)을 흡수하기 위해 1회 자동 재시도.
+  //   자동 재시도까지 실패하면 sendError로 '다시 보내기'를 노출(메시지 손실 없음).
+  const runChatTurn = useCallback(async (
+    msgs: Message[],
+    meta: { turnCount: number; isCrisis: boolean },
+  ) => {
+    if (!context) return;
+    setSendError(false);
+    setIsSending(true);
+    pendingTurnRef.current = { msgs, meta }; // 실패 시 수동 재전송용 보존
+
+    try {
+      // 1회 자동 재시도: 첫 호출이 실패하면 짧은 backoff 후 한 번 더.
+      let response: AIResponse;
+      try {
+        response = await sendMessageToAI({ messages: msgs, context });
+      } catch {
+        await new Promise((r) => setTimeout(r, 800));
+        response = await sendMessageToAI({ messages: msgs, context }); // 2차 실패는 아래 catch로
+      }
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response.content,
+        timestamp: new Date(),
+      };
+      const updatedMessages = [...msgs, assistantMessage];
+      setMessages(updatedMessages);
+      pendingTurnRef.current = null; // 성공 → 재전송 정보 해제
+
+      // Path C: 정서 위기 — 추출 스킵, DB 메타만 INSERT, Crisis 모달
+      if (meta.isCrisis) {
+        await triggerCrisisFinalize();
+        return;
+      }
+
+      // Phase 자동 전환
+      const next = inferPhase(phase, response.content, meta.turnCount);
+      if (next.phase !== phase) setPhase(next.phase);
+      if (next.agreedFocus && next.agreedFocus !== agreedFocus) {
+        setAgreedFocus(next.agreedFocus);
+      }
+
+      // Path A: 코치 자연 종료 발화 감지 시 완료 상태로 전환
+      if (detectCoachClosing(response.content)) {
+        setIsComplete(true);
+        saveSession(updatedMessages);
+        return;
+      }
+
+      if (response.isInterviewComplete) {
+        setIsComplete(true);
+        clearSession();
+      } else {
+        saveSession(updatedMessages);
+      }
+    } catch {
+      // 자동 재시도까지 실패 → 막다른 에러 버블 대신 '다시 보내기' 노출.
+      setSendError(true);
+    } finally {
+      setIsSending(false);
+      // iOS Safari: 키보드 전환 직후 프로그래매틱 focus()를 호출하면
+      // visualViewport resize가 두 번 발생하면서 position:fixed 컨테이너의
+      // 터치 히트 영역이 오래된 좌표로 고정되는 버그 발생 → 입력창이 안 눌림
+      // 모바일(iOS)에서는 skip, 데스크탑에서만 재포커스
+      const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+      if (!isIOS) {
+        textareaRef.current?.focus();
+      }
+    }
+  }, [context, phase, agreedFocus, triggerCrisisFinalize]);
+
   // ── 메시지 전송 ───────────────────────────────────────────
   const handleSend = useCallback(async () => {
     if (!input.trim() || isSending || !context || !userId) return;
@@ -439,76 +517,20 @@ function CareerInterviewContent() {
     };
 
     setInput('');
-    setIsSending(true);
 
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
 
-    try {
-      const response = await sendMessageToAI({
-        messages: nextMessages,
-        context,
-      });
+    await runChatTurn(nextMessages, { turnCount, isCrisis });
+  }, [input, isSending, context, userId, messages, phase, agreedFocus, sessionDuration, runChatTurn]);
 
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: response.content,
-        timestamp: new Date(),
-      };
-
-      const updatedMessages = [...nextMessages, assistantMessage];
-      setMessages(updatedMessages);
-
-      // Path C: 정서 위기 — 추출 스킵, DB 메타만 INSERT, Crisis 모달
-      if (isCrisis) {
-        await triggerCrisisFinalize();
-        return;
-      }
-
-      // Phase 자동 전환
-      const next = inferPhase(phase, response.content, turnCount);
-      if (next.phase !== phase) setPhase(next.phase);
-      if (next.agreedFocus && next.agreedFocus !== agreedFocus) {
-        setAgreedFocus(next.agreedFocus);
-      }
-
-      // Path A: 코치 자연 종료 발화 감지 시 완료 상태로 전환
-      //   (자동 finalize 하지 않음 — 사용자가 대화를 다시 보고 '진단 완료하기'를 눌러야 진행)
-      if (detectCoachClosing(response.content)) {
-        setIsComplete(true);
-        saveSession(updatedMessages);
-        return;
-      }
-
-      if (response.isInterviewComplete) {
-        setIsComplete(true);
-        clearSession();
-      } else {
-        saveSession(updatedMessages);
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '잠시 연결이 불안정해요. 다시 시도해주세요.',
-          timestamp: new Date(),
-        },
-      ]);
-    } finally {
-      setIsSending(false);
-      // iOS Safari: 키보드 전환 직후 프로그래매틱 focus()를 호출하면
-      // visualViewport resize가 두 번 발생하면서 position:fixed 컨테이너의
-      // 터치 히트 영역이 오래된 좌표로 고정되는 버그 발생 → 입력창이 안 눌림
-      // 모바일(iOS)에서는 skip, 데스크탑에서만 재포커스
-      const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-      if (!isIOS) {
-        textareaRef.current?.focus();
-      }
-    }
-  }, [input, isSending, context, userId, messages, phase, agreedFocus, sessionDuration, triggerFinalize, triggerCrisisFinalize]);
+  // ── '다시 보내기' — 마지막으로 실패한 턴을 그대로 재전송 ──────
+  //   사용자 메시지는 이미 대화에 남아 있으므로 손실 없음. 같은 messages로 재호출.
+  const handleRetrySend = useCallback(() => {
+    const pending = pendingTurnRef.current;
+    if (!pending || isSending) return;
+    runChatTurn(pending.msgs, pending.meta);
+  }, [isSending, runChatTurn]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -980,6 +1002,30 @@ function CareerInterviewContent() {
             fontSize: '13px', color: '#DC2626',
           }} role="alert">
             {finalizeError}
+          </div>
+        )}
+
+        {/* 전송 실패 (자동 재시도 후에도): 다시 보내기 */}
+        {sendError && !isSending && (
+          <div style={{
+            margin: '10px 16px 0',
+            padding: '10px 14px', borderRadius: '10px',
+            background: '#FEF2F2', border: '1.5px solid #FECACA',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+          }} role="alert">
+            <span style={{ fontSize: '13px', color: '#DC2626' }}>
+              메시지를 보내지 못했어요.
+            </span>
+            <button
+              onClick={handleRetrySend}
+              style={{
+                flexShrink: 0, padding: '6px 12px', borderRadius: '8px',
+                border: '1px solid #DC2626', background: '#fff', color: '#DC2626',
+                fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              다시 보내기
+            </button>
           </div>
         )}
 
