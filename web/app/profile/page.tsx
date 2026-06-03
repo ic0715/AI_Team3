@@ -195,7 +195,14 @@ function ProfileContent() {
 
   // ── 커리어 방향 재설정 ────────────────────────────────────
   const handleConfirmReset = useCallback(async () => {
-    if (!goal || resetting) return;
+    if (resetting) return;
+
+    // active goal이 없는 상태 → DB 업데이트 없이 바로 이동
+    if (!goal) {
+      router.push('/onboarding/career-intro');
+      return;
+    }
+
     setResetting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
