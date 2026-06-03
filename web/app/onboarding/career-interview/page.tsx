@@ -160,8 +160,11 @@ function CareerInterviewContent() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isComplete, setIsComplete] = useState(false);
-  const [isSessionInvalid, setIsSessionInvalid] = useState(false);
   const [showCrisisModal, setShowCrisisModal] = useState(false);
+  // "인터뷰 종료" 버튼 → 충분히 진행됐을 때의 결과 생성 확인 다이얼로그
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  // 빈/얕은 세션 또는 분석 무효 시: '결과를 만들 수 없음' 안내 후 홈으로
+  const [showHomeGuide, setShowHomeGuide] = useState(false);
 
   // Running State (CONTRACT_v2 §5)
   const [phase, setPhase] = useState<Phase>('opening');
@@ -345,7 +348,8 @@ function CareerInterviewContent() {
         !result.extraction.agreed_focus &&
         !result.extraction.user_takeaway;
       if (invalid) {
-        setIsSessionInvalid(true);
+        // 분석 결과가 비면(실질 내용 없음) 결과 페이지 대신 '결과 불가' 안내 → 홈.
+        setShowHomeGuide(true);
         return;
       }
       clearSession();
@@ -682,6 +686,16 @@ function CareerInterviewContent() {
     );
   }
 
+  // 종료 시 '의미있는 결과 생성' 자격 판정 — 종료 동작 분기의 단일 게이트.
+  //   ⚠️ exploration 진입(주제 합의)만으론 방향성이 아직 없으므로 '준비됨'으로 보지 않는다.
+  //   준비됨(→ 결과) = 코치가 마무리 질문을 시작(closing) OR 탐색이 충분히 깊어짐(≥N턴).
+  //   그 외(빈 세션·합의·얕은 탐색) = 분석 불가 → 따뜻한 안내 후 홈으로(대화는 보존, 이어가기 가능).
+  const RESULT_READY_MIN_TURNS = 6; // 탐색 깊이 보조선(사용자 답변 누적). 조정 가능.
+  const userTurnCount = messages.filter((m) => m.role === 'user').length;
+  const isReadyForResult =
+    phase === 'closing' ||
+    (phase === 'exploration' && userTurnCount >= RESULT_READY_MIN_TURNS);
+
   return (
     <div
       ref={containerRef}
@@ -730,8 +744,38 @@ function CareerInterviewContent() {
           <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', flex: 1, textAlign: 'center' }}>
             커리어 인터뷰
           </span>
-          {/* 우측 공백 (뒤로가기 버튼과 시각 대칭) */}
-          <div style={{ width: '44px', flexShrink: 0 }} />
+          {/* 우측: "인터뷰 종료하기" 버튼 (진행 중에만 노출, 완료/분석 중엔 대칭용 빈 div) */}
+          {!isComplete && !isFinalizing ? (
+            <button
+              className="end-interview-btn"
+              onClick={() => {
+                // 충분히 진행됐으면 결과 생성 확인, 아니면(빈/얕음) 홈 안내.
+                if (isReadyForResult) setShowEndConfirm(true);
+                else setShowHomeGuide(true);
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap',
+                padding: '8px 13px', borderRadius: '999px',
+                border: '1.5px solid var(--border)', background: 'var(--surface)',
+                color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600,
+                fontFamily: 'inherit', lineHeight: 1,
+                boxShadow: '0 1px 3px rgba(0,0,0,.08)',
+                WebkitTapHighlightColor: 'transparent',
+                marginTop: '6px', // 제목보다 살짝 아래로
+              }}
+              aria-label="인터뷰 종료"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              인터뷰 종료
+            </button>
+          ) : (
+            <div style={{ width: '44px', flexShrink: 0 }} />
+          )}
         </div>
       </header>
 
@@ -766,6 +810,86 @@ function CareerInterviewContent() {
               style={btnOutline}
             >
               처음부터 시작하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 인터뷰 종료 확인 (충분히 진행됨 → 결과 생성) ──── */}
+      {showEndConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+            width: 'min(430px, 100vw)', height: '100dvh',
+            background: 'rgba(0,0,0,.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '24px',
+          }}
+        >
+          <div style={{ background: 'var(--surface)', borderRadius: '20px', padding: '28px 24px', width: '100%' }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, textAlign: 'center', marginBottom: '8px', color: 'var(--text-primary)' }}>
+              인터뷰를 종료할까요?
+            </div>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6, marginBottom: '24px' }}>
+              지금 종료하면 지금까지 나눈 내용으로 커리어 결과를 만들어 드려요.
+            </p>
+            <button
+              onClick={() => {
+                setShowEndConfirm(false);
+                handleFinalize(); // 곧장 finalize → 결과 페이지
+              }}
+              style={btnPrimary}
+            >
+              종료하고 결과 보기
+            </button>
+            <button
+              onClick={() => setShowEndConfirm(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', width: '100%', padding: '12px', marginTop: '4px' }}
+            >
+              계속하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 결과 불가 안내 (빈/얕은 세션 또는 분석 무효 → 홈) ── */}
+      {showHomeGuide && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+            width: 'min(430px, 100vw)', height: '100dvh',
+            background: 'rgba(0,0,0,.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '24px',
+          }}
+        >
+          <div style={{ background: 'var(--surface)', borderRadius: '20px', padding: '28px 24px', width: '100%' }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, textAlign: 'center', marginBottom: '8px', color: 'var(--text-primary)' }}>
+              아직 분석할 이야기가 없어요
+            </div>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6, marginBottom: '24px' }}>
+              {userTurnCount === 0
+                ? '아직 나눈 대화가 없어 커리어 결과를 만들 수 없어요. 홈으로 돌아갈게요 — 준비되면 언제든 다시 시작할 수 있어요.'
+                : '아직 결과를 만들 만큼 이야기가 충분하지 않아요. 더 이야기 나누면 커리어 결과를 만들 수 있어요. 홈으로 돌아가도 나눈 대화는 이어서 진행할 수 있어요.'}
+            </p>
+            {/* 강조: 계속 이야기하기 (대화로 복귀) */}
+            <button
+              onClick={() => setShowHomeGuide(false)}
+              style={btnPrimary}
+            >
+              계속 이야기하기
+            </button>
+            {/* 보조: 홈으로 (세션은 보존 → 다음에 이어가기 가능) */}
+            <button
+              onClick={() => {
+                setShowHomeGuide(false);
+                router.push('/home');
+              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', width: '100%', padding: '12px', marginTop: '4px' }}
+            >
+              홈으로 나가기
             </button>
           </div>
         </div>
@@ -934,6 +1058,18 @@ function CareerInterviewContent() {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+        .end-interview-btn {
+          transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .08s ease;
+        }
+        .end-interview-btn:hover {
+          background: var(--bg);
+          border-color: var(--text-muted);
+          box-shadow: 0 2px 6px rgba(0,0,0,.12);
+        }
+        .end-interview-btn:active {
+          transform: scale(.95);
+          box-shadow: 0 1px 2px rgba(0,0,0,.10);
+        }
       `}</style>
 
       {/* Path C 정서 위기 모달 */}
@@ -946,19 +1082,6 @@ function CareerInterviewContent() {
         }}
       />
 
-      {/* 세션 무효 재시도 모달 */}
-      <RetryModal
-        open={isSessionInvalid}
-        onRetry={() => {
-          setIsSessionInvalid(false);
-          if (context) startNewInterview(context);
-        }}
-        onSkip={() => {
-          setIsSessionInvalid(false);
-          clearSession();
-          router.push('/home');
-        }}
-      />
     </div>
   );
 }
@@ -1061,42 +1184,6 @@ function CrisisModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           <li>📞 <b>정신건강 위기상담전화 1577-0199</b> (24시간)</li>
         </ul>
         <button onClick={onClose} style={btnPrimary}>닫고 홈으로</button>
-      </div>
-    </div>
-  );
-}
-
-// ── 세션 무효 시 재시도 모달 ──────────────────────────────────
-function RetryModal({
-  open, onRetry, onSkip,
-}: {
-  open: boolean;
-  onRetry: () => void;
-  onSkip: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 200,
-      background: 'rgba(0,0,0,.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '24px',
-    }} role="dialog" aria-modal="true">
-      <div style={{
-        background: 'var(--surface)', borderRadius: '20px',
-        padding: '28px 24px', maxWidth: '340px', width: '100%',
-        boxShadow: '0 12px 40px rgba(0,0,0,.25)',
-      }}>
-        <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '10px', color: 'var(--text-primary)' }}>
-          인터뷰가 충분히 진행되지 않았어요
-        </div>
-        <p style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--text-secondary)', marginBottom: '20px' }}>
-          한 가지 풀고 싶은 고민에 대해 좀 더 이야기 나눠보실까요? 다시 시작하시면 됩니다.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <button onClick={onRetry} style={btnPrimary}>다시 시도하기</button>
-          <button onClick={onSkip} style={btnOutline}>나중에</button>
-        </div>
       </div>
     </div>
   );
