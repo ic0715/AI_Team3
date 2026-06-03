@@ -269,6 +269,8 @@ export default function LoginPage() {
       .from('career_interview_results')
       .select('id, recommended_competencies')
       .eq('user_id', user.id)
+      // 최신 인터뷰 기준으로 라우팅 판단 (행이 여러 개일 때 옛 행 선택 방지)
+      .order('interviewed_at', { ascending: false })
       .limit(1);
 
     if (!interviews?.length) {
