@@ -20,8 +20,14 @@ interface ChatResponse {
   isInterviewComplete: boolean;
 }
 
-// 안전망: 사용자 메시지가 너무 많으면 강제 완료 (long 세션 평균 20턴, 최대 25턴 + 안전 마진)
-const HARD_COMPLETE_THRESHOLD = 30;
+// ⚠️ 고정 턴 기반 '강제 종료'는 두지 않는다. 세션 완료(isComplete)는 오직 코치의
+// 자연 종료 키워드(Path A) — 즉 코치의 '발화'로만 일어난다. turn_count 자체는 완료
+// 신호가 아니다.
+// 대신 63턴 이후부터는 매 턴 forceClose 지시를 프롬프트에 주입해, 코치가 §14에 따라
+// 스스로 따뜻하게 마무리(§9 키워드)하도록 '강하게 유도'한다(끊는 게 아니라 유도).
+// 프롬프트 흐름: 30~35 방향 점검 → 55~62 소프트 넛지 → 63+ 자연 종료 유도.
+// 모든 단계는 turn_count가 아니라 🟢 일단락 신호가 보일 때만 발동(§12~14 공통).
+const FORCE_CLOSE_FROM = 63;
 
 // LLM의 종료 신호 키워드 — CONTRACT_v2.md §4.1 COACH_CLOSING_KEYWORDS와 정확히 동일
 const ENDING_KEYWORDS = [
@@ -41,6 +47,9 @@ export async function POST(req: Request) {
 
     const userMsgCount = messages.filter((m) => m.role === 'user').length;
 
+    // 상한 직전(63턴~)부터 코치가 §14에 따라 스스로 따뜻하게 닫도록 강제 종료 지시 주입.
+    const forceClose = userMsgCount >= FORCE_CLOSE_FROM;
+
     const system = buildSystemPrompt({
       nickname: context.nickname,
       jobField: context.jobField,
@@ -48,6 +57,7 @@ export async function POST(req: Request) {
       mainConcern: context.mainConcern ?? '',
       strengthsKo: context.strengths.map((s) => s.name_ko),
       strengthsEn: context.strengths.map((s) => s.name_en),
+      forceClose,
     });
 
     // 히스토리 캐시 breakpoint: 현재 user 입력 직전 메시지에 cache_control을 달아
@@ -84,9 +94,15 @@ export async function POST(req: Request) {
 
     const text = extractText(message).trim();
 
-    const llmSignaledEnd = detectEnding(text);
-    const overThreshold = userMsgCount >= HARD_COMPLETE_THRESHOLD;
-    const isComplete = llmSignaledEnd || overThreshold;
+    // 완료는 오직 코치의 자연 종료 키워드(Path A)로만. turn_count로 강제 완료하지 않음.
+    // 63턴~ forceClose 지시로 코치가 스스로 키워드를 내며 닫는 게 기대 동작.
+    const isComplete = detectEnding(text);
+    // 관측용: 매우 길어졌는데도 코치가 아직 안 닫은 경우 로그만 남김(완료 강제 아님).
+    if (!isComplete && userMsgCount >= FORCE_CLOSE_FROM + 7) {
+      console.warn(
+        `[career-interview/chat] ${userMsgCount} user turns and still open — coach has not emitted a closing keyword despite forceClose`,
+      );
+    }
 
     const response: ChatResponse = {
       content: text,
