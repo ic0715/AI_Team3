@@ -144,6 +144,9 @@ function CareerResultContent() {
             .from('career_interview_results')
             .select('id, key_insights, ai_summary, recommended_competencies')
             .eq('user_id', user.id)
+            // ⚠️ 한 사용자에 인터뷰 행이 여러 개 쌓일 수 있어(재실행 등) 반드시 최신 행을 읽어야 한다.
+            // 정렬 없이 limit(1)이면 임의의 옛 행(growth_competencies=[])을 집어 역량 매칭이 강점 fallback으로 빠진다.
+            .order('interviewed_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
         ]);
