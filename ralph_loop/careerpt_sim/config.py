@@ -55,14 +55,39 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 COACH_MODEL = os.getenv("COACH_MODEL", "claude-sonnet-4-5")
 PERSONA_MODEL = os.getenv("PERSONA_MODEL", "gpt-4o")
-JUDGE_MODEL = os.getenv("JUDGE_MODEL", "claude-haiku-4-5")
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4o")
 
+# Prompt-cache TTL for the coach's cached system blocks.
+#   "5m" (default): 1.25× write cost. Best for single/one-off runs — the cache
+#                   is created once per run and read ~dozens of times within it.
+#   "1h"          : 2× write cost, but survives across personas. For BATCH runs
+#                   (a full round) this lets persona 2..N reuse persona 1's spec
+#                   caches instead of re-creating them → large net savings.
+# Single persona: keep "5m". Whole round: set "1h".
+CACHE_TTL = os.getenv("CACHE_TTL", "5m")
+
+# Career-interview close keywords — prefix-substring match, identical to
+# web/app/api/career-interview/chat/route.ts ENDING_KEYWORDS.
 H_PATTERN_KEYWORDS = [
-    "오늘 인터뷰는 여기서 마무리할게요",
-    "오늘은 여기까지 정리해볼게요",
+    "오늘 인터뷰는 여기서",
+    "오늘은 여기까지",
     "여기서 마무리할게요",
 ]
-MAX_INTERVIEW_TURNS = 14  # coach AI turns, safety cap
+
+# Career-interview hard completion — counted on persona(user) messages.
+# Production (web/app/api/career-interview/chat/route.ts) uses 30; this harness
+# raises it to 60 so natural closing (the closing keyword) has more room — the
+# threshold is only a runaway safety net, not the intended stop.
+INTERVIEW_HARD_COMPLETE_THRESHOLD = 60
+
+# Reflect-coaching turn guards — mirror web/app/api/reflect-coach/chat/route.ts.
+#   SOFT_CAP: inject a "wrap up gently" hint into the system prompt (NOT forced end).
+#   HARD_FAILSAFE: coach is obligated to close; session force-completes.
+REFLECT_SOFT_CAP = 30
+REFLECT_HARD_FAILSAFE = 50
+
+# Back-compat alias (older callers); no longer the primary control.
+MAX_INTERVIEW_TURNS = INTERVIEW_HARD_COMPLETE_THRESHOLD
 
 
 def round_dir(round_n: int) -> Path:

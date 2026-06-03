@@ -107,7 +107,7 @@ python -m careerpt_sim.export_transcripts --round 1
 1. **시드 풀 25/72**: `web/lib/constants/seeds.ts` 가 5 역량만 채워짐. 슬롯 4·5 액션 다양성 제한
 2. **Step 1 match_score**: `linked_strengths` 교집합 크기 (단순화)
 3. **`finalize → cards Step1`**: `mentioned_competencies` 가 finalize 호출 결과에 의존 — 빈 배열이면 slot 4 자동 fallback
-4. **인터뷰 종료**: H-키워드 미감지 시 14턴 상한에서 강제 종료 (`MAX_INTERVIEW_TURNS` 조정 가능)
+4. **인터뷰 종료**: 실제 웹앱(`career-interview/chat`)과 동일 — 종료 키워드가 1차 종료, 페르소나(user) 메시지 30개 도달 시 hard-complete (`INTERVIEW_HARD_COMPLETE_THRESHOLD`). 회고는 `reflect-coach/chat`처럼 SOFT_CAP 30(부드러운 수렴 힌트 주입)·HARD_FAILSAFE 50(강제 종료) 2단계 (`REFLECT_SOFT_CAP`/`REFLECT_HARD_FAILSAFE`)
 
 ## 다음 단계 (구현 안 됨)
 

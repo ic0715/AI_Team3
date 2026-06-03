@@ -1,0 +1,17 @@
+{
+  "_comment": "최다인(35)·노준혁(36) 회고/세션용 goal 메타데이터. 엑셀에 Goal 시트가 없어 별도 작성. axis_code 분류=sustain/redefine/pivot/identity/integrate/anchor/decide/influence, emotional_tone=exhausted/anxious/curious/frustrated/numb. goal=1인칭 표면 목표(첫 2~3턴에 자연스럽게 노출), secret_goal=마음속 진짜 두려움(트리거 충족 전 절대 노출 금지).",
+  "35": {
+    "axis_code": "identity",
+    "goal": "캠페인은 자신 있는데, 그 성과를 숫자로 설명하는 게 너무 약해요. 데이터로 '왜 잘 됐는지'를 제 입으로 말할 수 있게 되고 싶어요.",
+    "secret_goal": "사실 두려운 건 데이터를 못 다룬다는 사실보다, '감으로만 하는 마케터'로 낙인찍혀서 아이디어라는 내 유일한 무기까지 평가절하되고 승진에서 밀리는 거다. 데이터를 못 읽는 내가 진짜 마케터가 맞는지조차 흔들린다.",
+    "specificity_level": "medium",
+    "emotional_tone": "anxious"
+  },
+  "36": {
+    "axis_code": "redefine",
+    "goal": "기획서 내용은 탄탄하다는 평을 받는데, 발표만 가면 묻혀요. 같은 내용인데 통과되는 사람과 저의 차이가 뭔지, 전달력을 어떻게 키울지 정리하고 싶어요.",
+    "secret_goal": "사실은 '내용으로 인정받아야지 발표 기술 따위로 평가받는 건 부당하다'는 자존심과, 사람들 앞에서 주목받고 설득해야 하는 상황 자체가 불편한 내향적 구조형 기질이 충돌하고 있다. 전달이 약한 게 아니라, 그 자리에 서는 것 자체가 두렵다는 걸 인정하기 싫다.",
+    "specificity_level": "medium",
+    "emotional_tone": "frustrated"
+  }
+}

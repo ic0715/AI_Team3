@@ -24,11 +24,15 @@ import anthropic
 
 from .config import (
     ANTHROPIC_API_KEY,
+    CACHE_TTL,
     COACH_MODEL,
     H_PATTERN_KEYWORDS,
     load_spec,
     system_prompt_for_round,
 )
+
+# Beta header required to use 1-hour prompt-cache TTL.
+_EXTENDED_TTL_BETA = "extended-cache-ttl-2025-04-11"
 from .seeds import load_competencies, load_seeds
 
 
@@ -111,7 +115,10 @@ def _sys_blocks(*parts: tuple[str, bool]) -> list[dict]:
             continue
         b = {"type": "text", "text": text}
         if cache:
-            b["cache_control"] = {"type": "ephemeral"}
+            cc = {"type": "ephemeral"}
+            if CACHE_TTL == "1h":
+                cc["ttl"] = "1h"
+            b["cache_control"] = cc
         out.append(b)
     return out
 
@@ -207,13 +214,16 @@ def coach_turn(
     client = _client()
     if isinstance(system, str):
         system = [{"type": "text", "text": system}]
-    resp = client.messages.create(
+    kwargs = dict(
         model=COACH_MODEL,
         max_tokens=max_tokens,
         temperature=temperature,
         system=system,
         messages=history,
     )
+    if CACHE_TTL == "1h":
+        kwargs["extra_headers"] = {"anthropic-beta": _EXTENDED_TTL_BETA}
+    resp = client.messages.create(**kwargs)
     _record_usage(resp.usage)
     return resp.content[0].text.strip()
 

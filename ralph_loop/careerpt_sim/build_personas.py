@@ -75,7 +75,7 @@ def _cell(ws, r, c):
 def load_personas(wb):
     ws = wb[PERSONA_SHEET]
     personas = {}
-    for r in range(3, 37):  # rows 3..36
+    for r in range(3, ws.max_row + 1):  # rows 3.. (34-persona sheet ends at 36; small sheets end earlier)
         pid = _cell(ws, r, 1)
         if pid is None:
             continue
@@ -88,7 +88,13 @@ def load_personas(wb):
 
 
 def load_goals(wb):
-    """Return {persona_id: [goal_dict, ...]} in sheet order."""
+    """Return {persona_id: [goal_dict, ...]} in sheet order.
+
+    Returns {} when the workbook has no Goal sheet (e.g. the 2-persona
+    add-on file). In that case the caller supplies goals via --goals JSON.
+    """
+    if GOAL_SHEET not in wb.sheetnames:
+        return {}
     ws = wb[GOAL_SHEET]
     goals = {}
     for r in range(2, ws.max_row + 1):
@@ -109,6 +115,8 @@ def load_goals(wb):
 
 
 def load_notes(wb):
+    if NOTE_SHEET not in wb.sheetnames:
+        return {}
     ws = wb[NOTE_SHEET]
     notes = {}
     # rows 2..36, persona_id assumed aligned with persona sheet order (1..34)
@@ -131,37 +139,77 @@ def pick_goal(goal_list):
     return chosen
 
 
-def main():
-    wb = openpyxl.load_workbook(excel_path(), data_only=True)
+def _load_external_goals(path: Path) -> dict:
+    """Load a goals JSON keyed by persona_id (string or int).
+
+    Each value is a single goal dict (axis_code/goal/secret_goal/
+    specificity_level/emotional_tone). Used when the Excel has no Goal sheet.
+    Keys starting with '_' (e.g. '_comment') are ignored.
+    """
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    out = {}
+    for k, v in raw.items():
+        if str(k).startswith("_"):
+            continue
+        out[int(k)] = v
+    return out
+
+
+def main(argv=None):
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Build personas_with_goals JSONL from a CareerPT persona Excel.")
+    ap.add_argument("--excel", type=str, default=None,
+                    help="Path to the persona Excel. Default: newest CliftonStrengths_*.xlsx under docs/ralph_loop/.")
+    ap.add_argument("--goals", type=str, default=None,
+                    help="Path to an external goals JSON (keyed by persona_id). Used when the Excel has no Goal sheet.")
+    ap.add_argument("--out", type=str, default=None,
+                    help=f"Output JSONL path. Default: {OUT}")
+    ap.add_argument("--append", action="store_true",
+                    help="Append to the output file instead of overwriting (keeps existing personas).")
+    args = ap.parse_args(argv)
+
+    xlsx = Path(args.excel) if args.excel else excel_path()
+    out_path = Path(args.out) if args.out else OUT
+    external_goals = _load_external_goals(Path(args.goals)) if args.goals else {}
+
+    wb = openpyxl.load_workbook(xlsx, data_only=True)
     personas = load_personas(wb)
     goals = load_goals(wb)
     notes = load_notes(wb)
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     atypical_ids = []
-    with OUT.open("w", encoding="utf-8") as f:
+    mode = "a" if args.append else "w"
+    written = 0
+    with out_path.open(mode, encoding="utf-8") as f:
         for pid in sorted(personas):
             rec = personas[pid]
             gl = goals.get(pid, [])
-            if not gl:
-                print(f"WARN: persona {pid} ({rec.get('nickname')}) has no goal entries")
+            if gl:
+                chosen = pick_goal(gl)
+                all_goals = [{k: v for k, v in g.items() if k != "_row"} for g in gl]
+            elif pid in external_goals:
+                chosen = dict(external_goals[pid])
+                all_goals = [chosen]
+            else:
+                print(f"WARN: persona {pid} ({rec.get('nickname')}) has no goal entries (sheet or --goals) — skipped")
                 continue
-            chosen = pick_goal(gl)
             rec["selected_goal"] = chosen
-            rec["all_goals"] = [
-                {k: v for k, v in g.items() if k != "_row"} for g in gl
-            ]
+            rec["all_goals"] = all_goals
             rec["simulation_note"] = notes.get(pid)
             rec["is_atypical"] = rec["nickname"] in ATYPICAL_NICKNAMES
             if rec["is_atypical"]:
                 atypical_ids.append(pid)
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            written += 1
 
-    ATYP_OUT.write_text(
-        "\n".join(str(p) for p in atypical_ids) + "\n", encoding="utf-8"
-    )
-    print(f"Wrote {len(personas)} personas → {OUT}")
-    print(f"Atypical 7 persona_ids: {atypical_ids} → {ATYP_OUT}")
+    # Only rewrite the atypical-id index for the canonical 34-persona build
+    # (the add-on personas are not atypical and must not clobber the index).
+    if not args.append and atypical_ids:
+        ATYP_OUT.write_text("\n".join(str(p) for p in atypical_ids) + "\n", encoding="utf-8")
+        print(f"Atypical persona_ids: {atypical_ids} → {ATYP_OUT}")
+    print(f"Wrote {written} personas → {out_path} (mode={mode})")
 
 
 if __name__ == "__main__":

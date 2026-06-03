@@ -24,7 +24,7 @@ from . import eval_b as EB
 from . import eval_c as EC
 from . import persona_llm as PL
 from . import score as SC
-from .config import MAX_INTERVIEW_TURNS, persona_dir
+from .config import INTERVIEW_HARD_COMPLETE_THRESHOLD, persona_dir
 
 
 def _write_json(p: Path, obj):
@@ -70,10 +70,15 @@ def run_session(persona: dict, round_n: int) -> dict:
     transcript_path.write_text("", encoding="utf-8")
 
     closed_by_keyword = False
-    for ai_turn_i in range(1, MAX_INTERVIEW_TURNS + 1):
+    # Termination mirrors web/app/api/career-interview/chat: stop on a closing
+    # keyword, else hard-complete once persona(user) messages hit the threshold.
+    ai_turn_i = 0
+    for _ in range(INTERVIEW_HARD_COMPLETE_THRESHOLD + 2):
+        ai_turn_i += 1
         # Coach speaks first on turn 1 (no prior user input → seed with a system-style nudge)
         if ai_turn_i == 1:
             coach_history.append({"role": "user", "content": "(세션 시작 — 사용자가 앱에 진입했습니다. 첫 발화를 시작하세요.)"})
+        user_msg_count = sum(1 for m in coach_history if m["role"] == "user")
         coach_text = C.coach_turn(coach_sys, coach_history)
         turn_rec = {"turn_id": f"{session_id}_coach_{ai_turn_i}", "role": "coach", "content": coach_text}
         transcript.append(turn_rec)
@@ -84,6 +89,8 @@ def run_session(persona: dict, round_n: int) -> dict:
 
         if C.has_closing_keyword(coach_text):
             closed_by_keyword = True
+            break
+        if user_msg_count >= INTERVIEW_HARD_COMPLETE_THRESHOLD:
             break
 
         # Persona responds
