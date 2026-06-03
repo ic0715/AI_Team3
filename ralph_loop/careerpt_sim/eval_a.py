@@ -8,7 +8,7 @@ import json
 import re
 import time
 
-from .config import GEMINI_API_KEY, JUDGE_MODEL, ANTHROPIC_API_KEY
+from .config import GEMINI_API_KEY, JUDGE_MODEL, ANTHROPIC_API_KEY, OPENAI_API_KEY
 
 
 COACHING_CATS = {"powerful_question", "reflection", "acknowledgment", "hold_space"}
@@ -51,6 +51,19 @@ def _judge_call(prompt: str) -> str:
             messages=[{"role": "user", "content": prompt}],
         )
         return resp.content[0].text
+    elif JUDGE_MODEL.startswith("gpt") or JUDGE_MODEL.startswith("o"):
+        from openai import OpenAI
+        if not OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY not set")
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        resp = client.chat.completions.create(
+            model=JUDGE_MODEL,
+            temperature=0.0,
+            max_tokens=400,
+            response_format={"type": "json_object"},  # force valid JSON
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.choices[0].message.content or ""
     elif JUDGE_MODEL.startswith("gemini"):
         import google.generativeai as genai
         if not GEMINI_API_KEY:

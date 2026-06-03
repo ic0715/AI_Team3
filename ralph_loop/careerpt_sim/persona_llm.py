@@ -137,6 +137,137 @@ def persona_turn(
     return resp.choices[0].message.content.strip()
 
 
+def persona_select(
+    persona: dict,
+    cards: list[dict],
+    actions: list[dict],
+    temperature: float = 0.7,
+) -> tuple[dict, str]:
+    """Step ③ — persona picks 1 of the 5 competency cards as the week's focus,
+    and which of the proposed action items they'll actually commit to.
+
+    The persona sees the cards exactly as the app renders them (title + badge
+    + personalized blurb) and the proposed actions (title + description). It does
+    NOT see competency codes/ids. Returns (parsed_selection, raw_text).
+
+    parsed_selection schema:
+      {"selected_card_slot": int, "selected_action_indices": [int,...],
+       "narrative": str}
+    indices are 1-based into the `actions` list.
+    """
+    system = build_persona_system(persona)
+    badge_ko = {
+        "strength_match": "강점이 잘 맞아요",
+        "user_interest": "관심을 보이셨어요",
+        "growth_potential": "성장 가능성",
+    }
+    cards_block = "\n\n".join(
+        f"[{c['slot']}번 카드] {c['title']}  ({badge_ko.get(c.get('badge'), c.get('badge',''))})\n"
+        f"   {c.get('personalized_text','')}"
+        for c in cards
+    )
+    actions_block = "\n\n".join(
+        f"{i+1}. {a['title']}\n   {a['description']}"
+        for i, a in enumerate(actions)
+    )
+
+    user = f"""앱이 당신의 인터뷰를 바탕으로 '커리어 방향 카드' 5장과, 이번 주 실행 액션 후보들을 보여줍니다.
+
+[방향 카드 5장 — 이번 12주 동안 집중할 방향을 하나 고르세요]
+{cards_block}
+
+[이번 주 실행 액션 후보]
+{actions_block}
+
+당신(페르소나)으로서 솔직하게 고르세요.
+1) 5장 중 가장 끌리는(또는 가장 필요하다고 느끼는) 카드 1장.
+2) 위 액션 후보 중 이번 주에 실제로 해볼 것 1~3개 (번호로).
+3) 왜 그걸 골랐는지 페르소나 1인칭 입말로 2~3문장. 진단지 어휘·역량 코드 명명 금지.
+
+마지막 줄에 아래 JSON 한 개만 출력(JSON 뒤에는 아무것도 쓰지 말 것):
+{{"selected_card_slot": <1~5>, "selected_action_indices": [<번호들>], "narrative": "<1인칭 2~3문장>"}}"""
+
+    raw = persona_turn(system, [{"role": "user", "content": user}], temperature=temperature, max_tokens=500)
+    parsed = _parse_selection(raw, n_cards=len(cards), n_actions=len(actions))
+    return parsed, raw
+
+
+def _parse_selection(text: str, n_cards: int, n_actions: int) -> dict:
+    """Pull the trailing selection JSON; fall back to a safe default."""
+    objs = re.findall(r"\{[^{}]*\"selected_card_slot\"[^{}]*\}", text, flags=re.S)
+    parsed = None
+    if objs:
+        try:
+            parsed = json.loads(objs[-1])
+        except Exception:
+            parsed = None
+    if not isinstance(parsed, dict) or "selected_card_slot" not in parsed:
+        # fallback: first card, first action
+        return {
+            "selected_card_slot": 1,
+            "selected_action_indices": [1] if n_actions else [],
+            "narrative": "",
+            "_fallback": True,
+        }
+    slot = parsed.get("selected_card_slot")
+    if not isinstance(slot, int) or not (1 <= slot <= n_cards):
+        slot = 1
+    idxs = parsed.get("selected_action_indices") or []
+    idxs = [i for i in idxs if isinstance(i, int) and 1 <= i <= n_actions]
+    if not idxs and n_actions:
+        idxs = [1]
+    return {
+        "selected_card_slot": slot,
+        "selected_action_indices": idxs,
+        "narrative": str(parsed.get("narrative") or ""),
+    }
+
+
+def persona_week_report(
+    persona: dict,
+    chosen_card: dict,
+    chosen_actions: list[dict],
+    temperature: float = 0.8,
+) -> tuple[dict, str]:
+    """Before the reflection interview, the persona reports how week 1 of the
+    chosen actions actually went — a short, realistic first-person retro.
+
+    Returns (parsed, raw). parsed schema:
+      {"done_count": int, "weekly_retro": str}
+    done_count is 0..len(chosen_actions).
+    """
+    system = build_persona_system(persona)
+    actions_block = "\n".join(f"- {a['title']}" for a in chosen_actions) or "- (선택한 액션 없음)"
+    n = len(chosen_actions)
+    user = f"""이번 주(1주차) 동안 당신이 하기로 한 액션은 다음과 같았습니다:
+{actions_block}
+
+한 주가 지났습니다. 페르소나로서 솔직하게, 실제로 어떻게 보냈는지 짧게 회고하세요.
+완벽히 다 했을 수도, 일부만 했을 수도, 거의 못 했을 수도 있습니다 — 당신의 성격·상황·감정에 맞게.
+
+페르소나 1인칭 입말 2~4문장으로 한 주를 돌아본 뒤, 마지막 줄에 아래 JSON 한 개만 출력:
+{{"done_count": <0~{n}>, "weekly_retro": "<1인칭 2~4문장 회고>"}}"""
+
+    raw = persona_turn(system, [{"role": "user", "content": user}], temperature=temperature, max_tokens=450)
+    parsed = None
+    objs = re.findall(r"\{[^{}]*\"done_count\"[^{}]*\}", raw, flags=re.S)
+    if objs:
+        try:
+            parsed = json.loads(objs[-1])
+        except Exception:
+            parsed = None
+    if not isinstance(parsed, dict):
+        # fallback: derive retro from the free text, assume partial completion
+        retro = re.sub(r"\{.*\}\s*$", "", raw, flags=re.S).strip()
+        parsed = {"done_count": min(1, n), "weekly_retro": retro[:400], "_fallback": True}
+    else:
+        dc = parsed.get("done_count")
+        if not isinstance(dc, int) or not (0 <= dc <= n):
+            parsed["done_count"] = min(1, n)
+        parsed["weekly_retro"] = str(parsed.get("weekly_retro") or "")
+    return parsed, raw
+
+
 def parse_layer_c(text: str) -> dict | None:
     """Extract the trailing 4-axis self-score JSON, if present."""
     # find last JSON object in the text
