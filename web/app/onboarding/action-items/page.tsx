@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
@@ -678,6 +678,22 @@ function ActionCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  const descRef = useRef<HTMLParagraphElement>(null);
+  // 설명이 2줄을 넘겨 잘리는지 측정 → 잘리는 카드에만 "더보기" 신호를 띄운다.
+  // (펼친 상태에선 clamp가 풀려 측정이 불가하므로 직전 값을 유지)
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (selected) return;
+      setOverflowing(el.scrollHeight > el.clientHeight + 1);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [selected, seed.description]);
+
   return (
     <button
       role="radio"
@@ -739,19 +755,61 @@ function ActionCard({
             {seed.title}
           </div>
           <p
+            ref={descRef}
             style={{
-              margin: '0 0 8px',
+              margin: '0 0 6px',
               fontSize: '12.5px',
               color: 'var(--text-secondary)',
               lineHeight: 1.6,
-              display: '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: 2,
-              overflow: 'hidden',
+              // 선택된 카드는 전문 표시, 나머지는 2줄 미리보기(말줄임)
+              ...(selected
+                ? { display: 'block', overflow: 'visible' }
+                : {
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    WebkitLineClamp: 2,
+                    overflow: 'hidden',
+                  }),
             }}
           >
             {seed.description}
           </p>
+
+          {/* 펼침 신호 — 잘리는 카드에만 표시. 카드 전체가 클릭 영역이라 시각 신호만 둔다. */}
+          {overflowing && (
+            <span
+              aria-hidden="true"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                color: 'var(--accent)',
+                marginBottom: '8px',
+              }}
+            >
+              {selected ? '접기' : '더보기'}
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                style={{
+                  transform: selected ? 'rotate(180deg)' : 'none',
+                  transition: 'transform .18s',
+                }}
+              >
+                <path
+                  d="M6 9l6 6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          )}
         </div>
       </div>
     </button>

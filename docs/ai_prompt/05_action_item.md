@@ -263,7 +263,7 @@ top5_blocks = [STRENGTH_ACTION_BLOCKS[name] for name in top5_names]
 **핵심 자세**:
 - **시드의 의도(`purpose`)는 보존**한다. 시드의 핵심 행동을 임의로 다른 행동으로 바꾸지 않는다.
 - **강점 블록의 표현·접근 방식**을 빌려 액션의 형태와 동기 부여 문구를 사용자 결에 맞춘다.
-- 액션 1건당 `title` 1줄 + `description` 1~3문장. 짧고 또렷하게.
+- 액션 1건당 `title` 1줄 + `description` 1~2문장. 짧고 또렷하게.
 - 사용자의 강점이 자연스럽게 호명되어도 좋지만, 강점 진단·평가는 하지 않는다 ("당신은 분석가형입니다" 금지).
 
 **톤**:
@@ -279,7 +279,7 @@ top5_blocks = [STRENGTH_ACTION_BLOCKS[name] for name in top5_names]
 
 **필수 표현 패턴**:
 - `title`: 시드 `title`을 강점 결에 맞춰 살짝 다듬은 한 줄 (15~30자 권장).
-- `description`: 시드 `purpose`를 사용자의 강점·맥락에 연결하는 1~3문장.
+- `description`: 시드 `purpose`를 사용자의 강점·맥락에 연결하는 1~2문장.
 - `tags`: 2~4개. 형식 자유지만 카테고리는 통일된 어휘에서 — 행동 형식(예: "📝 메모", "📹 영상", "💬 대화"), 소요 시간(예: "⏱ 10분", "⏱ 1시간"), 진행 형태(예: "🌱 매일 루틴", "🎯 1회").
 
 ---
@@ -442,7 +442,7 @@ prompt_vars = {
    시드 외 자유 행동을 만들지 마세요.
 3. 각 액션의 source_seed_id는 파생된 시드의 seed_id를 그대로 적습니다.
 4. title은 15~30자, 행동 동사로 끝맺습니다 ("~해보기", "~정리하기" 등).
-5. description은 1~3문장. 시드의 의도(purpose)를 사용자의 강점·맥락에 연결합니다.
+5. description은 1~2문장. 시드의 의도(purpose)를 사용자의 강점·맥락에 연결합니다.
 6. tags는 2~4개. 행동 형식·소요 시간·진행 형태 중 골라 적습니다.
 7. 출력은 다음 JSON 스키마를 정확히 따릅니다. JSON 외 텍스트 금지.
 
@@ -620,7 +620,7 @@ VALUES
         "required": ["title", "description", "tags", "source_seed_id"],
         "properties": {
           "title":          { "type": "string", "minLength": 8,  "maxLength": 60  },
-          "description":    { "type": "string", "minLength": 20, "maxLength": 240 },
+          "description":    { "type": "string", "minLength": 20, "maxLength": 120 },
           "tags":           { "type": "array",
                               "minItems": 2, "maxItems": 4,
                               "items": { "type": "string", "minLength": 2, "maxLength": 20 } },
@@ -648,7 +648,7 @@ N/A — 이 단계의 모든 출력은 DB에 저장된다. 화면에는 `action_
 | JSON 파싱 | `JSON.parse` 성공 | 재시도 |
 | 스키마 적합 | `actions` 배열 길이 3~5, 각 항목 4개 키 모두 존재 | 재시도 |
 | `title` 길이 | 8~60자 | 재시도 |
-| `description` 길이 | 20~240자 | 재시도 |
+| `description` 길이 | 20~120자 | 재시도 |
 | `tags` 개수 | 2~4개 | 재시도 |
 | `source_seed_id` 패턴 | `^(T-[1-3]|I-[1-3]|R-[1-3]|E-[1-3])-(junior|senior)-[1-3]$` | 재시도 |
 
