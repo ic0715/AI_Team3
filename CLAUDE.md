@@ -161,11 +161,15 @@ const competencies = [{ code: 'T-1', title: '비판적 사고' }, ...]
 import { COMPETENCIES } from '@/lib/constants/competencies'
 ```
 
-### 2. AI 생성 결과를 확인 없이 즉시 저장
+### 2. AI 생성 결과를 사용자 확인 없이 저장 (해당 터치포인트 한정)
 ```
-// ❌ AI 생성 → 바로 DB INSERT
-// ✅ AI 생성 → 사용자 확인 → DB INSERT
-// spec-handoff-ai.md의 #3 personalized_text = DB 미저장 원칙과 동일
+// ⚠ 터치포인트마다 저장 정책이 다릅니다. spec-handoff-ai.md를 먼저 확인하세요.
+
+// #3 역량 카드 personalized_text → DB 저장 ❌ (화면 표시 후 폐기)
+// #4 액션아이템 → AI 생성 후 바로 action_items INSERT ✅ (사용자 확인 단계 없음, 설계 의도)
+// #7 인사이트 요약 → AI 생성 후 바로 coaching_insights INSERT ✅ (설계 의도)
+
+// 새 AI 기능 추가 시: "이 결과를 사용자가 확인해야 하는가?"를 먼저 스펙에서 확인
 ```
 
 ### 3. competency_code / goal_title 자유 생성
