@@ -114,37 +114,51 @@ lib/constants/seeds.ts         → 역량별 액션 아이템 시드 (p10)
 
 ---
 
-## AI 코딩 4원칙
+## Claude Code 작업 원칙
 
-이 레포에서 구현 작업을 할 때는 아래 원칙을 먼저 적용합니다.
+> 출처: Anthropic 공식 문서
+> - https://code.claude.com/docs/en/best-practices
+> - https://code.claude.com/docs/en/memory
 
-### 1. Think Before Coding
-assumption을 명시하고, 불분명하면 먼저 질문합니다.
-- 여러 해석이 가능하면 선택지를 제시합니다. 묵묵히 하나를 선택하지 않습니다.
-- 더 단순한 접근이 있으면 먼저 말합니다.
-- 불분명한 것이 있으면 구현 전에 명확히 합니다.
+### 1. 탐색 → 계획 → 구현 순서를 지킨다
 
-### 2. Simplicity First
-요청된 것만 구현합니다. 투기성 abstraction은 만들지 않습니다.
-- 요청하지 않은 flexibility, configurability를 추가하지 않습니다.
-- 200줄로 쓴 코드가 50줄로 가능하면 다시 씁니다.
-- "시니어 엔지니어라면 과하다고 할까?" — Yes면 단순화합니다.
+> *"Separate research and planning from implementation to avoid solving the wrong problem."*
+> — Anthropic Claude Code Best Practices
 
-### 3. Surgical Changes
-요청한 라인만 수정합니다. 인접 코드를 함께 개선하지 않습니다.
+복잡한 변경 전에는 코드를 바로 작성하지 않습니다.
+- 관련 파일을 먼저 읽고 구조를 파악합니다.
+- 변경 범위와 영향 파일을 정리한 뒤 구현합니다.
+- 작업이 명확히 한 문장으로 설명되는 소규모 변경이라면 계획 단계를 생략해도 됩니다.
+
+### 2. 검증 기준을 먼저 정의한다
+
+> *"Give Claude a check it can run: tests, a build, a screenshot to compare. It's the difference between a session you watch and one you walk away from."*
+> — Anthropic Claude Code Best Practices
+
+구현 완료 선언 전에 반드시 확인합니다.
+- `npm run typecheck` — 타입 오류 0
+- `npm run build` — 빌드 성공
+- UI 변경 시: Vercel preview URL에서 모바일(390px) 기준 화면 확인
+- 완료됐다고 말하기 전에 위 체크를 직접 실행하고 결과를 보여줍니다.
+
+### 3. 구체적인 컨텍스트를 제공하고 범위를 지킨다
+
+> *"The more precise your instructions, the fewer corrections you'll need. Reference specific files, mention constraints, and point to example patterns."*
+> — Anthropic Claude Code Best Practices
+
+- 요청받은 파일과 범위만 수정합니다. 인접한 코드를 함께 개선하지 않습니다.
 - 기존 코드 스타일이 마음에 들지 않아도 맞춥니다.
-- 내 변경으로 생긴 orphan(미사용 import·변수·함수)만 정리합니다.
-- 기존 dead code는 언급만 하고 삭제하지 않습니다.
-- 모든 변경 라인은 사용자 요청으로 직접 추적 가능해야 합니다.
+- 불분명한 요청은 구현 전에 명확히 합니다. 묵묵히 가정하지 않습니다.
+- 내 변경으로 생긴 orphan(미사용 import·변수)만 정리합니다. 기존 dead code는 언급만 합니다.
 
-### 4. Goal-Driven Execution
-성공 기준을 먼저 정의하고, 검증 후에만 완료를 선언합니다.
-- 멀티스텝 작업은 시작 전에 계획을 먼저 제시합니다.
-  ```
-  1. [Step] → verify: [확인 방법]
-  2. [Step] → verify: [확인 방법]
-  ```
-- "완료됐습니다"는 실제 검증 후에만 선언합니다.
+### 4. 같은 실수가 반복되면 컨텍스트를 리셋한다
+
+> *"After two failed corrections, `/clear` and write a better initial prompt incorporating what you learned."*
+> — Anthropic Claude Code Best Practices
+
+- 같은 문제로 두 번 이상 수정이 필요하면 접근 방식이 잘못된 것입니다.
+- 긴 세션에서 무관한 컨텍스트가 쌓이면 성능이 저하됩니다.
+- 관련 없는 작업 사이에는 컨텍스트를 초기화합니다.
 
 ---
 
