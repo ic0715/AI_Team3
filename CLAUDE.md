@@ -35,15 +35,17 @@ DISCOVER → DIRECTION → DO
 구현 결정 시 아래 순서로 읽습니다. 앞 문서가 뒤 문서보다 우선합니다.
 
 1. `docs/schema/spec-handoff-ai.md` — 7개 AI 터치포인트 · DB 입출력 · 저장 포맷
-2. `docs/functional_spec/_post_mvp_v2/` — post-MVP 구현 기준 스펙 (p11·p12·p13·p15)
-3. `docs/functional_spec/_mvp/` — MVP 구현 기준 스펙
-4. `docs/ARCHITECTURE.md` — 라우트 구조 · 데이터 레이어 · 스타일 시스템
-5. `docs/STRUCTURE.md` — 현재 구현 현황 · 팀 체크리스트
-6. `docs/schema/spec-schema.md` — DB 스키마 (v0.9 기준)
-7. `docs/ai_prompt/` — AI 프롬프트 명세 (#6 회고 코칭은 `06_reflect_coaching.md`)
-8. 기존 코드 · 테스트
+2. `docs/CAREER_INTERVIEW_V2_DECISIONS.md` — 커리어 인터뷰 v2/v3 결정사항 (Single Source of Truth)
+3. `docs/functional_spec/_post_mvp_v2/` — post-MVP 구현 기준 스펙 (p11·p12·p13·p15)
+4. `docs/functional_spec/_mvp/` — MVP 구현 기준 스펙
+5. `docs/ARCHITECTURE.md` — 라우트 구조 · 데이터 레이어 · 스타일 시스템
+6. `docs/STRUCTURE.md` — 현재 구현 현황 · 팀 체크리스트
+7. `docs/schema/spec-schema.md` — DB 스키마 (v0.9 기준)
+8. `docs/ai_prompt/` — AI 프롬프트 명세 (커리어 인터뷰: `03.career_interview.md`, 회고 코칭: `06_reflect_coaching.md`)
+9. 기존 코드 · 테스트
 
 > `_post_mvp_v1/`은 pivot 이전 보존용입니다. 구현 기준으로 사용하지 않습니다.
+> spec-handoff-ai.md는 schema v0.7.2 기준입니다. 커리어 인터뷰(p08) 구현 시 반드시 #2를 함께 확인하세요.
 
 ---
 
@@ -59,10 +61,11 @@ AI가 해도 되는 것:
 - 회고 대화 진행 → coaching_insights 구조화
 
 AI가 해서는 안 되는 것:
-- 새로운 competency_code 자유 생성 (12개 고정값만 사용)
+- 새로운 competency_code 자유 생성 (12개 고정값만 사용: T-1~T-3, I-1~I-3, R-1~R-3, E-1~E-3)
 - goal_title LLM 자유 생성 (앱 상수 한글명 그대로 INSERT)
 - 역량 매칭 점수 계산 (Step 1은 코드 로직, AI 없음)
 - 시드 없이 액션아이템 자유 생성 (반드시 source_seed_id 추적)
+- session_duration_choice 자유 생성 (enum 고정값만 사용: 'short' | 'medium' | 'long')
 
 AI 없이도 핵심 흐름이 동작해야 합니다. AI는 개인화 품질을 높이는 보조 수단입니다.
 
@@ -218,6 +221,7 @@ const data: any = ...
 ```bash
 cd web
 npm run typecheck   # 타입 오류 0
+npm run test        # 테스트 통과
 npm run build       # 빌드 성공
 ```
 
