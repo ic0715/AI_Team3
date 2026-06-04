@@ -194,35 +194,12 @@ function ProfileContent() {
   }, [profile, saving, editNickname, editJobField, editCareerLevel]);
 
   // ── 커리어 방향 재설정 ────────────────────────────────────
-  const handleConfirmReset = useCallback(async () => {
-    if (resetting) return;
-
-    // active goal이 없는 상태 → DB 업데이트 없이 바로 이동
-    if (!goal) {
-      router.push('/onboarding/career-intro');
-      return;
-    }
-
-    setResetting(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요해요.');
-
-      const { error: upErr } = await supabase
-        .from('goals')
-        .update({ status: 'abandoned' })
-        .eq('id', goal.id)
-        .eq('user_id', user.id);
-      if (upErr) throw upErr;
-
-      router.push('/onboarding/career-intro');
-    } catch (e) {
-      console.error('[14] reset goal:', e);
-      setError('재설정에 실패했어요. 다시 시도해주세요.');
-      setResetting(false);
-      setShowResetConfirm(false);
-    }
-  }, [goal, resetting, router]);
+  // goal의 abandoned 처리는 career-result에서 새 goal insert 직전에 수행합니다.
+  // 여기서 미리 abandoned 처리하면 인터뷰 도중 뒤로 가기 시 goal이 사라져
+  // 홈이 broken state가 됩니다.
+  const handleConfirmReset = useCallback(() => {
+    router.push('/onboarding/career-intro');
+  }, [router]);
 
   // ── 로그아웃 ──────────────────────────────────────────────
   const handleLogout = useCallback(async () => {
