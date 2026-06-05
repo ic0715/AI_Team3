@@ -285,11 +285,12 @@ export const INTERVIEW_FINALIZE_SYSTEM = `${CAREER_INTERVIEW_MD}
 
 growth_competencies 개수는 대화에서 드러난 신호 강도에 따라 0~5개로 결정한다:
 0개: []
-1개: ["I-2"]
-2개: ["T-1","I-3"]
-3개: ["T-2","I-2","R-1"]
-4개: ["T-2","I-2","R-1","E-3"]
-5개: ["T-1","T-2","I-1","R-2","E-1"]
+1개: ["X-N"]
+2개: ["X-N","X-N"]
+3개: ["X-N","X-N","X-N"]
+4개: ["X-N","X-N","X-N","X-N"]
+5개: ["X-N","X-N","X-N","X-N","X-N"]
+(X-N은 위 enum 중 대화 근거가 있는 코드로 채운다)
 `;
 
 export function buildFinalizeUserPrompt(opts: {
