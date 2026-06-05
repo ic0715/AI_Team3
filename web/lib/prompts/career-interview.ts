@@ -278,10 +278,19 @@ export const INTERVIEW_FINALIZE_SYSTEM = `${CAREER_INTERVIEW_MD}
 - 가장 강하게·반복적으로 드러난 것부터 우선순위 순으로 배열한다.
 - 0개도 정상(성장 의도가 전혀 드러나지 않으면 빈 배열). 추정·과잉 매칭 금지: 근거가 약하면 넣지 않는다. 최대 5개.
 
-응답 예시:
-{"presenting_issue":"...","agreed_focus":"...","agreement_evolution":"","user_takeaway":"...","session_duration_choice":"medium","key_insights":{"current_frustration":"..."},"growth_competencies":["T-1","I-3"]}
+응답 예시 (형식):
+{"presenting_issue":"...","agreed_focus":"...","agreement_evolution":"","user_takeaway":"...","session_duration_choice":"medium","key_insights":{"current_frustration":"...","future_vision":"..."},"growth_competencies":[...]}
 ---SUMMARY---
 한 줄 요약 60자 이내
+
+growth_competencies 개수는 대화에서 드러난 신호 강도에 따라 0~5개로 결정한다:
+0개: []
+1개: ["X-N"]
+2개: ["X-N","X-N"]
+3개: ["X-N","X-N","X-N"]
+4개: ["X-N","X-N","X-N","X-N"]
+5개: ["X-N","X-N","X-N","X-N","X-N"]
+(X-N은 위 enum 중 대화 근거가 있는 코드로 채운다)
 `;
 
 export function buildFinalizeUserPrompt(opts: {
