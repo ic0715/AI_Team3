@@ -5,26 +5,45 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
-import { ACTION_SEEDS_BY_COMPETENCY, type ActionItem } from '@/lib/constants/seeds';
+import { ACTION_SEEDS_BY_COMPETENCY, ACTION_DISPLAY_COUNT, type ActionItem } from '@/lib/constants/seeds';
 import {
   CUSTOM_MAX,
   CUSTOM_MIN,
   isCustomActionReady,
   validateCustomAction,
 } from '@/lib/actionItems/customAction';
-import {
-  buildSourceSeedId,
-  competencyCodeToSlug,
-  mergeAiActions,
-} from '@/lib/actionItems/seedMapping';
+import { competencyCodeToSlug } from '@/lib/actionItems/seedMapping';
+import { selectDisplaySeeds } from '@/lib/actionItems/selectSeeds';
 import { localISODate } from '@/lib/utils/localDate';
 
 // 커스텀 액션 선택 상태를 표현하는 sentinel id (시드 id와 구분)
 const CUSTOM_SELECTED_ID = '__custom__';
 
-// 시드 5개 표시용 타입
+// 시드 풀 타입. sourceSeedId = 시드의 안정 id(seeds.ts ActionItem.id). 풀 폴백·보충에 쓰인다.
 interface DisplaySeed extends ActionItem {
-  sourceSeedId: string; // `{competencyId}-{careerLevel}-{index}`
+  sourceSeedId: string;
+}
+
+// 화면에 렌더되는 액션. 생성분(source_seed_id=null)과 풀 폴백분(시드 id)을 하나로 통합한다.
+interface DisplayAction {
+  id: string;                  // React key + 선택 매칭. 생성분 'gen-{i}', 폴백분은 시드 id
+  title: string;
+  description: string;
+  tags: string[];
+  sourceSeedId: string | null; // 생성분 null, 폴백분 시드 id
+  strengthLink: string | null; // 이 액션이 발휘하는 강점(생성분). 폴백분 null → 저장 시 Top1로 대체
+}
+
+// 풀 시드 → 화면 액션 (폴백/보충용). 강점 연계는 생성분에만 있으므로 null.
+function seedToAction(s: DisplaySeed): DisplayAction {
+  return {
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    tags: s.tags,
+    sourceSeedId: s.sourceSeedId,
+    strengthLink: null,
+  };
 }
 
 // goals row (간략)
@@ -59,13 +78,15 @@ function ActionItemsContent() {
   const { ready, pendingRedirect, confirmRedirect } = useOnboardingGuard('action-items');
 
   const [goal, setGoal] = useState<ActiveGoal | null>(null);
-  const [careerLevel, setCareerLevel] = useState<string>('junior');
   const [aiContext, setAiContext] = useState<UserContextForAI | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // AI 개인화 액션 (시드 → 사용자 맞춤 변형)
-  const [aiActions, setAiActions] = useState<DisplaySeed[] | null>(null);
+  // 역량 전체 시드 풀 (데이터 로드 시 설정). AI에 통째로 보내 선택+재해석시킨다.
+  const [pool, setPool] = useState<DisplaySeed[] | null>(null);
+
+  // 최종 표시 액션 (생성 통과분 + 부족분 풀 보충, 또는 실패 시 풀 폴백). 1회 설정 후 고정.
+  const [aiActions, setAiActions] = useState<DisplayAction[] | null>(null);
   const [aiLoading, setAiLoading] = useState(true);
 
   // 단일 선택 상태 (시드 id 또는 CUSTOM_SELECTED_ID)
@@ -127,17 +148,27 @@ function ActionItemsContent() {
         if (!goalRes.data) {
           throw new Error('NO_ACTIVE_GOAL');
         }
+        const careerLevel = profileRes.data?.career_level ?? 'junior';
         setGoal(goalRes.data);
-        setCareerLevel(profileRes.data?.career_level ?? 'junior');
         setAiContext({
           nickname: profileRes.data?.nickname ?? '친구',
           jobField: profileRes.data?.job_field ?? '',
-          careerLevel: profileRes.data?.career_level ?? 'junior',
+          careerLevel,
           mainConcern: profileRes.data?.main_concern ?? '',
           strengths: (strengthRes.data?.strengths as UserContextForAI['strengths']) ?? [],
           interviewInsights: interviewRes.data?.key_insights ?? null,
         });
         setLoadingData(false);
+
+        // 역량 전체 시드 풀을 준비한다. (선택은 AI가 인터뷰 기반으로 — 아래 AI 효과에서)
+        const slug = competencyCodeToSlug(goalRes.data.competency_code);
+        const poolItems = ACTION_SEEDS_BY_COMPETENCY[slug]?.items ?? [];
+        if (poolItems.length > 0) {
+          setPool(poolItems.map((item) => ({ ...item, sourceSeedId: item.id })));
+        } else {
+          // 매핑 안 된 역량(방어적) — 풀이 없으면 AI 로딩을 끝내고 EmptySeeds + 커스텀 입력만 노출.
+          setAiLoading(false);
+        }
       } catch (e) {
         console.error(e);
         if (!cancelled) {
@@ -152,41 +183,24 @@ function ActionItemsContent() {
     return () => { cancelled = true; };
   }, [ready]);
 
-  // ── 시드 5개 매핑 ───────────────────────────────────────
-  // DB의 competency_code(T-1 등) → 슬러그로 변환 후 시드 lookup
+  // DB의 competency_code(T-1 등) → 슬러그 (역량 이모지 표시용).
   const seedSlug = useMemo(
     () => (goal ? competencyCodeToSlug(goal.competency_code) : null),
     [goal],
   );
 
-  // 베이스 시드 (constants에서 lookup) — AI 실패 시 fallback으로 사용
-  // 시드 없는 역량(예: R-1, R-2)은 빈 placeholder 5개로 채워서 AI가 처음부터 생성하게 함.
-  const baseSeeds: DisplaySeed[] = useMemo(() => {
-    if (!goal || !seedSlug) return [];
-    const seedSet = ACTION_SEEDS_BY_COMPETENCY[seedSlug];
-    const items = seedSet?.items;
-    if (items && items.length > 0) {
-      return items.map((item, idx) => ({
-        ...item,
-        // source_seed_id 형식은 스펙 코드 그대로 유지 (예: "T-1-junior-1")
-        sourceSeedId: buildSourceSeedId(goal.competency_code, careerLevel, idx),
-      }));
-    }
-    // 시드 데이터 없는 역량 — AI가 처음부터 생성하도록 빈 placeholder 5개
-    return Array.from({ length: 5 }, (_, idx) => ({
-      id: `${seedSlug}-placeholder-${idx + 1}`,
-      title: '',
-      description: '',
-      tags: [],
-      sourceSeedId: buildSourceSeedId(goal.competency_code, careerLevel, idx),
-    }));
-  }, [goal, seedSlug, careerLevel]);
-
-  // ── AI 개인화 호출 ─────────────────────────────────────────
+  // ── 액션 생성 + 검증 게이트 호출 (C) ───────────────────────
+  // 서버가 인터뷰·강점에서 액션을 생성하고 게이트를 통과시킨다.
+  // 통과분이 부족하면 검증된 풀로 보충, 서버 실패 시 풀로 전체 폴백. (안전망: 풀)
   useEffect(() => {
-    if (!goal || !aiContext || baseSeeds.length === 0) return;
+    if (!goal || !aiContext || !pool || pool.length === 0 || aiActions) return;
     let cancelled = false;
-    setAiLoading(true);
+    // aiLoading은 초기값 true이고 이 효과는 1회만 실행되므로 별도 true 세팅 불필요.
+
+    const ctx = aiContext;
+    const seedPool = pool;
+    const poolFill = (n: number): DisplayAction[] =>
+      selectDisplaySeeds(seedPool, ctx.careerLevel, Math.random, n).map(seedToAction);
 
     const run = async () => {
       try {
@@ -195,36 +209,48 @@ function ActionItemsContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userProfile: {
-              nickname: aiContext.nickname,
-              jobField: aiContext.jobField,
-              careerLevel: aiContext.careerLevel,
-              mainConcern: aiContext.mainConcern,
+              nickname: ctx.nickname,
+              jobField: ctx.jobField,
+              careerLevel: ctx.careerLevel,
+              mainConcern: ctx.mainConcern,
             },
-            userStrengths: aiContext.strengths,
-            interviewInsights: aiContext.interviewInsights,
+            userStrengths: ctx.strengths,
+            interviewInsights: ctx.interviewInsights,
             selectedGoal: {
               goal_title: goal.goal_title,
               competency_code: goal.competency_code,
             },
-            seeds: baseSeeds.map((s) => ({
-              sourceSeedId: s.sourceSeedId,
-              title: s.title,
-              description: s.description,
-              tags: s.tags,
-            })),
           }),
         });
         if (!res.ok) throw new Error('AI action generation failed');
         const data = (await res.json()) as {
-          actions: Array<{ sourceSeedId: string; title: string; description: string; tags: string[]; isAiModified: boolean }>;
+          actions: Array<{
+            title: string;
+            description: string;
+            tags: string[];
+            strength_link: string | null;
+            source_seed_id: string | null;
+          }>;
         };
         if (cancelled) return;
-        // baseSeeds 형식에 맞춰 id 보존 (sourceSeedId 기준 병합)
-        setAiActions(mergeAiActions(baseSeeds, data.actions));
+        const generated: DisplayAction[] = (data.actions ?? []).map((a, i) => ({
+          id: `gen-${i}`,
+          title: a.title,
+          description: a.description,
+          tags: Array.isArray(a.tags) ? a.tags : [],
+          sourceSeedId: a.source_seed_id ?? null,
+          strengthLink: a.strength_link ?? null,
+        }));
+        // 생성 통과분 우선 노출 + 부족분은 검증된 풀로 보충. 전멸 시 풀 전체.
+        const result =
+          generated.length >= ACTION_DISPLAY_COUNT
+            ? generated.slice(0, ACTION_DISPLAY_COUNT)
+            : [...generated, ...poolFill(ACTION_DISPLAY_COUNT - generated.length)];
+        setAiActions(result.length > 0 ? result : poolFill(ACTION_DISPLAY_COUNT));
       } catch (e) {
-        console.error('[10 AI personalize] failed, falling back to seeds:', e);
-        // 폴백: 시드 그대로 사용 (사용자에게는 AI 실패가 안 보임)
-        if (!cancelled) setAiActions(baseSeeds);
+        console.error('[10 generate] failed, falling back to vetted pool:', e);
+        // 폴백: 검증된 풀에서 선택 (사용자에게는 생성 실패가 안 보임)
+        if (!cancelled) setAiActions(poolFill(ACTION_DISPLAY_COUNT));
       } finally {
         if (!cancelled) setAiLoading(false);
       }
@@ -232,10 +258,10 @@ function ActionItemsContent() {
 
     run();
     return () => { cancelled = true; };
-  }, [goal, aiContext, baseSeeds]);
+  }, [goal, aiContext, pool, aiActions]);
 
-  // 실제 화면에 표시될 시드 (AI 결과 또는 fallback)
-  const seeds: DisplaySeed[] = aiActions ?? baseSeeds;
+  // 실제 화면에 표시될 액션 (생성+보충 또는 폴백)
+  const seeds: DisplayAction[] = aiActions ?? [];
 
   const seedEmoji = useMemo(() => {
     if (!seedSlug) return '🎯';
@@ -279,9 +305,9 @@ function ActionItemsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('로그인이 필요해요.');
 
-      // v0.8: action_items.strength_link — 11 홈 "오늘의 액션" 카드의 강점 표시용
-      // Top 1 강점 name_ko를 자유 텍스트로 저장 (없으면 null)
-      const strengthLink = aiContext?.strengths?.[0]?.name_ko ?? null;
+      // v0.8: action_items.strength_link — 11 홈 "오늘의 액션" 카드의 강점 표시용.
+      // 생성 액션은 자기가 발휘하는 강점(strengthLink)을 갖는다. 없으면 Top1로 대체.
+      const topStrength = aiContext?.strengths?.[0]?.name_ko ?? null;
 
       let payload: {
         user_id: string;
@@ -306,7 +332,7 @@ function ActionItemsContent() {
           tags: [],
           is_custom: true,
           source_seed_id: null,
-          strength_link: strengthLink,
+          strength_link: topStrength,
         };
       } else {
         const seed = seeds.find((s) => s.id === selectedId);
@@ -320,7 +346,7 @@ function ActionItemsContent() {
           tags: seed.tags,
           is_custom: false,
           source_seed_id: seed.sourceSeedId,
-          strength_link: strengthLink,
+          strength_link: seed.strengthLink ?? topStrength,
         };
       }
 
@@ -428,7 +454,7 @@ function ActionItemsContent() {
         ) : (
           <div
             role="radiogroup"
-            aria-label="추천 액션 5개"
+            aria-label={`추천 액션 ${seeds.length}개`}
             style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
           >
             {seeds.map((seed) => (
@@ -674,7 +700,7 @@ function ActionCard({
   selected,
   onClick,
 }: {
-  seed: DisplaySeed;
+  seed: DisplayAction;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -816,21 +842,6 @@ function ActionCard({
   );
 }
 
-function SelectedDot() {
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: '8px',
-        height: '8px',
-        borderRadius: '50%',
-        background: 'var(--accent)',
-        display: 'inline-block',
-      }}
-    />
-  );
-}
-
 // ────────────────────────────────────────────────────────────
 // 스타일
 // ────────────────────────────────────────────────────────────
@@ -911,15 +922,6 @@ const cardStyle: React.CSSProperties = {
   width: '100%',
 };
 
-const tagStyle: React.CSSProperties = {
-  fontSize: '11px',
-  fontWeight: 600,
-  color: 'var(--text-secondary)',
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  padding: '3px 8px',
-  borderRadius: '999px',
-};
 
 const customWrapStyle: React.CSSProperties = {
   marginTop: '20px',

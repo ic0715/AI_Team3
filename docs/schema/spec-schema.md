@@ -54,7 +54,7 @@
 | 3 | `career_interview_results.recommended_goal_categories` (text[]) → `recommended_competencies` (JSONB, code+match_score+badge 구조) |
 | 4 | 옵션 개수 정책: 3~5개 동적 → **5개 고정** |
 | 5 | 옵션 매칭 로직: AI 추천 → **결정적 매칭(코드)** + 카드 문구만 AI 개인화 |
-| 6 | 액션 생성 정책: AI 자유 생성 → competency_action_map.md 시드 6개 + AI 재해석 |
+| 6 | 액션 생성 정책 (2026-06 개정): 인터뷰·강점에서 **직접 생성 + 검증 게이트**(역량적합·강점연계·ICF·정서위기안전·형식) 통과분만 노출, 게이트 실패 시 검증된 시드 풀로 폴백. 생성분 `source_seed_id=NULL`. 상세 `docs/ai_prompt/05_action_item.md` 구현 현황 |
 | 7 | `action_items.source_seed_id` 컬럼 신규 추가 (선택) |
 | 8 | `profiles.career_level` 표준 enum화 (junior_new/junior/senior_mid/senior) |
 | 9 | 정적 레퍼런스 데이터 섹션 신규 추가 (DB 외부 데이터 명시) |
@@ -617,7 +617,7 @@ CREATE UNIQUE INDEX one_active_goal_per_user
 | 1 | 강점 인터뷰 | 대화형 | `profiles` (기본 정보) | `strength_analyses.strengths` |
 | 2 | 커리어 인터뷰 | 대화형 | `strength_analyses` + 강점 페어 슬라이스 (Top 5 → 10페어) | `career_interview_results.key_insights` (mentioned_competencies 포함) + `ai_summary` |
 | 3 | 역량 방향 도출 | **결정적 + 생성형** | `strength_analyses` + `career_interview_results` + `competency_action_map` | `career_interview_results.recommended_competencies` (5개 슬롯) |
-| 4 | 액션아이템 개인화 생성 | 생성형 | `goals` + `competency_action_map` 시드 6개 + 실행항목 슬라이스 (Top 5) + `coaching_insights` | `action_items` 3~5건 + `source_seed_id` |
+| 4 | 액션아이템 생성 | 생성형(생성+검증 게이트) | `goals` + 강점 슬라이스 (Top 5) + 인터뷰 인사이트 + `coaching_insights`. 폴백용 시드 풀(`seeds.ts`) | `action_items` (인터뷰·강점에서 생성→게이트 통과분, 부족분 풀 보충) + `strength_link`(발휘 강점) + `source_seed_id`(생성분 NULL/폴백분 시드 id) |
 | 5 | 회고 메모 → 코칭 컨텍스트 주입 | 분석형 | `daily_memos` + `action_completions` + `weekly_retros` | *(DB 저장 없음, 프롬프트 구성용)* |
 | 6 | 회고 코칭 | 대화형 | #5에서 구성한 컨텍스트 | *(대화 원문 미저장)* |
 | 7 | 인사이트 요약 | 생성형 | #6 대화 내용 (메모리) | `coaching_insights` + 다음 주 `action_items` |
