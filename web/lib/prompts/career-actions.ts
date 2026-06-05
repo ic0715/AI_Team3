@@ -11,32 +11,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ACTION_DISPLAY_COUNT } from '@/lib/constants/seeds';
 
-const DOCS_DIR = path.join(process.cwd(), '..', 'docs', 'ai_prompt');
-const SYSTEM_PROMPT_MD = fs.readFileSync(path.join(DOCS_DIR, 'system_prompt.md'), 'utf8');
-const ACTION_ITEM_MD = fs.readFileSync(path.join(DOCS_DIR, '05_action_item.md'), 'utf8');
-const ACTION_MAP_MD = fs.readFileSync(path.join(DOCS_DIR, 'competency_action_map.md'), 'utf8');
+// 액션 생성·검증 전용 압축 시스템 프롬프트.
+// 원본 3개 문서(system_prompt.md + 05_action_item.md + competency_action_map.md)에서
+// C 생성 모델에 필요한 부분만 추출·압축한 버전.
+// 원본 문서는 그대로 유지됨 — 다른 기능(인터뷰 등)에 영향 없음.
+const ACTIONS_SYSTEM_MD = fs.readFileSync(
+  path.join(process.cwd(), 'lib', 'prompts', 'career-actions-system.md'),
+  'utf8',
+);
 
 // 후보 과생성 개수 — 게이트 탈락 여유분 확보(노출은 ACTION_DISPLAY_COUNT개).
 export const GENERATE_CANDIDATE_COUNT = ACTION_DISPLAY_COUNT + 2;
 
-export const ACTIONS_SYSTEM = `${SYSTEM_PROMPT_MD}
-
----
-
-# 액션 아이템 작업 명세 (이 세션 전용)
-
-위의 일반 코칭 원칙(ICF·정서위기 가드레일 포함)을 그대로 따른다.
-지금은 사용자의 인터뷰·강점·직무에 맞는 실행 액션을 **직접 생성/검증**하는 작업이다.
-아래 명세와 역량-강점 매핑은 "정답을 베껴오는 출처"가 아니라, 각 역량의 **핵심 행동의 결**과
-**강점→행동 번역 방향**을 잡는 참고 자료다. (특정 시드를 그대로 인용할 의무는 없다.)
-
-${ACTION_ITEM_MD}
-
----
-
-# 12역량 × 연계 강점 매핑 (참고 — 강점을 어떤 행동으로 번역할지)
-
-${ACTION_MAP_MD}`;
+export const ACTIONS_SYSTEM = ACTIONS_SYSTEM_MD;
 
 // route의 풀 폴백/입력 형상(페이지가 보내는 시드 풀).
 export interface ActionSeedInput {
@@ -101,8 +88,7 @@ JSON 배열로만 응답(${count}개). 마크다운 펜스 금지. 형식:
     "title": "...",
     "description": "...",
     "tags": ["⏱ 30분", "..."],
-    "strength_link": "<Top5 강점 중 하나의 한글명>",
-    "competency_fit": "이 액션이 왜 '${o.selectedGoal.goal_title}'를 기르는지 한 줄"
+    "strength_link": "<Top5 강점 중 하나의 한글명>"
   }
 ]`;
 }
