@@ -14,6 +14,8 @@ import {
   type Phase,
   type SessionDurationLabel,
 } from '@/lib/constants/career-interview';
+import { isReadyForResult as computeIsReadyForResult } from '@/lib/career-interview/resultReadiness';
+import { isExtractionInvalid } from '@/lib/career-interview/extractionValidity';
 
 // ─────────────────────────────────────────────────────────────
 // AI 연동 인터페이스 (v2 자유 흐름)
@@ -347,10 +349,7 @@ function CareerInterviewContent() {
     try {
       const result = await finalizeInterview(msgs, context, userId);
       // CONTRACT_v2 §7: 세션 무효 — 신규 4키 중 핵심 3개가 모두 빈 문자열이면 결과 화면 진입 차단
-      const invalid =
-        !result.extraction.presenting_issue &&
-        !result.extraction.agreed_focus &&
-        !result.extraction.user_takeaway;
+      const invalid = isExtractionInvalid(result.extraction);
       if (invalid) {
         // 분석 결과가 비면(실질 내용 없음) 결과 페이지 대신 '결과 불가' 안내 → 홈.
         setShowHomeGuide(true);
@@ -712,11 +711,8 @@ function CareerInterviewContent() {
   //   ⚠️ exploration 진입(주제 합의)만으론 방향성이 아직 없으므로 '준비됨'으로 보지 않는다.
   //   준비됨(→ 결과) = 코치가 마무리 질문을 시작(closing) OR 탐색이 충분히 깊어짐(≥N턴).
   //   그 외(빈 세션·합의·얕은 탐색) = 분석 불가 → 따뜻한 안내 후 홈으로(대화는 보존, 이어가기 가능).
-  const RESULT_READY_MIN_TURNS = 6; // 탐색 깊이 보조선(사용자 답변 누적). 조정 가능.
   const userTurnCount = messages.filter((m) => m.role === 'user').length;
-  const isReadyForResult =
-    phase === 'closing' ||
-    (phase === 'exploration' && userTurnCount >= RESULT_READY_MIN_TURNS);
+  const isReadyForResult = computeIsReadyForResult(phase, userTurnCount);
 
   return (
     <div
