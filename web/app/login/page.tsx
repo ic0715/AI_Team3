@@ -788,7 +788,7 @@ export default function LoginPage() {
 
                 <Divider />
 
-                <GoogleButton label="Google로 시작하기" />
+                <GoogleButton label="Google로 시작하기" disableInApp />
               </form>}
             </div>
           </div>
@@ -844,8 +844,8 @@ function detectInAppBrowser(): boolean {
   return /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Twitter|Line\/|MicroMessenger/i.test(ua);
 }
 
-function GoogleButton({ label = 'Google로 계속하기' }: { label?: string }) {
-  const isInApp = detectInAppBrowser();
+function GoogleButton({ label = 'Google로 계속하기', disableInApp = false }: { label?: string; disableInApp?: boolean }) {
+  const isInApp = disableInApp && detectInAppBrowser();
 
   const handleGoogleLogin = async () => {
     if (isInApp) return;
