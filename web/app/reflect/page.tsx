@@ -363,11 +363,11 @@ function ReflectScreen({
       {/* 안내 문구 */}
       <div style={noticeCardStyle}>
         <div style={noticeHeaderStyle}>
-          💡 오늘의 느낌을 짧게 기록하고, 다음 주는 AI 코치와 함께 정해요
+          💡 오늘을 기록하면, 다음 주가 또렷해져요!
         </div>
         <div style={noticeBodyStyle}>
-          오늘 액션을 실행하면서 느낀 점을 메모로 남겨두세요. 한 주를 마무리할
-          때쯤 AI 코치와 다음 주 액션을 정해보세요.
+          오늘 액션을 실행하며 느낀 점을 가볍게 메모해두세요. 이 기록이 쌓이면,
+          AI 코치와 다음 주 액션을 더 또렷하게 정할 수 있어요.
         </div>
       </div>
 
@@ -442,7 +442,7 @@ function ReflectScreen({
               AI 코치와 다음 주 액션 정하기
             </div>
             <div style={{ fontSize: '12px', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
-              이번 주 회고를 바탕으로, 코치가 다음 주에 맞는 액션 아이템을 추천해드려요. (주말 시행 권장)
+              이번 주 회고를 바탕으로 다음 주 액션 아이템을 추천해드려요. (주말 시행 권장)
             </div>
             <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <span style={tagAccentTintStyle}>✦ 강점 기반 추천</span>
