@@ -837,8 +837,18 @@ function Divider() {
   );
 }
 
+/** 카카오톡·인스타그램 등 인앱브라우저(WebView) 감지 */
+function detectInAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Twitter|Line\/|MicroMessenger/i.test(ua);
+}
+
 function GoogleButton({ label = 'Google로 계속하기' }: { label?: string }) {
+  const isInApp = detectInAppBrowser();
+
   const handleGoogleLogin = async () => {
+    if (isInApp) return;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -846,26 +856,55 @@ function GoogleButton({ label = 'Google로 계속하기' }: { label?: string }) 
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleGoogleLogin}
-      style={{
-        width: '100%', padding: '12px 16px', background: 'var(--surface)',
-        color: 'var(--text-primary)', border: '1.5px solid var(--border)',
-        borderRadius: 'var(--radius-md)', fontSize: '14px', fontWeight: 600,
-        fontFamily: 'inherit', cursor: 'pointer', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', gap: '10px',
-      }}
-    >
-      {/* Google 아이콘 */}
-      <svg width="18" height="18" viewBox="0 0 18 18">
-        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z" />
-        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" />
-        <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" />
-        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z" />
-      </svg>
-      {label}
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <button
+        type="button"
+        onClick={handleGoogleLogin}
+        disabled={isInApp}
+        style={{
+          width: '100%', padding: '12px 16px', background: 'var(--surface)',
+          color: isInApp ? 'var(--text-muted)' : 'var(--text-primary)',
+          border: '1.5px solid var(--border)',
+          borderRadius: 'var(--radius-md)', fontSize: '14px', fontWeight: 600,
+          fontFamily: 'inherit',
+          cursor: isInApp ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+          opacity: isInApp ? 0.5 : 1,
+        }}
+      >
+        {/* Google 아이콘 */}
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z" />
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" />
+          <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" />
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z" />
+        </svg>
+        {label}
+      </button>
+
+      {/* 인앱브라우저 안내 */}
+      {isInApp && (
+        <div style={{
+          padding: '10px 14px',
+          background: '#FFF7ED',
+          border: '1.5px solid #FED7AA',
+          borderRadius: 'var(--radius-md)',
+          fontSize: '13px',
+          color: '#92400E',
+          lineHeight: 1.55,
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'flex-start',
+        }}>
+          <span style={{ flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+          <span>
+            카카오톡 등 앱 내 브라우저에서는 Google 로그인이 지원되지 않아요.
+            <br />
+            <strong>우측 상단 메뉴 → 기본 브라우저로 열기</strong>를 눌러주세요.
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
