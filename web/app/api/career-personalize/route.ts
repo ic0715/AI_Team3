@@ -4,6 +4,10 @@ import {
   PERSONALIZE_SYSTEM,
   buildPersonalizeUserPrompt,
 } from '@/lib/prompts/career-personalize';
+import {
+  validatePersonalizedResponse,
+  mergePersonalizedSlots,
+} from '@/lib/career/personalizeMerge';
 
 export const runtime = 'nodejs';
 
@@ -62,16 +66,10 @@ export async function POST(req: Request) {
     const raw = extractText(message);
     const parsed = parseJSONLoose<Array<{ slot: number; personalizedText: string }>>(raw);
 
-    if (!Array.isArray(parsed) || parsed.length !== 5) {
-      throw new Error(`LLM이 5개 슬롯을 반환하지 않음: ${parsed?.length ?? 0}개`);
-    }
+    validatePersonalizedResponse(parsed);
 
     // matchedSlots에 personalizedText 머지
-    const slots = matchedSlots.map((m) => {
-      const found = parsed.find((p) => p.slot === m.slot);
-      if (!found) throw new Error(`슬롯 ${m.slot} 결과 누락`);
-      return { ...m, personalizedText: found.personalizedText };
-    });
+    const slots = mergePersonalizedSlots(matchedSlots, parsed);
 
     return NextResponse.json({ slots });
   } catch (e) {

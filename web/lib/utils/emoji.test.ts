@@ -75,4 +75,46 @@ describe('stripLeadingEmoji', () => {
       expect(stripLeadingEmoji('인기 🔥')).toBe('인기 🔥');
     });
   });
+
+  describe('정책 경계 — 단일 그림 이모지 1개만 제거 (계약 고정)', () => {
+    it('앞에 그림 이모지가 2개 연달아 있으면 1개만 제거(나머지 1개는 보존)', () => {
+      // 정책: 맨 앞 "그림 이모지 1개 + 공백"만 제거. 두 번째 이모지는 본문 시작으로 간주.
+      expect(stripLeadingEmoji('🔥🔥 인기')).toBe('🔥 인기');
+    });
+
+    it('공백으로 분리된 두 이모지도 첫 이모지+공백만 제거', () => {
+      expect(stripLeadingEmoji('🔥 🔥 인기')).toBe('🔥 인기');
+    });
+
+    it('키캡 숫자 이모지(1️⃣)는 제거하지 않음 — 숫자 시작 보호 정책 연장', () => {
+      // 키캡은 ASCII 숫자 + U+FE0F + U+20E3 조합이라 첫 코드포인트가 Extended_Pictographic이 아님.
+      expect(stripLeadingEmoji('1️⃣ 첫번째')).toBe('1️⃣ 첫번째');
+    });
+
+    it('지역 표시 깃발 이모지(🇰🇷)는 제거하지 않음 — regional indicator는 Extended_Pictographic 아님', () => {
+      expect(stripLeadingEmoji('🇰🇷 한국')).toBe('🇰🇷 한국');
+    });
+
+    it('앞에 공백이 먼저 오면 이모지를 제거하지 않음 (정규식 ^ 앵커)', () => {
+      expect(stripLeadingEmoji('  🔥 인기')).toBe('  🔥 인기');
+    });
+
+    it('이모지만 있는 문자열 → 빈 문자열', () => {
+      expect(stripLeadingEmoji('🧠')).toBe('');
+    });
+  });
+
+  describe('competencies.ts 실제 태그 회귀 (09 카드 렌더 경로)', () => {
+    it('🗺️ 큰 그림 → 큰 그림', () => {
+      expect(stripLeadingEmoji('🗺️ 큰 그림')).toBe('큰 그림');
+    });
+
+    it('⏱️ 시간관리 → 시간관리 (variation selector 포함)', () => {
+      expect(stripLeadingEmoji('⏱️ 시간관리')).toBe('시간관리');
+    });
+
+    it('✅완료 → 완료 (공백 없는 변형)', () => {
+      expect(stripLeadingEmoji('✅완료')).toBe('완료');
+    });
+  });
 });

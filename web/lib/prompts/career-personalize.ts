@@ -3,6 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { careerLevelLabel, formatInsights } from '@/lib/career/personalizePromptParts';
 
 const DOCS_DIR = path.join(process.cwd(), '..', 'docs', 'ai_prompt');
 const SYSTEM_PROMPT_MD = fs.readFileSync(path.join(DOCS_DIR, 'system_prompt.md'), 'utf8');
@@ -34,34 +35,6 @@ JSON 배열로만 응답. 다른 설명·서두·코드블록·마크다운 펜�
 
 각 personalizedText는 2~3문장, 80~140자.`;
 
-interface KeyInsights {
-  current_satisfaction?: string;
-  current_frustration?: string;
-  future_vision?: string;
-  work_style?: string;
-  values?: string[] | string;
-  career_concern?: string;
-  dream?: string;
-}
-
-function formatInsights(raw: unknown): string {
-  if (!raw || typeof raw !== 'object') return '(인터뷰 인사이트 없음)';
-  const ki = raw as KeyInsights;
-  const valuesStr = Array.isArray(ki.values)
-    ? ki.values.join(', ')
-    : (ki.values ?? '');
-  const lines = [
-    ki.current_satisfaction && `- 일에서 에너지: ${ki.current_satisfaction}`,
-    ki.current_frustration && `- 답답한 순간: ${ki.current_frustration}`,
-    ki.future_vision && `- 3~5년 비전: ${ki.future_vision}`,
-    ki.work_style && `- 일하는 방식: ${ki.work_style}`,
-    valuesStr && `- 핵심 가치: ${valuesStr}`,
-    ki.career_concern && `- 커리어 고민: ${ki.career_concern}`,
-    ki.dream && `- 장기 꿈: ${ki.dream}`,
-  ].filter(Boolean);
-  return lines.length > 0 ? lines.join('\n') : '(인터뷰 인사이트 비어있음)';
-}
-
 export function buildPersonalizeUserPrompt(opts: {
   nickname: string;
   jobField: string;
@@ -74,17 +47,10 @@ export function buildPersonalizeUserPrompt(opts: {
 }): string {
   const { nickname, jobField, careerLevel, mainConcern, strengths, interviewInsights, aiSummary, matchedSlots } = opts;
 
-  const careerLevelLabel = ({
-    junior_new: '주니어(신입)',
-    junior: '주니어(2~4년차)',
-    senior_mid: '미드시니어(5~7년차)',
-    senior: '시니어',
-  } as Record<string, string>)[careerLevel] ?? careerLevel;
-
   return `<사용자_프로필>
 닉네임: ${nickname}
 직무/분야: ${jobField || '(미입력)'}
-경력 단계: ${careerLevelLabel}
+경력 단계: ${careerLevelLabel(careerLevel)}
 사전 입력한 커리어 고민: ${mainConcern || '(미입력)'}
 </사용자_프로필>
 
