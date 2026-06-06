@@ -73,7 +73,6 @@ function ProfileContent() {
 
   // 다이얼로그
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<'first' | 'second' | null>(null);
 
@@ -201,6 +200,12 @@ function ProfileContent() {
     router.push('/onboarding/career-intro');
   }, [router]);
 
+  // 역량목표 & 액션아이템만 다시 설정: 인터뷰는 그대로 두고 최신 인터뷰 결과 기반으로
+  // career-result(역량 추천)부터 재진입 → action-items까지 이어진다.
+  const handleResetGoals = useCallback(() => {
+    router.push('/onboarding/career-result');
+  }, [router]);
+
   // ── 로그아웃 ──────────────────────────────────────────────
   const handleLogout = useCallback(async () => {
     try {
@@ -314,7 +319,7 @@ function ProfileContent() {
             <span style={menuIconStyle}>🔄</span>
             <div style={{ flex: 1, textAlign: 'left' }}>
               <div style={menuTitleStyle}>커리어 방향 재설정</div>
-              <div style={menuSubStyle}>언제든 다시 인터뷰할 수 있어요</div>
+              <div style={menuSubStyle}>언제든 다시 설정할 수 있어요</div>
             </div>
             <span style={{ color: 'var(--ink-mute)' }}>›</span>
           </button>
@@ -466,14 +471,10 @@ function ProfileContent() {
 
       {/* 다이얼로그들 */}
       {showResetConfirm && (
-        <ConfirmDialog
-          title="커리어 방향을 다시 설정할까요?"
-          desc="현재 목표가 종료되고, 인터뷰부터 다시 진행해요."
-          confirmText={resetting ? '진행 중...' : '재설정'}
-          cancelText="취소"
-          onConfirm={handleConfirmReset}
+        <ResetChoiceDialog
+          onRedoInterview={handleConfirmReset}
+          onRedoGoals={handleResetGoals}
           onCancel={() => setShowResetConfirm(false)}
-          confirmDisabled={resetting}
         />
       )}
 
@@ -569,6 +570,38 @@ function ConfirmDialog({
             style={danger ? dialogBtnDangerStyle : dialogBtnPrimaryStyle}
           >
             {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 커리어 방향 재설정 선택지 다이얼로그 — 인터뷰 전체 재실행 vs 역량목표·액션아이템만 재설정.
+// 라벨이 길어 가로 배치 대신 세로 스택으로 구성한다.
+function ResetChoiceDialog({
+  onRedoInterview,
+  onRedoGoals,
+  onCancel,
+}: {
+  onRedoInterview: () => void;
+  onRedoGoals: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div role="dialog" aria-modal="true" style={dialogOverlayStyle}>
+      <div style={dialogBoxStyle}>
+        <div style={dialogTitleStyle}>커리어 방향을 다시 설정할까요?</div>
+        <p style={dialogDescStyle}>어디서부터 다시 시작할지 선택하세요.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button type="button" onClick={onRedoInterview} style={dialogBtnStackPrimaryStyle}>
+            인터뷰 다시하기
+          </button>
+          <button type="button" onClick={onRedoGoals} style={dialogBtnStackSecondaryStyle}>
+            역량목표 &amp; 액션아이템 다시 설정하기
+          </button>
+          <button type="button" onClick={onCancel} style={dialogBtnStackCancelStyle}>
+            취소
           </button>
         </div>
       </div>
@@ -934,4 +967,36 @@ const dialogBtnPrimaryStyle: CSSProperties = {
 const dialogBtnDangerStyle: CSSProperties = {
   ...dialogBtnPrimaryStyle,
   background: '#dc2626',
+};
+
+// 세로 스택용 버튼(전체 폭). 가로 배치용 flex:1 대신 width:100%를 쓴다
+// (column flex에서 flex:1은 세로로 늘어나버리므로).
+const dialogBtnStackBaseStyle: CSSProperties = {
+  width: '100%',
+  padding: '13px',
+  borderRadius: '12px',
+  border: 'none',
+  fontFamily: 'inherit',
+  fontWeight: 700,
+  fontSize: '14px',
+  cursor: 'pointer',
+};
+
+const dialogBtnStackPrimaryStyle: CSSProperties = {
+  ...dialogBtnStackBaseStyle,
+  background: 'var(--accent)',
+  color: '#fff',
+};
+
+const dialogBtnStackSecondaryStyle: CSSProperties = {
+  ...dialogBtnStackBaseStyle,
+  background: '#fff',
+  border: '1px solid var(--line-strong)',
+  color: 'var(--ink)',
+};
+
+const dialogBtnStackCancelStyle: CSSProperties = {
+  ...dialogBtnStackBaseStyle,
+  background: 'var(--bg-soft)',
+  color: 'var(--ink-soft)',
 };
