@@ -9,6 +9,11 @@ import type {
   SessionDurationChoice,
 } from '@/lib/types/database';
 import { clipString, clipArray } from '@/lib/utils/clip';
+import {
+  splitFinalizeResponse,
+  coerceSessionDuration,
+  cleanGrowthCompetencies,
+} from '@/lib/career-interview/finalizeParsing';
 
 export const runtime = 'nodejs';
 
@@ -27,15 +32,6 @@ interface FinalizeResponse {
   session_duration_choice: SessionDurationChoice;
   ai_summary: string;
 }
-
-const VALID_COMPETENCY_CODES = [
-  'T-1', 'T-2', 'T-3',
-  'I-1', 'I-2', 'I-3',
-  'R-1', 'R-2', 'R-3',
-  'E-1', 'E-2', 'E-3',
-] as const;
-
-const VALID_DURATION: readonly SessionDurationChoice[] = ['short', 'medium', 'long'] as const;
 
 export async function POST(req: Request) {
   try {
@@ -70,12 +66,14 @@ export async function POST(req: Request) {
       throw new Error('LLM 응답에 text 블록이 비어있음 (thinking만 반환되었을 가능성)');
     }
 
-    const parts = raw.split(/\n---SUMMARY---\n/);
-    if (parts.length !== 2) {
+    let jsonPart: string;
+    let summaryPart: string;
+    try {
+      ({ jsonPart, summaryPart } = splitFinalizeResponse(raw));
+    } catch (splitErr) {
       console.error('[finalize] SUMMARY 구분자 누락. raw:', raw);
-      throw new Error('LLM 응답에 ---SUMMARY--- 구분자가 정확히 1번 등장하지 않음');
+      throw splitErr;
     }
-    const [jsonPart, summaryPart] = parts;
 
     let extraction: Record<string, unknown>;
     try {
@@ -89,9 +87,7 @@ export async function POST(req: Request) {
 
     // session_duration_choice 검증 (enum 위반·누락 시 'medium' 강제)
     const sessionDuration: SessionDurationChoice =
-      (VALID_DURATION as readonly string[]).includes(extraction.session_duration_choice as string)
-        ? (extraction.session_duration_choice as SessionDurationChoice)
-        : 'medium';
+      coerceSessionDuration(extraction.session_duration_choice);
 
     // 신규 4키 (string clip)
     const presenting_issue = clipString(extraction.presenting_issue, 500);
@@ -113,16 +109,7 @@ export async function POST(req: Request) {
 
     // growth_competencies (기르고 싶은 역량, 우선순위 순)
     // enum 위반 제거 + 중복 제거(첫 등장 우선순위 유지) + 최대 5개
-    const rawCompetencies = Array.isArray(extraction.growth_competencies)
-      ? extraction.growth_competencies
-      : [];
-    const seen = new Set<string>();
-    const cleanCompetencies = rawCompetencies
-      .filter((c: unknown): c is string =>
-        typeof c === 'string' && (VALID_COMPETENCY_CODES as readonly string[]).includes(c),
-      )
-      .filter((c) => (seen.has(c) ? false : (seen.add(c), true)))
-      .slice(0, 5);
+    const cleanCompetencies = cleanGrowthCompetencies(extraction.growth_competencies);
 
     const result: FinalizeResponse = {
       extraction: {

@@ -14,7 +14,7 @@
 | 페이즈 | MAINTAIN |
 | 역할 | 사용자 정보 조회·수정 + 강점 수정 + 커리어 방향 재설정 + 비밀번호 변경 + 로그아웃/탈퇴 |
 | 진입 경로 | 탭바 [프로필] / 04 강점 선택 (?from=profile 저장 완료 시 자동 복귀) |
-| 다음 화면 | 04 강점 선택 (`/onboarding/strengths?from=profile`, 강점 수정) / 07 커리어 인터뷰 인트로 (커리어 방향 재설정) / NEW07 비밀번호 변경 (`/profile/password-change`) / 01 랜딩 (로그아웃·탈퇴) |
+| 다음 화면 | 04 강점 선택 (`/onboarding/strengths?from=profile`, 강점 수정) / 07 커리어 인터뷰 인트로 (`/onboarding/career-intro`, 재설정 › 인터뷰 다시하기) / 09 역량 추천 결과 (`/onboarding/career-result`, 재설정 › 역량목표 & 액션아이템 다시 설정) / NEW07 비밀번호 변경 (`/profile/password-change`) / 01 랜딩 (로그아웃·탈퇴) |
 
 > **v1.2: ID 별칭 안내** — `_mvp/14_profile.md`와 동일 화면. _post_mvp_v2 문서는 ID 15로 유지(이력 보존), feature/12 코드 라우트는 `/profile` 사용.
 
@@ -68,9 +68,14 @@ section-card 스타일.
 - 내용:
   - `goals.goal_title` (17px, weight 800, accent 색상)
   - "역량 목표 **{current_week}주차** 진행 중이에요. ✨"
-- 메뉴 아이템: "🔄 커리어 방향 재설정" + "언제든 다시 인터뷰할 수 있어요" → 07 커리어 인터뷰 인트로
+- 메뉴 아이템: "🔄 커리어 방향 재설정" + "언제든 다시 설정할 수 있어요" → 재설정 선택 다이얼로그 (v1.5 3선택지)
 
-> 재설정 진입 시: 확인 다이얼로그 → 기존 `goals.status='abandoned'` UPDATE → 07로 이동.
+> 재설정 진입 시: **재설정 선택 다이얼로그**(`ResetChoiceDialog`, 제목 "커리어 방향을 다시 설정할까요?", 설명 "어디서부터 다시 시작할지 선택하세요.")에서 세로로 쌓인 3개 버튼 중 선택 —
+> ① **인터뷰 다시하기** (primary) → 07 커리어 인터뷰 인트로 (`/onboarding/career-intro`) → 08 → 09 → 10 으로 새 사이클.
+> ② **역량목표 & 액션아이템 다시 설정하기** (secondary) → 09 역량 추천 결과 (`/onboarding/career-result`) 로 직접 진입, **최신 인터뷰 결과(`career_interview_results`)를 재사용**해 역량 목표만 다시 추천 → 10 액션 아이템까지.
+> ③ **취소** → 다이얼로그 닫기.
+>
+> 기존 `goals.status='abandoned'` UPDATE는 본 화면이 아니라 **09 career-result 확정 시점**에 처리(인터뷰 도중 뒤로가기 시 기존 goal 유실 방지). 따라서 프로필 화면은 네비게이션만 수행하고 goals를 직접 쓰지 않음.
 
 ### 3.5 기본 정보 섹션
 
@@ -129,7 +134,7 @@ section-card 스타일 (border 없음, 버튼만).
 | --- | --- |
 | 화면 진입 | `profiles`, `strength_analyses`(is_latest), `goals`(active) 조회 후 렌더링 |
 | 기본 정보 수정 | "수정" 버튼 탭 → 인라인 편집 모드 진입. "저장하기" 탭 → `profiles` UPDATE → 보기 모드 복귀. "취소" → 원래 값 리셋 후 보기 모드 복귀 |
-| 커리어 방향 재설정 | 확인 다이얼로그 → `goals.status='abandoned'` UPDATE → `/onboarding/career-intro` |
+| 커리어 방향 재설정 | 재설정 선택 다이얼로그(3선택지) → ① 인터뷰 다시하기 `/onboarding/career-intro`(07) / ② 역량목표 & 액션아이템 다시 설정하기 `/onboarding/career-result`(09, 최신 인터뷰 재사용) / ③ 취소. 본 화면은 네비게이션만 수행하며 `goals` 직접 쓰기 없음(`status='abandoned'`는 09 확정 시 처리) |
 | 비밀번호 변경 | "🔒 비밀번호 변경" 탭 → NEW07 화면으로 이동 |
 | 로그아웃 | 확인 다이얼로그 → `supabase.auth.signOut()` → `/` (랜딩) |
 | 회원 탈퇴 | 확인 다이얼로그(2단계) → `profiles` 및 관련 데이터 삭제 → `deleteUser()` → `/` |
@@ -152,7 +157,6 @@ section-card 스타일 (border 없음, 버튼만).
 | 테이블/API | 동작 | 시점 |
 | --- | --- | --- |
 | `profiles` | UPDATE (nickname, job_field, career_level) | 기본 정보 "저장하기" 탭 |
-| `goals` | `status='abandoned'` UPDATE | 커리어 방향 재설정 확인 |
 | `supabase.auth.signOut()` | 세션 종료 | 로그아웃 |
 | 관련 테이블 전체 | DELETE | 회원 탈퇴 |
 | `supabase.auth.deleteUser()` | 계정 삭제 | 회원 탈퇴 |
@@ -190,3 +194,4 @@ section-card 스타일 (border 없음, 버튼만).
 | v1.2 | 2026-05-21 | **[feature/12 구현 반영]** **1.** 화면 ID에 별칭 `14_profile` 표기 (라우트 `/profile`). _mvp/14_profile.md와 동일 화면이고 _post_mvp_v2 문서는 ID 15로 이력 보존. **3.7** 회원 탈퇴 — MVP는 `signOut`만 수행, 실제 데이터 삭제는 서버 admin API 권한 필요로 미구현 (TODO 마커). Post-MVP로 분류. |
 | v1.3 | 2026-05-23 | **[강점 수정 기능 추가]** **1.** 역할에 "강점 수정" 추가. 진입 경로에 "04 강점 선택 ?from=profile 저장 완료 시 자동 복귀" 추가, 다음 화면에 "04 강점 선택 (`/onboarding/strengths?from=profile`)" 추가. **3.3** 내 강점 Top 5 섹션 — chip 영역 아래에 "✏️ 강점 수정" 메뉴 아이템 신규 추가. 클릭 시 `/onboarding/strengths?from=profile`로 이동. 04 페이지는 `from=profile` 파라미터를 감지해 저장 완료 시 `/profile`로 자동 복귀하고, 페이지 타이틀 + CTA 버튼 라벨을 컨텍스트에 맞게 변경. |
 | v1.4 | 2026-05-24 | **[히어로 카드 아바타 제거]** **3.2** 프로필 히어로 카드에서 76×76px 이니셜 아바타 영역 제거. 사진 업로드 기능을 도입하지 않기로 결정 → 빈 자리만 차지하는 이니셜 표시를 제거하고 이름·이메일·배지 행으로만 구성. |
+| v1.5 | 2026-06-06 | **[커리어 방향 재설정 — 단일 → 3선택지 다이얼로그 + abandon 시점 정정]** 기존엔 재설정 클릭 시 확인 다이얼로그 하나로 곧장 07 인터뷰 인트로로 이동했으나, **3개 선택지 다이얼로그(`ResetChoiceDialog`)**로 확장. ① **인터뷰 다시하기** → 07 `/onboarding/career-intro`, ② **역량목표 & 액션아이템 다시 설정하기** → 09 `/onboarding/career-result`(최신 인터뷰 결과 재사용해 역량 목표만 다시 추천), ③ **취소**. **§1 다음 화면**에 09 추가, **§3.4** 메뉴 서브타이틀 "언제든 다시 인터뷰할 수 있어요" → "언제든 다시 설정할 수 있어요", 재설정 진입 설명을 3선택지로 개정. **§4 기능 표 / §5.2 쓰기 표 정정** — 프로필 화면은 더 이상 `goals`를 직접 쓰지 않음. 기존 사이클 중단(`goals.status='abandoned'`) UPDATE는 **09 career-result 확정 시점**에 처리됨(인터뷰 도중 뒤로가기 시 기존 goal 유실 방지)을 반영해 5.2 쓰기 표에서 `goals` 행 제거. UI 정리: 미사용 `resetting` state 제거, 다이얼로그 버튼 세로 스택 스타일 추가. |

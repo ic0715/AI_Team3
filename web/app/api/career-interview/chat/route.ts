@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { anthropic, MODEL, extractText } from '@/lib/anthropic';
 import { buildSystemPrompt } from '@/lib/prompts/career-interview';
+import {
+  countUserMessages,
+  detectEnding,
+  shouldForceClose,
+  shouldWarnStillOpen,
+} from '@/lib/career-interview/chatTurn';
 
 export const runtime = 'nodejs';
 
@@ -27,28 +33,17 @@ interface ChatResponse {
 // 스스로 따뜻하게 마무리(§9 키워드)하도록 '강하게 유도'한다(끊는 게 아니라 유도).
 // 프롬프트 흐름: 30~35 방향 점검 → 55~62 소프트 넛지 → 63+ 자연 종료 유도.
 // 모든 단계는 turn_count가 아니라 🟢 일단락 신호가 보일 때만 발동(§12~14 공통).
-const FORCE_CLOSE_FROM = 63;
-
-// LLM의 종료 신호 키워드 — CONTRACT_v2.md §4.1 COACH_CLOSING_KEYWORDS와 정확히 동일
-const ENDING_KEYWORDS = [
-  '오늘 인터뷰는 여기서',
-  '오늘은 여기까지',
-  '여기서 마무리할게요',
-];
-
-function detectEnding(text: string): boolean {
-  return ENDING_KEYWORDS.some((k) => text.includes(k));
-}
+// 턴/종료 판정 순수 로직은 @/lib/career-interview/chatTurn 으로 추출됨.
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequestBody;
     const { messages, context } = body;
 
-    const userMsgCount = messages.filter((m) => m.role === 'user').length;
+    const userMsgCount = countUserMessages(messages);
 
     // 상한 직전(63턴~)부터 코치가 §14에 따라 스스로 따뜻하게 닫도록 강제 종료 지시 주입.
-    const forceClose = userMsgCount >= FORCE_CLOSE_FROM;
+    const forceClose = shouldForceClose(userMsgCount);
 
     const system = buildSystemPrompt({
       nickname: context.nickname,
@@ -98,7 +93,7 @@ export async function POST(req: Request) {
     // 63턴~ forceClose 지시로 코치가 스스로 키워드를 내며 닫는 게 기대 동작.
     const isComplete = detectEnding(text);
     // 관측용: 매우 길어졌는데도 코치가 아직 안 닫은 경우 로그만 남김(완료 강제 아님).
-    if (!isComplete && userMsgCount >= FORCE_CLOSE_FROM + 7) {
+    if (shouldWarnStillOpen(userMsgCount, isComplete)) {
       console.warn(
         `[career-interview/chat] ${userMsgCount} user turns and still open — coach has not emitted a closing keyword despite forceClose`,
       );

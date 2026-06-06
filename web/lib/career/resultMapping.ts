@@ -53,3 +53,28 @@ export function extractGrowthCompetencies(keyInsights: unknown): string[] {
 export function hasStoredSlots<T>(value: T[] | null | undefined): value is T[] {
   return Array.isArray(value) && value.length > 0;
 }
+
+/**
+ * 저장된 슬롯 1개가 CompetencyCard 렌더에 필요한 최소 필드를 갖췄는지 검증.
+ *
+ * CompetencyCard가 읽는 필드: slot(number), goalTitle, personalizedText, fitLabel(문자열),
+ * badge(문자열), tags(string[]). 하나라도 빠지거나 타입이 어긋나면 카드가 깨진다.
+ *
+ * ⚠️ 현재 page.tsx는 recommended_competencies(JSONB)를 타입 단언만으로 복원한다
+ * (hasStoredSlots = 비어있지 않은 배열인지만 확인). 구버전·손상 데이터가 들어오면
+ * 런타임에서야 깨진다. 이 술어는 그 빈틈을 메우는 "렌더 가능 여부" 계약을 명시한다.
+ * (회귀 위험 때문에 page.tsx 배선은 보류 — 사람 검토 후 도입 권장.)
+ */
+export function isRenderableSlot(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const s = value as Record<string, unknown>;
+  return (
+    typeof s.slot === 'number' &&
+    typeof s.goalTitle === 'string' &&
+    typeof s.personalizedText === 'string' &&
+    typeof s.fitLabel === 'string' &&
+    typeof s.badge === 'string' &&
+    Array.isArray(s.tags) &&
+    s.tags.every((t) => typeof t === 'string')
+  );
+}

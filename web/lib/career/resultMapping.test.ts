@@ -4,6 +4,7 @@ import {
   domainToCode,
   extractGrowthCompetencies,
   hasStoredSlots,
+  isRenderableSlot,
 } from './resultMapping';
 
 describe('domainToCode', () => {
@@ -126,5 +127,64 @@ describe('hasStoredSlots', () => {
     } else {
       throw new Error('should be truthy');
     }
+  });
+});
+
+describe('isRenderableSlot', () => {
+  // CompetencyCard 렌더에 필요한 최소 필드를 모두 갖춘 슬롯
+  const valid = {
+    slot: 1,
+    goalTitle: '비판적 사고 기르기',
+    personalizedText: '당신의 분석 강점을 살려...',
+    fitLabel: '추천',
+    badge: 'user_interest',
+    tags: ['🔍 논리적 사고', '📌 근거 기반 판단'],
+  };
+
+  it('필수 필드를 모두 갖추면 true', () => {
+    expect(isRenderableSlot(valid)).toBe(true);
+  });
+
+  it('tags가 빈 배열이어도 (string[]이면) true', () => {
+    expect(isRenderableSlot({ ...valid, tags: [] })).toBe(true);
+  });
+
+  describe('방어적 처리 → false', () => {
+    it('null / undefined / 원시값', () => {
+      expect(isRenderableSlot(null)).toBe(false);
+      expect(isRenderableSlot(undefined)).toBe(false);
+      expect(isRenderableSlot('slot')).toBe(false);
+      expect(isRenderableSlot(1)).toBe(false);
+    });
+
+    it('slot이 number가 아니면 false (문자열 "1")', () => {
+      expect(isRenderableSlot({ ...valid, slot: '1' })).toBe(false);
+    });
+
+    it('goalTitle 누락 → false', () => {
+      const { goalTitle: _omit, ...rest } = valid;
+      expect(isRenderableSlot(rest)).toBe(false);
+    });
+
+    it('personalizedText 누락 → false (Step2 머지 실패한 구데이터 방어)', () => {
+      const { personalizedText: _omit, ...rest } = valid;
+      expect(isRenderableSlot(rest)).toBe(false);
+    });
+
+    it('badge / fitLabel 누락 → false', () => {
+      const { badge: _b, ...noBadge } = valid;
+      expect(isRenderableSlot(noBadge)).toBe(false);
+      const { fitLabel: _f, ...noFit } = valid;
+      expect(isRenderableSlot(noFit)).toBe(false);
+    });
+
+    it('tags가 배열이 아니면 false', () => {
+      expect(isRenderableSlot({ ...valid, tags: '논리적 사고' })).toBe(false);
+      expect(isRenderableSlot({ ...valid, tags: null })).toBe(false);
+    });
+
+    it('tags에 string 아닌 원소가 섞이면 false', () => {
+      expect(isRenderableSlot({ ...valid, tags: ['ok', 123] })).toBe(false);
+    });
   });
 });

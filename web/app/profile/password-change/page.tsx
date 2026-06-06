@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import {
+  evaluateStrength,
+  STRENGTH_COLOR,
+  STRENGTH_LABEL,
+} from '@/lib/profile/passwordStrength';
 
 // ────────────────────────────────────────────────────────────
 // NEW07 비밀번호 변경 (스펙 v1.3)
@@ -14,31 +19,9 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 // 진입 차단: OAuth 전용 사용자 (app_metadata.providers에 'email' 미포함)
 //   → "Google 계정 비밀번호는 Google에서 관리해주세요" 안내 후 14 복귀
 // 변경 완료 시: 11 홈으로
+//
+// 강도 평가(evaluateStrength)/라벨/색상은 @/lib/profile/passwordStrength로 분리.
 // ────────────────────────────────────────────────────────────
-
-type StrengthLevel = 'weak' | 'medium' | 'strong';
-
-function evaluateStrength(pwd: string): StrengthLevel {
-  if (pwd.length < 8) return 'weak';
-  const hasLetter = /[a-zA-Z]/.test(pwd);
-  const hasNumber = /\d/.test(pwd);
-  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd);
-  if (pwd.length >= 12 && hasLetter && hasNumber && hasSpecial) return 'strong';
-  if (hasLetter && hasNumber) return 'medium';
-  return 'weak';
-}
-
-const STRENGTH_LABEL: Record<StrengthLevel, string> = {
-  weak: '약함',
-  medium: '보통',
-  strong: '강함',
-};
-
-const STRENGTH_COLOR: Record<StrengthLevel, string> = {
-  weak: '#dc2626',
-  medium: '#F59E0B',
-  strong: '#10B981',
-};
 
 // ────────────────────────────────────────────────────────────
 
