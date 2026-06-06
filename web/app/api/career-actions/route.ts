@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { anthropic, MODEL, extractText, parseJSONLoose } from '@/lib/anthropic';
 import { resolveStrengthBlocks } from '@/lib/actionItems/strengthGuide';
+import { clamp } from '@/lib/actionItems/clamp';
+import { sanitizeCandidates, type GenCandidate } from '@/lib/actionItems/sanitizeCandidates';
+import { passedIndexSet, type Verdict } from '@/lib/actionItems/passedVerdicts';
 import { ACTION_DISPLAY_COUNT } from '@/lib/constants/seeds';
 import {
   ACTIONS_SYSTEM,
@@ -23,22 +26,6 @@ interface ActionsRequestBody {
   selectedGoal: { goal_title: string; competency_code: string };
 }
 
-// 생성 후보(LLM 출력)
-interface GenCandidate {
-  title: string;
-  description: string;
-  tags: string[];
-  strength_link: string;
-  competency_fit?: string;
-}
-
-// 게이트 판정(LLM 출력)
-interface Verdict {
-  index: number;
-  pass: boolean;
-  fail?: string[];
-}
-
 // 클라이언트로 내보내는 액션 (생성·게이트 통과분). 풀 보충은 페이지가 한다.
 interface GeneratedAction {
   title: string;
@@ -47,11 +34,6 @@ interface GeneratedAction {
   strength_link: string | null;
   source_seed_id: null; // 생성분은 시드 인용이 아니므로 null
 }
-
-const clamp = (s: unknown, max: number): string => {
-  const str = typeof s === 'string' ? s : '';
-  return str.length > max ? str.slice(0, max).trimEnd() : str;
-};
 
 /**
  * C(생성) + 검증 게이트.
@@ -95,16 +77,7 @@ export async function POST(req: Request) {
     const candidatesRaw = parseJSONLoose<GenCandidate[]>(extractText(genMsg));
 
     // 생성 위생: 배열·필수필드·강점연계(Top5 내)만 통과. (강점 연계는 제품 핵심 — 여기서 1차 강제)
-    const candidates = (Array.isArray(candidatesRaw) ? candidatesRaw : [])
-      .filter(
-        (c): c is GenCandidate =>
-          !!c &&
-          typeof c.title === 'string' &&
-          c.title.trim().length > 0 &&
-          typeof c.strength_link === 'string' &&
-          strengthSet.has(c.strength_link),
-      )
-      .slice(0, GENERATE_CANDIDATE_COUNT);
+    const candidates = sanitizeCandidates(candidatesRaw, strengthSet, GENERATE_CANDIDATE_COUNT);
 
     if (candidates.length === 0) {
       // 생성이 비었음 → 페이지가 풀 폴백하도록 빈 배열 반환(에러 아님).
@@ -137,9 +110,7 @@ export async function POST(req: Request) {
     if (!Array.isArray(verdicts)) {
       throw new Error('게이트 응답이 배열이 아님');
     }
-    const passed = new Set(
-      verdicts.filter((v) => v && v.pass === true && Number.isInteger(v.index)).map((v) => v.index),
-    );
+    const passed = passedIndexSet(verdicts);
 
     // ── ③ 통과분 조립 (최대 ACTION_DISPLAY_COUNT) ────────────
     const actions: GeneratedAction[] = [];

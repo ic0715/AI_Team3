@@ -14,6 +14,7 @@ import {
 } from '@/lib/actionItems/customAction';
 import { competencyCodeToSlug } from '@/lib/actionItems/seedMapping';
 import { selectDisplaySeeds } from '@/lib/actionItems/selectSeeds';
+import { mapApiActions, mergeWithPool, type DisplayAction } from '@/lib/actionItems/mergeActions';
 import { localISODate } from '@/lib/utils/localDate';
 
 // 커스텀 액션 선택 상태를 표현하는 sentinel id (시드 id와 구분)
@@ -22,16 +23,6 @@ const CUSTOM_SELECTED_ID = '__custom__';
 // 시드 풀 타입. sourceSeedId = 시드의 안정 id(seeds.ts ActionItem.id). 풀 폴백·보충에 쓰인다.
 interface DisplaySeed extends ActionItem {
   sourceSeedId: string;
-}
-
-// 화면에 렌더되는 액션. 생성분(source_seed_id=null)과 풀 폴백분(시드 id)을 하나로 통합한다.
-interface DisplayAction {
-  id: string;                  // React key + 선택 매칭. 생성분 'gen-{i}', 폴백분은 시드 id
-  title: string;
-  description: string;
-  tags: string[];
-  sourceSeedId: string | null; // 생성분 null, 폴백분 시드 id
-  strengthLink: string | null; // 이 액션이 발휘하는 강점(생성분). 폴백분 null → 저장 시 Top1로 대체
 }
 
 // 풀 시드 → 화면 액션 (폴백/보충용). 강점 연계는 생성분에만 있으므로 null.
@@ -233,20 +224,9 @@ function ActionItemsContent() {
           }>;
         };
         if (cancelled) return;
-        const generated: DisplayAction[] = (data.actions ?? []).map((a, i) => ({
-          id: `gen-${i}`,
-          title: a.title,
-          description: a.description,
-          tags: Array.isArray(a.tags) ? a.tags : [],
-          sourceSeedId: a.source_seed_id ?? null,
-          strengthLink: a.strength_link ?? null,
-        }));
+        const generated: DisplayAction[] = mapApiActions(data.actions);
         // 생성 통과분 우선 노출 + 부족분은 검증된 풀로 보충. 전멸 시 풀 전체.
-        const result =
-          generated.length >= ACTION_DISPLAY_COUNT
-            ? generated.slice(0, ACTION_DISPLAY_COUNT)
-            : [...generated, ...poolFill(ACTION_DISPLAY_COUNT - generated.length)];
-        setAiActions(result.length > 0 ? result : poolFill(ACTION_DISPLAY_COUNT));
+        setAiActions(mergeWithPool(generated, ACTION_DISPLAY_COUNT, poolFill));
       } catch (e) {
         console.error('[10 generate] failed, falling back to vetted pool:', e);
         // 폴백: 검증된 풀에서 선택 (사용자에게는 생성 실패가 안 보임)
