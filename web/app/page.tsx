@@ -135,8 +135,8 @@ export default function LandingPage() {
           </p>
           <p style={subStyle}>
             마치 PT를 받는 것처럼,<br />
-            아는 것을 진짜로 해내는{' '}
-            <strong style={{ ...subBStyle, color: 'var(--accent)' }}>‘실천 근육’</strong>을 12주간 길러나가요.
+            12주간 코치와 함께{' '}
+            <strong style={{ ...subBStyle, color: 'var(--accent)' }}>‘실천 근육’</strong>을 길러요.
           </p>
         </section>
 
@@ -364,6 +364,8 @@ const subStyle: CSSProperties = {
   color: 'var(--text-secondary)',
   fontSize: '15.5px',
   lineHeight: 1.6,
+  // 한국어 어절 단위 줄바꿈: 좁은 화면에서 마지막 "요" 한 글자만 다음 줄로 떨어지는 고아(orphan) 방지.
+  wordBreak: 'keep-all',
 };
 
 const subBStyle: CSSProperties = {
@@ -415,6 +417,8 @@ const trustTxStyle: CSSProperties = {
   lineHeight: 1.45,
   flex: 1,
   minWidth: 0,
+  // 한국어 어절 단위 줄바꿈: "…함께 만들었어요"에서 "요"만 다음 줄로 떨어지는 고아(orphan) 방지.
+  wordBreak: 'keep-all',
 };
 
 const flowStyle: CSSProperties = {
