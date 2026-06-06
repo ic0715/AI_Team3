@@ -891,7 +891,7 @@ function GoogleButton({ label = 'Google로 계속하기', disableInApp = false }
           textAlign: 'center',
         }}>
           앱 내 브라우저에서는 Google 로그인이 지원되지 않아요.<br />
-          기본 브라우저로 열기를 눌러주세요.
+          Google 로그인은 기본 브라우저에서 시도해주세요.
         </div>
       )}
     </div>
