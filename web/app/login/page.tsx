@@ -596,7 +596,7 @@ export default function LoginPage() {
 
             <Divider />
 
-            <GoogleButton />
+            <GoogleButton disableInApp />
 
             {/* 회원가입 링크 */}
             <div style={{ textAlign: 'center', marginTop: '20px' }}>
@@ -889,18 +889,16 @@ function GoogleButton({ label = 'Google로 계속하기', disableInApp = false }
           background: '#FFF7ED',
           border: '1.5px solid #FED7AA',
           borderRadius: 'var(--radius-md)',
-          fontSize: '13px',
+          fontSize: '11.5px',
           color: '#92400E',
-          lineHeight: 1.55,
+          lineHeight: 1.5,
           display: 'flex',
-          gap: '8px',
-          alignItems: 'flex-start',
+          gap: '6px',
+          alignItems: 'center',
         }}>
-          <span style={{ flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+          <span style={{ flexShrink: 0 }}>⚠️</span>
           <span>
-            카카오톡 등 앱 내 브라우저에서는 Google 로그인이 지원되지 않아요.
-            <br />
-            <strong>우측 상단 메뉴 → 기본 브라우저로 열기</strong>를 눌러주세요.
+            앱 내 브라우저에서는 Google 로그인이 지원되지 않아요. <strong>기본 브라우저로 열기</strong>를 눌러주세요.
           </span>
         </div>
       )}
