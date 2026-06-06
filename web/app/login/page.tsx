@@ -885,21 +885,13 @@ function GoogleButton({ label = 'Google로 계속하기', disableInApp = false }
       {/* 인앱브라우저 안내 */}
       {isInApp && (
         <div style={{
-          padding: '10px 14px',
-          background: '#FFF7ED',
-          border: '1.5px solid #FED7AA',
-          borderRadius: 'var(--radius-md)',
           fontSize: '11.5px',
-          color: '#92400E',
-          lineHeight: 1.5,
-          display: 'flex',
-          gap: '6px',
-          alignItems: 'center',
+          color: 'var(--text-muted)',
+          lineHeight: 1.6,
+          textAlign: 'center',
         }}>
-          <span style={{ flexShrink: 0 }}>⚠️</span>
-          <span>
-            앱 내 브라우저에서는 Google 로그인이 지원되지 않아요. <strong>기본 브라우저로 열기</strong>를 눌러주세요.
-          </span>
+          앱 내 브라우저에서는 Google 로그인이 지원되지 않아요.<br />
+          기본 브라우저로 열기를 눌러주세요.
         </div>
       )}
     </div>
