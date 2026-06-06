@@ -3,6 +3,12 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import {
+  buildFeedbackPayload,
+  canSubmitFeedback,
+  feedbackRatingError,
+  ratingLabel,
+} from '@/lib/profile/feedback';
 
 // ────────────────────────────────────────────────────────────
 // FeedbackSheet — 피드백 바텀시트
@@ -45,20 +51,17 @@ export function FeedbackSheet({ open, onClose, source, onSubmitted }: FeedbackSh
   };
 
   const handleSubmit = async () => {
-    if (rating === 0) { setError('별점을 선택해주세요'); return; }
+    const ratingErr = feedbackRatingError(rating);
+    if (ratingErr) { setError(ratingErr); return; }
     setError('');
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError('로그인이 필요해요'); return; }
 
-      const { error: insertError } = await supabase.from('feedbacks').insert({
-        user_id: user.id,
-        rating,
-        liked: liked.trim() || null,
-        improved: improved.trim() || null,
-        source,
-      });
+      const { error: insertError } = await supabase.from('feedbacks').insert(
+        buildFeedbackPayload(user.id, rating, liked, improved, source),
+      );
       if (insertError) throw insertError;
 
       setDone(true);
@@ -137,7 +140,7 @@ export function FeedbackSheet({ open, onClose, source, onSubmitted }: FeedbackSh
                 </div>
                 {rating > 0 && (
                   <div style={ratingLabelStyle}>
-                    {['', '아쉬워요', '조금 아쉬워요', '보통이에요', '좋아요', '최고예요!'][rating]}
+                    {ratingLabel(rating)}
                   </div>
                 )}
               </div>
@@ -172,11 +175,11 @@ export function FeedbackSheet({ open, onClose, source, onSubmitted }: FeedbackSh
 
               <button
                 onClick={handleSubmit}
-                disabled={submitting || rating === 0}
+                disabled={!canSubmitFeedback(rating, submitting)}
                 style={{
                   ...primaryBtnStyle,
-                  opacity: submitting || rating === 0 ? 0.45 : 1,
-                  cursor: submitting || rating === 0 ? 'not-allowed' : 'pointer',
+                  opacity: !canSubmitFeedback(rating, submitting) ? 0.45 : 1,
+                  cursor: !canSubmitFeedback(rating, submitting) ? 'not-allowed' : 'pointer',
                 }}
               >
                 {submitting ? '전송 중...' : '의견 보내기'}

@@ -9,6 +9,10 @@ import { TabBar } from '@/components/ui/TabBar';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { calculateCurrentWeek } from '@/lib/utils/week';
 import {
+  RESET_REDO_GOALS_PATH,
+  RESET_REDO_INTERVIEW_PATH,
+} from '@/lib/profile/careerReset';
+import {
   buildProfileUpdate,
   canSaveProfile,
   careerLabel,
@@ -197,13 +201,13 @@ function ProfileContent() {
   // 여기서 미리 abandoned 처리하면 인터뷰 도중 뒤로 가기 시 goal이 사라져
   // 홈이 broken state가 됩니다.
   const handleConfirmReset = useCallback(() => {
-    router.push('/onboarding/career-intro');
+    router.push(RESET_REDO_INTERVIEW_PATH);
   }, [router]);
 
   // 역량목표 & 액션아이템만 다시 설정: 인터뷰는 그대로 두고 최신 인터뷰 결과 기반으로
   // career-result(역량 추천)부터 재진입 → action-items까지 이어진다.
   const handleResetGoals = useCallback(() => {
-    router.push('/onboarding/career-result');
+    router.push(RESET_REDO_GOALS_PATH);
   }, [router]);
 
   // ── 로그아웃 ──────────────────────────────────────────────
