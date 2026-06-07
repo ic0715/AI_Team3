@@ -22,7 +22,7 @@ DISCOVER → DIRECTION → DO
 강점 인터뷰 (#1)
 → 커리어 인터뷰 (#2)
 → 역량 방향 도출 (#3, 결정적 매칭 + AI 카드 개인화)
-→ 액션아이템 생성 (#4, 시드 기반 AI 재해석)
+→ 액션아이템 생성 (#4, 인터뷰·강점 기반 생성 + 검증 게이트, 부족분은 시드 재작성)
 → 매주 메모·완료·회고 (#5 컨텍스트 주입)
 → 회고 AI 코칭 (#6, 브라우저 메모리)
 → 인사이트 요약 + 다음 주 액션 (#7)
@@ -64,7 +64,10 @@ AI가 해서는 안 되는 것:
 - 새로운 competency_code 자유 생성 (12개 고정값만 사용: T-1~T-3, I-1~I-3, R-1~R-3, E-1~E-3)
 - goal_title LLM 자유 생성 (앱 상수 한글명 그대로 INSERT)
 - 역량 매칭 점수 계산 (Step 1은 코드 로직, AI 없음)
-- 시드 없이 액션아이템 자유 생성 (반드시 source_seed_id 추적)
+- 검증 게이트를 통과하지 않은 액션아이템 노출
+  (#4 액션은 인터뷰·강점에서 직접 생성하되 — 시드 인용 강제 아님 —
+   역량적합·강점연계·ICF·정서안전·형식 게이트를 통과해야 노출. 생성분은 source_seed_id=null,
+   부족분은 검증된 시드를 재작성해 보충하고 source_seed_id로 추적. 최종 폴백은 검증된 시드 풀)
 - session_duration_choice 자유 생성 (enum 고정값만 사용: 'short' | 'medium' | 'long')
 
 AI 없이도 핵심 흐름이 동작해야 합니다. AI는 개인화 품질을 높이는 보조 수단입니다.
@@ -196,10 +199,14 @@ import { COMPETENCIES } from '@/lib/constants/competencies'
 // 허용값: T-1~T-3, I-1~I-3, R-1~R-3, E-1~E-3
 ```
 
-### 4. source_seed_id 없는 action_items 생성
+### 4. 검증 게이트를 우회한 액션아이템 노출
 ```
-// ❌ action_items INSERT without source_seed_id
-// ✅ 모든 AI 생성 액션은 어느 시드에서 파생됐는지 추적
+// ❌ 생성·재작성 액션을 게이트 통과 없이 사용자에게 노출
+// ✅ 모든 노출 액션은 검증 게이트(역량적합·강점연계·ICF·정서안전·형식)를 통과한다.
+//    - 생성분: source_seed_id=null (시드 인용 강제 아님), 단 강점연계·게이트는 필수
+//    - 재작성 폴백분: source_seed_id=원본 시드 id (추적성)
+//    - 콜/파싱 실패 시 검증된 시드 풀로 폴백 (fail-closed)
+// 과거 "시드 인용 강제(source_seed_id 필수)" 모델에서 전환됨 — spec-handoff-ai.md #4 콜아웃 참조
 ```
 
 ### 5. Type widening for convenience

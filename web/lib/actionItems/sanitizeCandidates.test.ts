@@ -107,11 +107,30 @@ describe('sanitizeCandidates', () => {
     });
   });
 
-  describe('원본 객체 보존(참조 동일)', () => {
-    it('통과한 후보는 그대로(map하지 않음)', () => {
+  describe('원본 객체 보존(참조 동일) — 정확일치 한정', () => {
+    it('정확일치로 통과한 후보는 그대로(참조 동일)', () => {
       const c = cand('A', '분석');
       const out = sanitizeCandidates([c], TOP5, LIMIT);
       expect(out[0]).toBe(c);
+    });
+  });
+
+  describe('strength_link 정규화 + 정식명 치환', () => {
+    it('변형("분석적 사고")은 통과하되 정식명("분석")으로 치환된 새 객체', () => {
+      const c = cand('A', '분석적 사고');
+      const out = sanitizeCandidates([c], TOP5, LIMIT);
+      expect(out).toHaveLength(1);
+      expect(out[0].strength_link).toBe('분석'); // 치환됨
+      expect(out[0]).not.toBe(c); // 새 객체(참조 다름)
+      expect(out[0].title).toBe('A'); // 다른 필드 보존
+    });
+    it('영문명("Empathy")도 한글 정식명("공감")으로 치환', () => {
+      const out = sanitizeCandidates([cand('A', 'Empathy')], TOP5, LIMIT);
+      expect(out[0].strength_link).toBe('공감');
+    });
+    it('정규화 실패(Top5 무관)는 여전히 탈락', () => {
+      const out = sanitizeCandidates([cand('A', '리더십'), cand('B', '전략')], TOP5, LIMIT);
+      expect(out.map((c) => c.strength_link)).toEqual(['전략']);
     });
   });
 });

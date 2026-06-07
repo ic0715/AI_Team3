@@ -6,13 +6,16 @@
  *  - 배열이어야 함(아니면 빈 배열로 시작),
  *  - falsy 항목 제외(`!!c`),
  *  - title이 string이고 trim 후 비어있지 않을 것,
- *  - strength_link가 string이고 사용자 Top5 강점 집합(strengthSet) 안에 있을 것
- *    (강점 연계는 제품 핵심 — 여기서 1차 강제),
+ *  - strength_link가 사용자 Top5 강점으로 **정규화**될 것
+ *    (정확일치/공백/영문명/부분포함 — normalizeStrengthLink. 강점 연계는 제품 핵심 — 여기서 1차 강제),
  *  - 최대 limit(GENERATE_CANDIDATE_COUNT)개로 slice.
  *
- * 기존 route.ts의 인라인 filter+slice를 byte-for-byte 보존해 분리한 것.
- * (게이트 호출 전 단계이므로 여기 통과가 곧 노출은 아니다 — 게이트가 최종 판정.)
+ * 정규화로 통과한 후보는 strength_link를 **정식 한글명으로 치환**해 반환한다
+ * (후속 게이트·조립 단계의 strengthSet.has()가 그대로 통과하도록). 정확일치였던 후보는
+ * 치환이 불필요하므로 원본 객체를 그대로 보존한다(참조 동일).
  */
+
+import { normalizeStrengthLink } from './strengthLink';
 
 // 생성 후보(LLM 출력)
 export interface GenCandidate {
@@ -34,14 +37,16 @@ export function sanitizeCandidates(
   strengthSet: Set<string>,
   limit: number,
 ): GenCandidate[] {
-  return (Array.isArray(candidatesRaw) ? candidatesRaw : [])
-    .filter(
-      (c): c is GenCandidate =>
-        !!c &&
-        typeof c.title === 'string' &&
-        c.title.trim().length > 0 &&
-        typeof c.strength_link === 'string' &&
-        strengthSet.has(c.strength_link),
-    )
-    .slice(0, limit);
+  const out: GenCandidate[] = [];
+  for (const c of Array.isArray(candidatesRaw) ? candidatesRaw : []) {
+    if (out.length >= limit) break;
+    if (!c || typeof (c as GenCandidate).title !== 'string') continue;
+    const title = (c as GenCandidate).title;
+    if (title.trim().length === 0) continue;
+    const canonical = normalizeStrengthLink((c as GenCandidate).strength_link, strengthSet);
+    if (!canonical) continue;
+    // 정확일치였으면 원본 보존(참조 동일), 변형이었으면 정식명으로 치환한 새 객체.
+    out.push(canonical === (c as GenCandidate).strength_link ? c : { ...c, strength_link: canonical });
+  }
+  return out;
 }
