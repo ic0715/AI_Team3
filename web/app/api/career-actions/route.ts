@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     // ── ① 생성 ──────────────────────────────────────────────
     const genMsg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 3200,                                       // 한글 후보 8개(=COUNT)가 잘리지 않도록 상향. 상한일 뿐 실제 출력분만 과금.
       system: [{ type: 'text', text: ACTIONS_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: buildGenerateUserPrompt(genContext) }],
     });
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     // ── ② 검증 게이트 (같은 system → 프롬프트 캐시 히트) ──────
     const valMsg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 1280,                                       // 후보 8개(=COUNT) verdict 배열 여유. verdict는 짧아 영향 작음.
       system: [{ type: 'text', text: ACTIONS_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [
         {

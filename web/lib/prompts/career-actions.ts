@@ -21,7 +21,9 @@ const ACTIONS_SYSTEM_MD = fs.readFileSync(
 );
 
 // 후보 과생성 개수 — 게이트 탈락 여유분 확보(노출은 ACTION_DISPLAY_COUNT개).
-export const GENERATE_CANDIDATE_COUNT = ACTION_DISPLAY_COUNT + 2;
+// +3: 게이트가 엄격해 탈락이 잦으므로 통과분이 ACTION_DISPLAY_COUNT를 채울 여유를 넉넉히 둔다.
+// (그 이상 키우면 생성 출력·게이트 입력이 함께 커져 지연·비용이 악화되므로 +3에서 멈춘다.)
+export const GENERATE_CANDIDATE_COUNT = ACTION_DISPLAY_COUNT + 3;
 
 export const ACTIONS_SYSTEM = ACTIONS_SYSTEM_MD;
 
