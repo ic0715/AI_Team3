@@ -95,6 +95,42 @@ JSON 배열로만 응답(${count}개). 마크다운 펜스 금지. 형식:
 ]`;
 }
 
+// ── ①-b 재작성 폴백 프롬프트 ────────────────────────────────
+// 생성+게이트 통과분이 ACTION_DISPLAY_COUNT에 못 미칠 때, 부족분을 "날 시드"로 채우는 대신
+// 검증된 시드를 출발점으로 인터뷰·강점 톤에 맞게 다시 쓴다(재해석).
+//   → 모든 카드의 품질·형식·강점연계가 균질해지고, source_seed_id 추적성도 복원된다(시드에서 파생).
+// seed_index로 원본 시드를 가리켜 라우트가 source_seed_id를 안전하게 부여한다(순서 신뢰 안 함).
+export function buildRewriteUserPrompt(
+  o: GenContext & { seeds: ActionSeedInput[] },
+): string {
+  const seedList = o.seeds
+    .map((s, i) => `#${i} title: ${s.title}\n   description: ${s.description}`)
+    .join('\n');
+  return `${contextBlock(o)}
+
+아래는 "${o.selectedGoal.goal_title}" 역량의 **검증된 액션 시드 ${o.seeds.length}개**다.
+각 시드를 출발점으로, 이 사용자의 인터뷰·강점·직무 맥락에 맞게 **다시 써라**(재해석).
+시드의 핵심 의도는 유지하되 표현·예시·강점 연계를 이 사람 맥락으로 바꾼다.
+
+각 재작성이 반드시 지킬 것(생성과 동일):
+1. **강점 연계(필수)**: Top5 강점(${o.strengthsKo.join(', ')}) 중 **정확히 하나**를 발휘. 그 강점명을 \`strength_link\`에.
+2. **역량 직결**: "${o.selectedGoal.goal_title}"를 실제로 기르는 행동.
+3. **직무 구체화**: ${o.jobField}의 실제 업무 맥락에서 내일 할 수 있는 한 가지 행동.
+4. **ICF 준수**: 행동 가능·미래지향. 훈계/지시·정답 주입·추상적 다짐 금지.
+5. **안전**: 정서 위기 신호가 있으면 압박형 과제 금지(가드레일 준수).
+
+description은 1~2문장 **최대 120자**, title은 한 줄(최대 60자).
+
+[재작성할 시드]
+${seedList}
+
+각 시드에 대응하는 재작성 결과를 JSON 배열로만 응답. \`seed_index\`로 원본 시드를 가리켜라.
+마크다운 펜스 금지. 형식:
+[
+  { "seed_index": 0, "title": "...", "description": "...", "tags": ["⏱ 30분"], "strength_link": "<Top5 강점 중 하나>" }
+]`;
+}
+
 // ── ② 검증 게이트 프롬프트 ──────────────────────────────────
 export interface CandidateForReview {
   title: string;

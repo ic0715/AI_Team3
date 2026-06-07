@@ -190,8 +190,14 @@ function ActionItemsContent() {
 
     const ctx = aiContext;
     const seedPool = pool;
-    const poolFill = (n: number): DisplayAction[] =>
-      selectDisplaySeeds(seedPool, ctx.careerLevel, Math.random, n).map(seedToAction);
+    // 날 풀 폴백. exclude: 서버가 이미 재작성에 쓴 시드(source_seed_id)는 제외해
+    // "재작성본 + 같은 시드 날것"이 중복 노출되지 않게 한다.
+    const poolFill = (n: number, exclude?: Set<string>): DisplayAction[] => {
+      const avail = exclude && exclude.size > 0
+        ? seedPool.filter((s) => !exclude.has(s.sourceSeedId))
+        : seedPool;
+      return selectDisplaySeeds(avail, ctx.careerLevel, Math.random, n).map(seedToAction);
+    };
 
     const run = async () => {
       try {
@@ -211,6 +217,14 @@ function ActionItemsContent() {
               goal_title: goal.goal_title,
               competency_code: goal.competency_code,
             },
+            // 부족분 재작성용 검증된 시드 풀. 서버가 통과분이 모자랄 때 이 시드를
+            // 인터뷰·강점 톤으로 재작성해 보충(source_seed_id 추적). 전달 실패 시 페이지가 날 풀 폴백.
+            seedPool: seedPool.map((s) => ({
+              sourceSeedId: s.sourceSeedId,
+              title: s.title,
+              description: s.description,
+              tags: s.tags,
+            })),
           }),
         });
         if (!res.ok) throw new Error('AI action generation failed');
@@ -225,8 +239,14 @@ function ActionItemsContent() {
         };
         if (cancelled) return;
         const generated: DisplayAction[] = mapApiActions(data.actions);
-        // 생성 통과분 우선 노출 + 부족분은 검증된 풀로 보충. 전멸 시 풀 전체.
-        setAiActions(mergeWithPool(generated, ACTION_DISPLAY_COUNT, poolFill));
+        // 서버 응답(생성+재작성)에 이미 쓰인 시드는 날 풀 보충에서 제외(중복 방지).
+        const usedSeedIds = new Set(
+          generated.map((g) => g.sourceSeedId).filter((id): id is string => !!id),
+        );
+        // 서버 통과분(생성+재작성) 우선 + 부족분은 검증된 날 풀로 보충. 전멸 시 풀 전체.
+        setAiActions(
+          mergeWithPool(generated, ACTION_DISPLAY_COUNT, (n) => poolFill(n, usedSeedIds)),
+        );
       } catch (e) {
         console.error('[10 generate] failed, falling back to vetted pool:', e);
         // 폴백: 검증된 풀에서 선택 (사용자에게는 생성 실패가 안 보임)
