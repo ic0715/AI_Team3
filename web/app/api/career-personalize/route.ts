@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     const raw = extractText(message);
     const parsed = parseJSONLoose<Array<{ slot: number; personalizedText: string }>>(raw);
 
-    validatePersonalizedResponse(parsed);
+    validatePersonalizedResponse(parsed, matchedSlots.length);
 
     // matchedSlots에 personalizedText 머지
     const slots = mergePersonalizedSlots(matchedSlots, parsed);

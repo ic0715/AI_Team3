@@ -20,49 +20,57 @@ function matched(...slots: number[]) {
   }));
 }
 
+// 3장짜리 정상 파싱 결과 (현재 COMPETENCY_DISPLAY_COUNT)
+function three(): ParsedPersonalizedSlot[] {
+  return [1, 2, 3].map((slot) => ({ slot, personalizedText: `텍스트${slot}` }));
+}
+
 describe('validatePersonalizedResponse', () => {
-  it('정확히 5개 배열이면 통과 (throw 없음)', () => {
-    expect(() => validatePersonalizedResponse(five())).not.toThrow();
+  it('기대 개수(3)와 일치하면 통과 (throw 없음)', () => {
+    expect(() => validatePersonalizedResponse(three(), 3)).not.toThrow();
   });
 
-  it('배열이 아니면 throw — null', () => {
-    expect(() => validatePersonalizedResponse(null)).toThrow('LLM이 5개 슬롯을 반환하지 않음: 0개');
+  it('기대 개수(5)와 일치하면 통과 (레거시 길이도 인자로 검증)', () => {
+    expect(() => validatePersonalizedResponse(five(), 5)).not.toThrow();
+  });
+
+  it('배열이 아니면 throw — null (기대 개수 메시지에 노출)', () => {
+    expect(() => validatePersonalizedResponse(null, 3)).toThrow('LLM이 3개 슬롯을 반환하지 않음: 0개');
   });
 
   it('배열이 아니면 throw — 객체', () => {
-    expect(() => validatePersonalizedResponse({ slot: 1 })).toThrow(
-      'LLM이 5개 슬롯을 반환하지 않음: 0개',
+    expect(() => validatePersonalizedResponse({ slot: 1 }, 3)).toThrow(
+      'LLM이 3개 슬롯을 반환하지 않음: 0개',
     );
   });
 
   it('배열이 아니면 throw — undefined', () => {
-    expect(() => validatePersonalizedResponse(undefined)).toThrow(
-      'LLM이 5개 슬롯을 반환하지 않음: 0개',
+    expect(() => validatePersonalizedResponse(undefined, 3)).toThrow(
+      'LLM이 3개 슬롯을 반환하지 않음: 0개',
     );
   });
 
-  it('길이가 5가 아니면 throw — 4개 (개수 메시지에 노출)', () => {
-    expect(() => validatePersonalizedResponse(five().slice(0, 4))).toThrow(
-      'LLM이 5개 슬롯을 반환하지 않음: 4개',
+  it('기대 개수보다 적으면 throw — 기대 3, 실제 2 (개수 메시지에 노출)', () => {
+    expect(() => validatePersonalizedResponse(three().slice(0, 2), 3)).toThrow(
+      'LLM이 3개 슬롯을 반환하지 않음: 2개',
     );
   });
 
-  it('길이가 5가 아니면 throw — 6개', () => {
-    const six = [...five(), { slot: 6, personalizedText: 'x' }];
-    expect(() => validatePersonalizedResponse(six)).toThrow(
-      'LLM이 5개 슬롯을 반환하지 않음: 6개',
+  it('기대 개수보다 많으면 throw — 기대 3, 실제 5', () => {
+    expect(() => validatePersonalizedResponse(five(), 3)).toThrow(
+      'LLM이 3개 슬롯을 반환하지 않음: 5개',
     );
   });
 
   it('빈 배열 → throw (0개)', () => {
-    expect(() => validatePersonalizedResponse([])).toThrow(
-      'LLM이 5개 슬롯을 반환하지 않음: 0개',
+    expect(() => validatePersonalizedResponse([], 3)).toThrow(
+      'LLM이 3개 슬롯을 반환하지 않음: 0개',
     );
   });
 
   it('통과 후 타입 가드로 좁혀짐(asserts) — 컴파일+런타임', () => {
-    const parsed: unknown = five();
-    validatePersonalizedResponse(parsed);
+    const parsed: unknown = three();
+    validatePersonalizedResponse(parsed, 3);
     // 좁혀진 뒤 인덱싱 가능
     expect(parsed[0].slot).toBe(1);
   });
