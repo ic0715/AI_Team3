@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useOnboardingGuard } from '@/lib/hooks/useOnboardingGuard';
 import OnboardingRedirectModal from '@/components/OnboardingRedirectModal';
-import { COMPETENCIES, COMPETENCY_BY_ID, COMPETENCY_BY_CODE } from '@/lib/constants/competencies';
+import { COMPETENCIES, COMPETENCY_BY_ID, COMPETENCY_BY_CODE, COMPETENCY_DISPLAY_COUNT } from '@/lib/constants/competencies';
 import {
   deterministicMatch,
   getCompetencyCode,
@@ -38,10 +38,10 @@ import {
 //   - userProfile: { nickname, jobField, careerLevel, mainConcern }
 //   - interviewInsights: 08 인터뷰의 key_insights JSONB
 //                        (현재는 08 mock이라 placeholder 내용)
-//   - matchedSlots: Step1 결정적 매칭 결과 (5개 슬롯)
+//   - matchedSlots: Step1 결정적 매칭 결과 (COMPETENCY_DISPLAY_COUNT개 슬롯)
 //
 // PersonalizationResult:
-//   - slots: 각 슬롯에 personalized_text 추가된 5개 객체
+//   - slots: 각 슬롯에 personalized_text 추가된 객체 배열 (matchedSlots와 같은 길이)
 //
 // 자세한 인계 내용은 docs/HANDOFF_AI.md 참조.
 // ─────────────────────────────────────────────────────────────
@@ -341,7 +341,7 @@ function CareerResultContent() {
           선택 후 바로 시작해 볼 수 있는 액션 아이템을 알려드립니다.
         </p>
 
-        {/* 5개 카드 (스펙 3.4) */}
+        {/* 추천 역량 카드 (스펙 3.4) — 개수는 COMPETENCY_DISPLAY_COUNT */}
         {loadingMatch ? (
           <SkeletonCards />
         ) : error && !slots ? (
@@ -349,7 +349,7 @@ function CareerResultContent() {
         ) : slots ? (
           <div
             role="radiogroup"
-            aria-label="추천 역량 5개"
+            aria-label={`추천 역량 ${slots.length}개`}
             style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
           >
             {slots.map((slot) => (
@@ -543,7 +543,7 @@ function SkeletonCards() {
         </div>
       </div>
 
-      {[1, 2, 3, 4, 5].map((i) => (
+      {Array.from({ length: COMPETENCY_DISPLAY_COUNT }, (_, i) => i + 1).map((i) => (
         <div
           key={i}
           style={{

@@ -15,7 +15,7 @@ export const PERSONALIZE_SYSTEM = `${SYSTEM_PROMPT_MD}
 
 # 역량 방향 결과 카드 생성 명세 (이 세션 전용)
 
-위의 일반 코칭 원칙을 따르되, 지금은 5개 역량 카드 각각의 추천 메모(personalizedText)를 생성합니다. 아래 명세를 그대로 따르세요.
+위의 일반 코칭 원칙을 따르되, 지금은 아래 <추천_카드>에 제공된 역량 카드 각각의 추천 메모(personalizedText)를 생성합니다. 아래 명세를 그대로 따르세요.
 
 ${COMPETENCY_ANALYSIS_MD}
 
@@ -24,13 +24,12 @@ ${COMPETENCY_ANALYSIS_MD}
 # 출력 형식 (강제)
 
 JSON 배열로만 응답. 다른 설명·서두·코드블록·마크다운 펜스 금지.
-형식:
+아래 <추천_카드>에 제공된 슬롯마다 정확히 하나씩, 슬롯 번호(slot)를 그대로 사용해 작성합니다.
+배열 길이는 제공된 카드 수와 정확히 같아야 합니다(더도 덜도 안 됨).
+형식 예시(슬롯 수는 제공된 카드 수에 맞춤):
 [
   {"slot": 1, "personalizedText": "..."},
-  {"slot": 2, "personalizedText": "..."},
-  {"slot": 3, "personalizedText": "..."},
-  {"slot": 4, "personalizedText": "..."},
-  {"slot": 5, "personalizedText": "..."}
+  {"slot": 2, "personalizedText": "..."}
 ]
 
 각 personalizedText는 2~3문장, 80~140자.`;
@@ -62,11 +61,11 @@ ${strengths.map((s, i) => `${i + 1}위: ${s.name_ko} (${s.domain})`).join('\n')}
 ${aiSummary ? `한 줄 요약: ${aiSummary}\n` : ''}${formatInsights(interviewInsights)}
 </커리어_인터뷰_요약>
 
-<추천_카드_5장>
+<추천_카드 count="${matchedSlots.length}">
 ${matchedSlots.map(s =>
   `[카드 ${s.slot}] goal="${s.goalTitle}" badge=${s.badge} domain=${s.domain}`
 ).join('\n')}
-</추천_카드_5장>
+</추천_카드>
 
-위 5개 슬롯 각각의 personalizedText를 슬롯 순서대로 작성하세요.`;
+위 ${matchedSlots.length}개 슬롯 각각의 personalizedText를 슬롯 순서대로 작성하세요.`;
 }

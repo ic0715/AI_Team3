@@ -4,6 +4,11 @@ import type { Domain } from './strengths';
 
 export type FitLabel = '추천' | '강점 연계 높음' | '성장 잠재력 높음';
 
+// 역량 방향 결과(#3) 화면에 노출하는 추천 역량 카드 개수.
+// deterministicMatch의 슬롯 상한(의도 우선 채움 + 부족분 강점 보충)이 이 값을 공유한다.
+// (액션 화면의 ACTION_DISPLAY_COUNT(seeds.ts)와 같은 표출-개수 상수 패턴)
+export const COMPETENCY_DISPLAY_COUNT = 3;
+
 export interface Competency {
   id: string;                // slug (예: "critical-thinking")
   code: string;              // DB CHECK constraint 코드 (예: "T-1")
