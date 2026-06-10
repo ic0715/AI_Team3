@@ -29,6 +29,7 @@ CareerPT 시스템
 1. [프로젝트 개요](#프로젝트-개요)
 2. [A. AI-Native 제품 기능](#a-ai-native-제품-기능)
 3. [B. 개발 인프라 — Evaluation Harness](#b-개발-인프라--evaluation-harness)
+   - [ralph_loop — 전체 구조](#ralph_loop--전체-구조)
    - [careerpt_sim — 코칭 품질 평가 배터리](#careerpt_sim--코칭-품질-평가-배터리)
    - [retention_sim — 12주 이탈 예측 연구](#retention_sim--12주-이탈-예측-연구)
 4. [Harness Engineering 구현 현황](#harness-engineering-구현-현황)
