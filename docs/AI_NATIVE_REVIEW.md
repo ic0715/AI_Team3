@@ -32,8 +32,7 @@ CareerPT 시스템
    - [careerpt_sim — 코칭 품질 평가 배터리](#careerpt_sim--코칭-품질-평가-배터리)
    - [retention_sim — 12주 이탈 예측 연구](#retention_sim--12주-이탈-예측-연구)
 4. [Harness Engineering 현황](#harness-engineering-현황)
-5. [미구현 필수 요소](#미구현-필수-요소)
-6. [우선순위 로드맵](#우선순위-로드맵)
+5. [우선순위 로드맵](#우선순위-로드맵)
 
 ---
 
@@ -50,6 +49,8 @@ CareerPT 시스템
 ## A. AI-Native 제품 기능
 
 > **정의**: 실제 서비스에서 사용자가 직접 경험하는 AI 기능 (`web/src/app/api/` 하위)
+
+---
 
 ### ✅ 구현 완료
 
@@ -134,6 +135,116 @@ session_duration: medium
 - `clipString()` / `clipArray()`: 길이 클리핑 및 배열 중복 제거
 - enum 검증 (역량 코드, 세션 시간 등) + 기본값 fallback
 - finalize 엔드포인트 전체: **3-attempt retry** 공통 적용
+
+---
+
+### ❌ 미구현 — 필수 추가 요소
+
+#### 🔴 Priority 1 — 사용자 경험 직결
+
+**스트리밍 응답 (Streaming)**
+
+- **현재**: 전체 응답 완성 후 일괄 반환 → 2~4초 공백 후 텍스트가 한번에 출력
+- **필요**: `stream: true` + `ReadableStream`으로 토큰 단위 실시간 출력
+
+```typescript
+// 현재
+const response = await anthropic.messages.create({ ... })
+
+// 필요
+const stream = await anthropic.messages.stream({ ..., stream: true })
+return new Response(stream.toReadableStream())
+```
+
+---
+
+#### 🔴 Priority 2 — AI 신뢰성
+
+**Tool Use / Function Calling**
+
+- **현재**: AI 텍스트 출력 → `parseJSONLoose()` 수동 파싱 → 잘못된 JSON 시 조용히 빈 값 저장
+- **필요**: Anthropic `tools` 파라미터로 스키마 기반 구조화 추출
+
+```typescript
+tools: [{
+  name: "extract_career_insights",
+  input_schema: {
+    type: "object",
+    properties: {
+      presenting_issue: { type: "string", maxLength: 500 },
+      growth_competencies: { type: "array", items: { enum: COMPETENCY_CODES } }
+    },
+    required: ["presenting_issue", "growth_competencies"]
+  }
+}]
+```
+
+**Zod 런타임 검증**
+
+- **현재**: `JSON.parse(text) as Record<string, unknown>` → 타입 없는 수동 처리
+- **현재 위험**: LLM 잘못된 JSON → `clipString(undefined)` → 빈 값이 DB에 저장
+
+```typescript
+// 필요
+const FinalizeSchema = z.object({
+  presenting_issue: z.string().max(500),
+  growth_competencies: z.array(CompetencyCodeEnum).max(5),
+  session_duration_choice: z.enum(['short', 'medium', 'long']).default('medium')
+});
+const result = FinalizeSchema.safeParse(extraction);
+```
+
+---
+
+#### 🟡 Priority 3 — 지능 고도화
+
+**크로스세션 패턴 감지**
+
+- **현재**: 각 세션이 독립적 — 이전 주 코칭 결과가 이번 주 AI에 반영되지 않음
+- **필요**: 여러 세션 결과를 분석해 장기 패턴 도출
+
+```
+Session 1 (3주 전) ─┐
+Session 2 (2주 전) ─┼→ [패턴 분석] → "3주 연속 실행력 이슈"
+Session 3 (이번 주) ─┘
+```
+
+**토큰 사용량 추적**
+
+- **현재**: `response.usage` 데이터 미저장 — 세션별 비용 파악 불가
+- **필요**: Supabase에 저장 후 비용 집계 대시보드
+
+```typescript
+// response.usage 예시
+{ input_tokens: 1200, output_tokens: 350,
+  cache_read_input_tokens: 800, cache_creation_input_tokens: 400 }
+```
+
+**임베딩 / 벡터 검색**
+
+- **현재**: 역량 매칭이 하드코딩된 키워드 기반
+- **필요**: Supabase `pgvector` + 인터뷰 내러티브 임베딩 → 의미적 유사도 검색
+
+---
+
+### AI-Native 제품 기능 현황 요약
+
+| 기능 | 구현 | 우선순위 |
+|------|------|---------|
+| 멀티턴 대화 AI + 프롬프트 캐싱 | ✅ | — |
+| Extended Thinking (심층 추론) | ✅ | — |
+| 하이브리드 개인화 | ✅ | — |
+| 세션 안전장치 (위기감지 포함) | ✅ | — |
+| 구조화된 프롬프트 엔지니어링 | ✅ | — |
+| 상태 인식 컨텍스트 주입 | ✅ | — |
+| 턴 캡 & 소프트/하드 종료 | ✅ | — |
+| JSON 구조화 추출 + 3-attempt retry | ✅ | — |
+| 스트리밍 응답 | ❌ | 🔴 P1 (UX 직결) |
+| Tool Use / Function Calling | ❌ | 🔴 P2 (신뢰성) |
+| Zod 런타임 검증 | ❌ | 🔴 P2 (운영 안전) |
+| 크로스세션 패턴 감지 | ❌ | 🟡 P3 (장기 가치) |
+| 토큰 사용량 추적 | ❌ | 🟡 P3 (비용 관리) |
+| 임베딩 / 벡터 검색 | ❌ | 🟡 P3 (지능 고도화) |
 
 ---
 
@@ -305,101 +416,25 @@ web/src/lib/utils/week.test.ts         ✅ 날짜 계산 유틸 (82 lines)
 
 ---
 
-### ❌ 미구현 (웹 앱)
+### ❌ 미구현
 
-**API 라우트 테스트 전무**
+**웹 앱**
 
-```
-web/src/app/api/
-  career-interview/chat/     ❌ 테스트 없음
-  career-interview/finalize/ ❌ 테스트 없음
-  reflect-coach/chat/        ❌ 테스트 없음
-  career-personalize/        ❌ 테스트 없음
-```
+| 항목 | 현황 | 위험 |
+|------|------|------|
+| API 라우트 테스트 | 5개 라우트 전무 | 코드 변경 시 회귀 감지 불가 |
+| CI/CD 파이프라인 | 없음 | 수동 배포, 품질 게이트 없음 |
+| 구조적 로깅 | `console.error`만 | 운영 디버깅 불가 |
+| 지수 백오프 | 고정 3회 즉시 재시도 | Anthropic 429 상황 악화 |
 
-**Zod 런타임 검증 없음**
+**ralph_loop 하네스**
 
-```typescript
-// 현재 위험: LLM 잘못된 JSON → clipString(undefined) → 빈 값 DB 저장
-const extraction = JSON.parse(text) as Record<string, unknown>;
-
-// 필요
-const FinalizeSchema = z.object({
-  presenting_issue: z.string().max(500),
-  growth_competencies: z.array(CompetencyCodeEnum).max(5),
-});
-```
-
-**CI/CD 파이프라인 없음**
-
-```
-현재: 코드 변경 → 수동 ralph_loop 실행 → 점수 확인 → PR 머지
-
-필요:
-  PR 생성 → GitHub Actions
-    → vitest + tsc --noEmit
-    → (선택) 미니 배터리 5페르소나
-    → 품질 게이트 통과 시 머지 허용
-```
-
-**구조적 로깅 없음**
-
-```typescript
-// 현재: console.error('[career-interview/chat] error:', e)
-// 필요: route + userId + anthropicRequestId + retryAttempt 포함한 구조적 로그
-```
-
-**지수 백오프 없음**
-
-- 현재: 고정 3회 즉시 재시도 → Anthropic 429 상황 악화 가능
-- 필요: `min(1000 × 2^attempt + jitter, 10000)` ms 대기
-
----
-
-### ❌ 미구현 (ralph_loop 하네스)
-
-- `churn_model.py` 공식 단위 테스트 없음
-- Method A ↔ Method B 불일치 자동 탐지 없음
-- 프롬프트 버전 헤더 미적용 (`ralph_loop/prompt/` 스냅샷과 실제 사용 파일 간 드리프트 위험)
-- 실제 사용자 데이터 수집 후 공식 재보정 파이프라인 없음
-
----
-
-## 미구현 필수 요소 (제품 기능)
-
-### 🔴 Priority 1 — 사용자 경험 & AI 신뢰성
-
-**스트리밍 응답** — 현재 2~4초 공백 후 일괄 출력
-
-```typescript
-// 현재
-const response = await anthropic.messages.create({ ... })
-// 필요
-const stream = await anthropic.messages.stream({ ..., stream: true })
-return new Response(stream.toReadableStream())
-```
-
-**Tool Use / Function Calling** — 현재 수동 JSON 파싱 실패 위험
-
-```typescript
-tools: [{ name: "extract_career_insights", input_schema: { ... } }]
-```
-
-### 🟡 Priority 2 — 지능 고도화
-
-**크로스세션 패턴 감지**
-
-```
-Session 1~N → [패턴 분석 루프] → "3주 연속 실행력 이슈" 같은 장기 인사이트
-```
-
-**토큰 사용량 추적**
-
-```typescript
-// response.usage → Supabase 저장 → 세션별 비용 집계 대시보드
-```
-
-**임베딩 / 벡터 검색** — Supabase pgvector + 인터뷰 내러티브 의미적 유사도 검색
+| 항목 | 현황 |
+|------|------|
+| `churn_model.py` 공식 단위 테스트 | 없음 |
+| Method A ↔ Method B 불일치 자동 탐지 | 없음 |
+| 프롬프트 버전 헤더 | 미적용 (스냅샷-실제 파일 간 드리프트 위험) |
+| 실사용자 데이터 기반 공식 재보정 | 없음 |
 
 ---
 
@@ -407,49 +442,40 @@ Session 1~N → [패턴 분석 루프] → "3주 연속 실행력 이슈" 같은
 
 ```
 Phase 1 — 운영 안정화 (즉시)
-  ① Zod 스키마로 LLM 출력 런타임 검증
-  ② 구조적 로깅 (route + userId + requestId)
-  ③ 지수 백오프 재시도
+  ① Zod 스키마로 LLM 출력 런타임 검증        [A] AI-Native
+  ② 구조적 로깅 (route + userId + requestId)  [B] Harness
+  ③ 지수 백오프 재시도                        [B] Harness
 
 Phase 2 — 품질 보증 연결 (단기)
-  ④ 스트리밍 응답 (UX 직결)
-  ⑤ Tool Use로 JSON 추출 안정화
-  ⑥ API 라우트 유닛 테스트 + GitHub Actions CI
-  ⑦ 프롬프트 버전 헤더 + 응답에 버전 로깅
+  ④ 스트리밍 응답 (UX 직결)                  [A] AI-Native
+  ⑤ Tool Use로 JSON 추출 안정화              [A] AI-Native
+  ⑥ API 라우트 유닛 테스트 + GitHub Actions  [B] Harness
+  ⑦ 프롬프트 버전 헤더 + 응답에 버전 로깅    [B] Harness
 
 Phase 3 — 지능 고도화 (중기)
-  ⑧ 토큰 사용량 DB 저장 + 비용 대시보드
-  ⑨ 크로스세션 패턴 감지 루프
-  ⑩ 임베딩 + 벡터 검색 기반 역량 매칭
+  ⑧ 토큰 사용량 DB 저장 + 비용 대시보드      [A] AI-Native
+  ⑨ 크로스세션 패턴 감지 루프               [A] AI-Native
+  ⑩ 임베딩 + 벡터 검색 기반 역량 매칭        [A] AI-Native
 ```
 
 ---
 
 ## 핵심 진단 요약
 
-### [A] AI-Native 제품 기능
+| 레이어 | 영역 | 현황 | 평가 |
+|--------|------|------|------|
+| **[A] 제품** | 멀티턴 대화 AI + 캐싱 | 상태관리, 위기감지 포함 | ✅ 완성도 높음 |
+| **[A] 제품** | 프롬프트 엔지니어링 | Extended Thinking, 상태주입 | ✅ 완성도 높음 |
+| **[A] 제품** | 개인화 파이프라인 | 하이브리드 매칭 + AI 개인화 | ✅ 양호 |
+| **[A] 제품** | 스트리밍 | 미구현 | ❌ UX 직결 |
+| **[A] 제품** | Tool Use + Zod 검증 | 미구현 | ❌ 신뢰성 |
+| **[A] 제품** | 크로스세션 분석 | 미구현 | 🟡 장기 코칭 가치 |
+| **[B] 하네스** | careerpt_sim 평가 배터리 | 3-Layer Eval, 34페르소나 | ✅ 정교함 |
+| **[B] 하네스** | retention_sim 이탈 예측 | 수학 + AI 교차검증 | ✅ 정교함 |
+| **[B] 하네스** | 웹 앱 테스트 커버리지 | API 라우트 전무 | ❌ 품질 보증 공백 |
+| **[B] 하네스** | CI/CD + 로깅 | 없음 | ❌ 운영 디버깅 불가 |
+| **[B] 하네스** | 프롬프트 버전 관리 | 수동 스냅샷 | 🟡 드리프트 위험 |
 
-| 영역 | 현황 | 평가 |
-|------|------|------|
-| 멀티턴 대화 AI | 상태관리, 위기감지 포함 | ✅ 완성도 높음 |
-| 프롬프트 엔지니어링 | 캐싱, Extended Thinking, 상태주입 | ✅ 완성도 높음 |
-| 개인화 파이프라인 | 하이브리드 매칭 + AI 개인화 | ✅ 양호 |
-| 스트리밍 | 미구현 | ❌ UX 직결 |
-| Tool Use | 미구현 | ❌ 추출 안정성 |
-| 크로스세션 분석 | 미구현 | 🟡 장기 코칭 가치 |
-
-### [B] 개발 인프라 (Harness)
-
-| 영역 | 현황 | 평가 |
-|------|------|------|
-| careerpt_sim 평가 배터리 | 3-Layer Eval, 34페르소나 | ✅ 정교함 |
-| retention_sim 이탈 예측 | 수학 + AI 교차검증 | ✅ 정교함 |
-| 웹 앱 테스트 커버리지 | API 라우트 전무 | ❌ 품질 보증 공백 |
-| CI/CD | 없음 | ❌ 수동 배포 |
-| 런타임 검증 (Zod) | 없음 | ❌ 운영 위험 |
-| 로깅/모니터링 | console.error만 | ❌ 운영 디버깅 불가 |
-| 프롬프트 버전 관리 | 수동 스냅샷 | 🟡 드리프트 위험 |
-
-> **결론**: [B] 평가 인프라(careerpt_sim, retention_sim)는 매우 정교하게 설계되어 있으나,  
-> 그 결과가 [A] 웹 앱의 품질 게이트(CI, 테스트, 런타임 검증)와 **연결되지 않는 구조적 공백**이 존재합니다.  
+> **결론**: [B] 평가 인프라는 매우 정교하게 설계되어 있으나,  
+> 그 결과가 [A] 웹 앱의 품질 게이트와 **연결되지 않는 구조적 공백**이 존재합니다.  
 > Phase 1 운영 안정화 → Phase 2 두 레이어의 품질 게이트 연결 순서로 접근하는 것을 권장합니다.
