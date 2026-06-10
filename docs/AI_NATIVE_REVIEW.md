@@ -5,15 +5,35 @@
 
 ---
 
+## 전체 구조 한눈에 보기
+
+```
+CareerPT 시스템
+│
+├── [A] AI-Native 제품 기능 (web/src)          ← 사용자가 직접 경험
+│     멀티턴 코칭, 개인화, 인사이트 추출 등
+│
+└── [B] 개발 인프라 / Evaluation Harness        ← 팀이 품질 보증에 사용
+      ralph_loop/
+      ├── careerpt_sim   코칭 품질 평가 배터리   ← AI-Native 기능을 검증하는 도구
+      └── retention_sim  12주 이탈 예측 연구     ← 제품 의사결정을 지원하는 도구
+```
+
+> `careerpt_sim`과 `retention_sim`은 **AI를 활용한 개발 하네스**입니다.  
+> 사용자에게 노출되지 않으며, AI-Native 제품 기능의 **품질을 보증하고 방향을 설정하기 위한 수단**입니다.
+
+---
+
 ## 목차
 
 1. [프로젝트 개요](#프로젝트-개요)
-2. [AI-Native 구현 현황](#ai-native-구현-현황)
-3. [Ralph-Loop 아키텍처](#ralph-loop-아키텍처)
-4. [Retention-Sim 아키텍처](#retention-sim-아키텍처)
-5. [Harness Engineering 현황](#harness-engineering-현황)
-6. [미구현 필수 요소](#미구현-필수-요소)
-7. [우선순위 로드맵](#우선순위-로드맵)
+2. [A. AI-Native 제품 기능](#a-ai-native-제품-기능)
+3. [B. 개발 인프라 — Evaluation Harness](#b-개발-인프라--evaluation-harness)
+   - [careerpt_sim — 코칭 품질 평가 배터리](#careerpt_sim--코칭-품질-평가-배터리)
+   - [retention_sim — 12주 이탈 예측 연구](#retention_sim--12주-이탈-예측-연구)
+4. [Harness Engineering 현황](#harness-engineering-현황)
+5. [미구현 필수 요소](#미구현-필수-요소)
+6. [우선순위 로드맵](#우선순위-로드맵)
 
 ---
 
@@ -23,11 +43,13 @@
 
 - **스택**: Next.js 16 + Anthropic SDK (`claude-sonnet-4-6`) + Supabase
 - **핵심 플로우**: 커리어 인터뷰 (멀티턴 대화) → 역량 매칭 → 주간 리플렉션 코칭
-- **평가 시스템**: `ralph_loop` — 34개 페르소나 시뮬레이션 기반 3-Layer 품질 평가
+- **품질 보증**: `ralph_loop` — 34개 페르소나 시뮬레이션 기반 오프라인 평가 인프라
 
 ---
 
-## AI-Native 구현 현황
+## A. AI-Native 제품 기능
+
+> **정의**: 실제 서비스에서 사용자가 직접 경험하는 AI 기능 (`web/src/app/api/` 하위)
 
 ### ✅ 구현 완료
 
@@ -36,7 +58,7 @@
 | 항목 | 내용 |
 |------|------|
 | 모델 | `claude-sonnet-4-6` |
-| 방식 | 매 POST마다 전체 대화 이력 재전송 |
+| 방식 | 매 POST마다 전체 대화 이력 재전송 (서버 stateless) |
 | 캐싱 | 시스템 프롬프트 + 이력에 `cache_control: ephemeral` (TTL 1h) |
 | 효과 | 세션 내 입력 토큰 ~90% 절감 |
 
@@ -49,9 +71,9 @@
 
 #### 2. Extended Thinking (심층 추론)
 
-- 인터뷰 종료 시 전체 transcript를 대상으로 `budget_tokens: 4000` 적용
+- 인터뷰 종료 시 전체 transcript 대상으로 `budget_tokens: 4000` 적용
 - 추출 항목: `presenting_issue`, `agreed_focus`, `agreement_evolution`, `growth_competencies`
-- temperature는 thinking 활성화 시 SDK 요구사항에 따라 1.0으로 고정
+- thinking 활성화 시 temperature SDK 요구에 따라 1.0 고정
 
 ```
 관련 파일: web/src/app/api/career-interview/finalize/route.ts
@@ -61,7 +83,7 @@
 
 ```
 Step 1 (결정론적): 12개 역량 중 5개를 인터뷰 인사이트 × 강점 점수 매트릭스로 매칭
-Step 2 (AI): 매칭된 5개 슬롯에 사용자 맥락 기반 설명 생성 (80–140자)
+Step 2 (AI):       매칭된 5개 슬롯에 사용자 맥락 기반 설명 생성 (80–140자)
 ```
 
 ```
@@ -70,7 +92,7 @@ Step 2 (AI): 매칭된 5개 슬롯에 사용자 맥락 기반 설명 생성 (80�
   web/src/lib/competency/match.ts
 ```
 
-#### 4. 세션 안전장치
+#### 4. 세션 안전장치 (3-Path 분기)
 
 | 경로 | 조건 | 처리 |
 |------|------|------|
@@ -115,243 +137,139 @@ session_duration: medium
 
 ---
 
-## Ralph-Loop 아키텍처
+## B. 개발 인프라 — Evaluation Harness
 
-### 전체 파이프라인
+> **정의**: 팀이 로컬에서 실행하는 오프라인 도구.  
+> 사용자에게 노출되지 않으며, [A] AI-Native 제품 기능의 품질 검증과 제품 의사결정을 위해 사용.
+
+---
+
+### careerpt_sim — 코칭 품질 평가 배터리
+
+**목적**: "프롬프트 변경이 코칭 품질을 실제로 향상시켰는가?"를 34개 페르소나 시뮬레이션으로 검증.
+
+#### 파이프라인
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  ralph_loop — 34페르소나 시뮬레이션 배터리              │
-│                                                       │
-│  [Layer 1] Interview Multi-Turn Loop                  │
-│    Claude Sonnet (코치) ↔ GPT-4o (페르소나)           │
-│    MAX_INTERVIEW_TURNS = 14                           │
-│           ↓                                           │
-│  [Layer 2] Finalize                                   │
-│    Extended Thinking → 핵심 인사이트 추출              │
-│    3-attempt retry                                    │
-│           ↓                                           │
-│  [Layer 3] Post-processing Pipeline                   │
-│    역량 매칭(결정론적) → AI 개인화 → Action 생성        │
-│           ↓                                           │
-│  [Evaluation]                                         │
-│    Layer A: LLM-as-Judge (Gemini/Haiku)               │
-│    Layer B: 결정론적 검증                              │
-│    Layer C: 페르소나 자기평가 (GPT-4o)                 │
-│                                                       │
-│  종합 점수 = 0.5·A + 0.3·B + 0.2·C  (10점 만점)      │
-│  통과 기준: 34페르소나 평균 ≥ 9.0                      │
-│            비정형 7개 모두 ≥ 8.0                       │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  careerpt_sim — 34페르소나 × 1세션 시뮬레이션              │
+│                                                           │
+│  [Session] Interview Multi-Turn Loop                      │
+│    Claude Sonnet (코치 역할) ↔ GPT-4o (페르소나 역할)     │
+│    MAX_INTERVIEW_TURNS = 14                               │
+│           ↓                                               │
+│  [Finalize] Extended Thinking → 핵심 인사이트 추출         │
+│           ↓                                               │
+│  [Post-processing]                                        │
+│    역량 매칭(결정론적) → AI 개인화 → Action 생성           │
+│           ↓                                               │
+│  [3-Layer Evaluation]                                     │
+│    Layer A: LLM-as-Judge (Gemini/Claude Haiku)            │
+│    Layer B: 결정론적 검증 (AI 없음)                        │
+│    Layer C: 페르소나 자기평가 (GPT-4o)                    │
+│                                                           │
+│  종합 점수 = 0.5·A + 0.3·B + 0.2·C  (10점 만점)          │
+│  통과 기준: 34페르소나 평균 ≥ 9.0 & 비정형 7개 모두 ≥ 8.0 │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### 3-Layer 평가 상세
+#### 3-Layer 평가 상세
 
-#### Layer A — LLM-as-Judge
-- 턴별 분류: **코칭 굿 5개** (powerful_question, reflection 등) + **안티패턴 4개** (advice, solution 등)
-- Judge 모델: Gemini 또는 Claude Haiku
-- 4개 KPI: Positive ratio, Antipattern ratio, Coherence score, Coaching balance
+| Layer | 방법 | 평가 항목 | 모델 |
+|-------|------|----------|------|
+| A | LLM-as-Judge | 턴별 코칭 굿 5개 / 안티패턴 4개 분류 | Gemini / Claude Haiku |
+| B | 결정론적 | 카드 매칭 정확도, 텍스트 길이 범위 검증 | 없음 (순수 Python) |
+| C | 페르소나 자기평가 | overall_value, insight_novelty, emotional_safety, desire_to_return (1~10) | GPT-4o |
 
-#### Layer B — 결정론적 검증
-- 카드 매칭 점수, 뱃지 정확성
-- 텍스트 길이 범위 검증 (카드: 60~200자, 액션: 20~240자)
-- AI 호출 없음
-
-#### Layer C — 페르소나 자기평가
-- GPT-4o가 세션 종료 후 4축 평가 (각 1~10점):
-  `overall_value`, `insight_novelty`, `emotional_safety`, `desire_to_return`
-
-### 산출물 구조 (세션당)
+#### 산출물 (세션당)
 
 ```
 round_{N}/persona_{NN}/
-├── input.json                  페르소나 + 목표
 ├── transcript_interview.jsonl  턴별 대화 기록
 ├── interview_extract.json      finalize 결과 + 메타
-├── recommendations.json        카드 + 단계 메타데이터
-├── actions.json                액션 풀 + 메타
-├── scores_layer_a.json         턴별 Judge 레이블
-├── scores_layer_b.json         결정론적 검증 결과
-├── scores_layer_c.json         페르소나 자기평가
-└── session_score.json          종합 점수 + 비용
+├── scores_layer_a/b/c.json     각 Layer 평가 결과
+└── session_score.json          종합 점수 + 비용 ($0.50/세션, 캐싱 적용)
 ```
 
-### 비용 추적
+#### 제품 기능과의 관계
 
-| 구분 | 수치 |
-|------|------|
-| 캐싱 적용 시 세션당 비용 | ~$0.50 |
-| 34페르소나 배터리 전체 | ~$17 |
-| 캐싱 절감 효과 | 입력 토큰 ~90% |
+```
+careerpt_sim 배터리 실행
+  → 점수 ≥ 9.0 통과
+  → 프롬프트 스냅샷 ralph_loop/prompt/에 저장
+  → PR로 docs/ai_prompt/ 업데이트
+  → 웹 앱에 반영 (다음 배포)
+```
 
 ---
 
-## Retention-Sim 아키텍처
+### retention_sim — 12주 이탈 예측 연구
 
-### 모듈 목적
+**목적**: "출시 전, 어느 주차에 어떤 이유로 이탈이 발생하는가?"를 예측해 제품 Hook 전략 수립.
 
-`retention_sim`은 **12주 사용자 이탈 예측 시뮬레이션 하네스**입니다.  
-"실제 출시 전, 어느 주차에 어떤 이유로 이탈이 발생하는가?"를 답하는 **제품 의사결정 도구**입니다.
+> careerpt_sim이 **코칭 품질**을 검증한다면,  
+> retention_sim은 **12주 리텐션**을 예측합니다.
 
-> careerpt_sim이 **코칭 품질**을 평가한다면,  
-> retention_sim은 **12주 제품 리텐션**을 예측합니다.
-
----
-
-### careerpt_sim과의 관계
+#### careerpt_sim과의 데이터 의존 관계
 
 ```
-careerpt_sim (1세션 코칭 품질 평가)
-  └─ Layer C 점수 (desire_to_return, emotional_safety, insight_novelty)
+careerpt_sim Layer C 점수
+  (desire_to_return, emotional_safety, insight_novelty)
          ↓ 입력으로 소비
-retention_sim (12주 이탈 예측)
+retention_sim → 12주 이탈 곡선 + 훅 효과 분석
 ```
 
-| 구분 | careerpt_sim | retention_sim |
-|------|-------------|---------------|
-| 범위 | 1세션 코칭 품질 | 12주 이탈 패턴 예측 |
-| 출력 | session_score (0~10) | 리텐션 곡선, 이탈 주차, 훅 효과 |
-| AI 역할 | 코치 역할 수행 | 사용자 행동 시뮬레이션 |
-| 모델 | Claude Sonnet(코치), GPT-4o(페르소나), Gemini(평가) | Claude Sonnet(시나리오), Claude Haiku(훅 평가) |
-| 시간 지평 | ~45분 (1세션) | 12주 |
-
----
-
-### 전체 파이프라인 (2개 병렬 트랙)
+#### 2개 병렬 트랙 파이프라인
 
 ```
-personas_with_goals.jsonl + Layer C 점수
+Layer C 점수 + 페르소나 메타데이터
          │
-         ├─── [Method A] 수학적 모델 ─────────────────────────────────────┐
-         │     churn_model.py                                              │
-         │     주차별 이탈 확률 공식 (순수 Python, AI 호출 없음)            │
-         │     → 3개 시나리오 곡선 (pessimistic / current / target)         │
-         │                                                                 │
-         └─── [Method B] AI-Native 시뮬레이션 ───────────────────────────┐ │
-               churn_scenario_gen.py (Claude Sonnet)                     │ │
-               → 12주 드롭아웃 시나리오 생성 (이탈 주차 + 이유 + 전환점)  │ │
-                        ↓                                                 │ │
-               churn_evaluator.py (Claude Haiku)                         │ │
-               → 4개 리텐션 훅의 재참여 효과 평가                          │ │
-                        ↓                                                 ↓ ↓
-                   [Cross-Validation] 두 방법이 불일치하는 지점 = 공식이
-                   감지 못한 감정적 맥락 (예: 푸시 알림이 소진된 사용자에게 역효과)
+         ├── [Method A] 수학적 모델 (AI 없음)
+         │     주차별 이탈 확률 공식
+         │     → 3개 시나리오 곡선 (pessimistic / current / target)
+         │
+         └── [Method B] AI-Native 시뮬레이션
+               Claude Sonnet → 12주 드롭아웃 시나리오 생성
+                      ↓
+               Claude Haiku → 4개 리텐션 훅 효과 평가
+                      ↓
+               [Cross-Validation]
+               두 방법 불일치 지점 = 공식이 놓친 감정적 맥락
 ```
 
----
-
-### Method A — 수학적 이탈 공식
+#### Method A — 수학적 이탈 공식
 
 ```python
 p_churn(week) =
-    0.80 × exp(-0.28 × dtr)              # desire_to_return 기반 베이스
-    + max(0, (6.0 - es) × 0.04)          # emotional_safety < 6 → 초기(1~3주) 패널티
+    0.80 × exp(-0.28 × dtr)               # desire_to_return 기반 베이스
+    + max(0, (6.0 - es) × 0.04)           # emotional_safety < 6 → 초기(1~3주) 패널티
     + max(0, (6.5 - nov) × 0.012 × decay) # insight_novelty 감소 → 4주차~ 포화
-    - (session_score - 5.0) × 0.012      # 코칭 품질 버퍼
+    - (session_score - 5.0) × 0.012       # 코칭 품질 버퍼
     → clamp(0, 0.95)
 ```
 
-**3개 시나리오 비교**
+| 시나리오 | score 배수 | dtr 조정 | 의미 |
+|----------|-----------|---------|------|
+| pessimistic | 0.78× | -1.5 | session_score ~7 상황 |
+| current | 1.00× | 0.0 | 실제 careerpt_sim 결과 |
+| target | 1.00× | +1.8 | session_score ≥9 달성 시 |
 
-| 시나리오 | score 배수 | dtr 조정 | novelty 감쇠 | 의미 |
-|----------|-----------|---------|-------------|------|
-| pessimistic | 0.78× | -1.5 | 1.4× 빠름 | session_score ~7 상황 |
-| current | 1.00× | 0.0 | 1.0× | 실제 ralph_loop 결과 |
-| target | 1.00× | +1.8 | 0.75× 느림 | session_score ≥9 달성 시 |
+#### Method B — AI-Native 시나리오 생성 핵심 발견
 
----
+| 훅 | Method A 예측 | Method B 발견 |
+|----|-------------|--------------|
+| `push_notification` | 이탈률 -3.2% | 소진된 페르소나에 **죄책감 역효과** |
+| `weekly_coaching_cta` | 효과 있음 | "5분 리플렉션" 긍정 프레임 **재참여 20%** |
+| `streak_badge` | 중립 | 압박감으로 이탈 **가속** |
 
-### Method B — AI-Native 시나리오 생성
+> **핵심 가치**: 수식이 놓친 감정적 맥락을 AI 내러티브가 포착. 두 방법의 **불일치 지점이 product insight**.
 
-**Step 1: 12주 드롭아웃 시나리오 생성** (Claude Sonnet 4.5)
-
-```json
-{
-  "churn_week": 1,
-  "primary_churn_reason": "첫 인터뷰에서 안전감 부족. 코치의 조언형 질문이 '넌 이미 알겠지' 느낌.",
-  "turning_points": [
-    { "week": 1, "mood": "불안·방어", "note": "카드 5장이 너무 일반적, 본인 상황 미반영" }
-  ],
-  "hook_sensitivity": {
-    "push_notification": false,
-    "weekly_coaching_cta": true,
-    "streak_badge": false
-  }
-}
-```
-
-**Step 2: 리텐션 훅 효과 평가** (Claude Haiku 4.5)
-
-4개 훅에 대해 이탈 위기 사용자가 재참여할 확률(`reopen_prob`) 계산:
-
-| 훅 | reopen_rate | 비고 |
-|----|-------------|------|
-| `none` | 0% | 기준선 |
-| `push_notification` | 0% | 소진된 사용자에게 **죄책감 역효과** |
-| `weekly_coaching_cta` | **20%** | "5분 리플렉션" 긍정적 프레임 효과 |
-| `streak_badge` | 0% | 압박감으로 이탈 가속 |
-
-**핵심 인사이트**: Method A 공식은 "push_notification이 이탈률 -3.2% 감소"라고 계산하지만,  
-Method B는 소진된 페르소나에서 **역효과**를 발견 — 감정적 맥락이 공식에 반영되지 않은 것.
-
----
-
-### 프롬프트 캐싱 최적화
-
-```
-34개 페르소나 실행 시:
-  1번째 페르소나 → 시스템 프롬프트 캐시 생성 (cache_creation_input_tokens)
-  2~34번째 페르소나 → 캐시 재사용 (cache_read_input_tokens, 비용 90% 절감)
-```
+#### 비용
 
 | 항목 | 비용 |
 |------|------|
 | Method A (순수 Python) | $0 |
-| Method B 시나리오 생성 (34개) | ~$0.50~0.60 |
-| Method B 훅 평가 (34개) | ~$0.40~0.50 |
-| **전체 배터리 합계** | **~$1.00** |
-
----
-
-### 산출물 구조
-
-```
-~/.careerpt-sim/
-├── churn_ai/
-│   ├── scenarios/persona_{01..34}.json   # 12주 드롭아웃 시나리오
-│   ├── hook_eval/
-│   │   ├── persona_{01..34}.json         # 훅별 reopen_prob
-│   │   └── summary.json                 # 집계 통계
-│   └── reports/
-│       ├── retention_report.html         # Chart.js 인터랙티브 대시보드
-│       └── hook_analysis.html
-└── retention_results/
-    ├── scenario_pessimistic.json
-    ├── scenario_current.json
-    └── scenario_target.json
-```
-
-**HTML 대시보드 시각화 포함:**
-- 페르소나 × 주차 리텐션 히트맵
-- 3개 시나리오 비교 곡선
-- 훅 효과 바 차트
-- Emotional_safety vs Churn_week 리스크 매트릭스
-
----
-
-### Retention-Sim 하네스 현황
-
-**✅ 구현된 것**
-- CLI `--personas`, `--skip-eval`, `--force` 플래그로 부분 실행 가능
-- 실행 전 비용 추정 출력 (캐시 히트율 고려)
-- 세션별 메타데이터 저장 (`model`, `elapsed_sec`, `usage`)
-- 기존 결과 파일 있으면 스킵 (idempotent 실행)
-
-**❌ 미구현**
-- 단위 테스트 없음 (`churn_model.py` 공식 검증 테스트 부재)
-- CI 연동 없음
-- Method A와 Method B 불일치 탐지 자동화 없음
-- 실제 사용자 데이터 수집 후 공식 재보정 파이프라인 없음
+| Method B 전체 (34페르소나, 캐싱 적용) | ~$1.00 |
 
 ---
 
@@ -359,125 +277,37 @@ Method B는 소진된 페르소나에서 **역효과**를 발견 — 감정적 �
 
 ### ✅ 구현된 것
 
-#### 테스트 (제한적)
+**웹 앱 테스트 (제한적)**
 
 ```
 web/src/lib/competency/match.test.ts   ✅ 역량 매칭 로직 (79 lines)
 web/src/lib/utils/week.test.ts         ✅ 날짜 계산 유틸 (82 lines)
 ```
 
-- 프레임워크: Vitest + React Testing Library
-- Anthropic SDK mock 없음
+**ralph_loop 하네스 운영 기능**
 
-#### 타입 시스템
+- CLI `--personas`, `--skip-eval`, `--force` 플래그로 부분 실행 가능
+- 실행 전 비용 추정 출력 (캐시 히트율 고려)
+- 세션별 메타데이터 저장 (`model`, `elapsed_sec`, `usage`)
+- 기존 결과 파일 있으면 스킵 (idempotent 실행)
 
-- API 입출력 TypeScript 인터페이스 정의
-- LLM 출력은 `Record<string, unknown>` 캐스팅 후 수동 처리
-- Supabase 타입은 수동 인터페이스 (codegen 미사용)
-
-#### 환경변수
+**환경변수 보안**
 
 | 변수 | 접근 범위 |
 |------|----------|
 | `NEXT_PUBLIC_SUPABASE_URL` | 클라이언트 (공개) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 클라이언트 (공개) |
-| `ANTHROPIC_API_KEY` | 서버 전용 (안전) |
+| `ANTHROPIC_API_KEY` | 서버 전용 ✅ |
 
-#### 에러 처리
+**에러 처리**
 
-- 모든 라우트: `try/catch` + `console.error('[route-name] error:', e)`
 - finalize: 3-attempt retry + 기본값 fallback
-- 사용자 응답: 한국어 에러 메시지 반환
+- 모든 라우트: `try/catch` + `console.error()`
 
 ---
 
-## 미구현 필수 요소
+### ❌ 미구현 (웹 앱)
 
-### 🔴 Priority 1 — 사용자 경험 & AI 신뢰성
-
-#### 스트리밍 응답 미구현
-
-**현재**: 전체 응답 완성 후 일괄 반환 → 2~4초 공백  
-**필요**: `stream: true` + `ReadableStream`으로 토큰 단위 실시간 출력
-
-```typescript
-// 현재
-const response = await anthropic.messages.create({ ... })
-
-// 필요
-const stream = await anthropic.messages.stream({ ..., stream: true })
-return new Response(stream.toReadableStream())
-```
-
-#### Tool Use / Function Calling 미구현
-
-**현재**: 텍스트 → `parseJSONLoose()` 수동 파싱 (실패 위험)  
-**필요**: Anthropic `tools` 파라미터로 스키마 기반 구조화 추출
-
-```typescript
-tools: [{
-  name: "extract_career_insights",
-  input_schema: {
-    type: "object",
-    properties: {
-      presenting_issue: { type: "string", maxLength: 500 },
-      growth_competencies: { type: "array", items: { enum: COMPETENCY_CODES } }
-    },
-    required: ["presenting_issue", "growth_competencies"]
-  }
-}]
-```
-
-### 🔴 Priority 2 — 운영 안정성
-
-#### Zod 런타임 검증 없음
-
-**현재 위험**: LLM이 잘못된 JSON 반환 시 → `clipString(undefined)` → 빈 값이 DB 저장
-
-```typescript
-// 현재 — 타입 안전하지 않음
-const extraction = JSON.parse(text) as Record<string, unknown>;
-const presenting_issue = clipString(extraction.presenting_issue, 500);
-
-// 필요
-const FinalizeSchema = z.object({
-  presenting_issue: z.string().max(500),
-  growth_competencies: z.array(CompetencyCodeEnum).max(5),
-  session_duration_choice: z.enum(['short', 'medium', 'long']).default('medium')
-});
-```
-
-#### 구조적 로깅 없음
-
-```typescript
-// 현재 — 운영 디버깅 불가
-console.error('[career-interview/chat] error:', e);
-
-// 필요 — 운영 가능한 구조
-logger.error({
-  route: 'career-interview/chat',
-  userId: context.userId,
-  turnCount: messages.length,
-  retryAttempt: attempt,
-  anthropicRequestId: response?.id,
-  errorType: e.name
-});
-```
-
-#### 지수 백오프 없음
-
-```typescript
-// 현재 — 고정 3회 즉시 재시도 (429 악화 가능)
-for (let attempt = 0; attempt < 3; attempt++) { ... }
-
-// 필요
-const delay = Math.min(1000 * 2 ** attempt + Math.random() * 100, 10000);
-await new Promise(r => setTimeout(r, delay));
-```
-
-### 🟡 Priority 3 — 품질 보증 인프라
-
-#### API 라우트 테스트 전무
+**API 라우트 테스트 전무**
 
 ```
 web/src/app/api/
@@ -485,66 +315,91 @@ web/src/app/api/
   career-interview/finalize/ ❌ 테스트 없음
   reflect-coach/chat/        ❌ 테스트 없음
   career-personalize/        ❌ 테스트 없음
-  career-actions/            ❌ 테스트 없음
 ```
 
-#### CI/CD 파이프라인 없음
+**Zod 런타임 검증 없음**
+
+```typescript
+// 현재 위험: LLM 잘못된 JSON → clipString(undefined) → 빈 값 DB 저장
+const extraction = JSON.parse(text) as Record<string, unknown>;
+
+// 필요
+const FinalizeSchema = z.object({
+  presenting_issue: z.string().max(500),
+  growth_competencies: z.array(CompetencyCodeEnum).max(5),
+});
+```
+
+**CI/CD 파이프라인 없음**
 
 ```
-현재: 코드 변경 → 수동 ralph_loop → 점수 확인 → PR 머지
+현재: 코드 변경 → 수동 ralph_loop 실행 → 점수 확인 → PR 머지
 
 필요:
   PR 생성 → GitHub Actions
-    → vitest 유닛 테스트
-    → tsc --noEmit 타입체크
-    → (선택) 미니 배터리 5페르소나 실행
+    → vitest + tsc --noEmit
+    → (선택) 미니 배터리 5페르소나
     → 품질 게이트 통과 시 머지 허용
 ```
 
-#### 프롬프트 버전 관리 미흡
-
-```
-현재:
-  ralph_loop/prompt/system_prompt_v1.md  (스냅샷, 수동 관리)
-  docs/ai_prompt/system_prompt.md        (실제 사용)
-  → 두 파일 간 드리프트 위험
-
-필요:
-  프롬프트 파일 상단에 버전 헤더
-  # system_prompt v2.3.1 (2026-06-10)
-  API 응답에 사용된 프롬프트 버전 로깅
-```
-
-### 🟢 Priority 4 — 지능 고도화
-
-#### 크로스세션 패턴 감지 루프 없음
-
-```
-현재: 각 세션이 독립적
-
-필요:
-  Session 1 (3주 전) ─┐
-  Session 2 (2주 전) ─┼→ [패턴 분석] → "3주 연속 실행력 이슈"
-  Session 3 (이번 주) ─┘
-```
-
-#### 토큰 사용량 추적 없음
+**구조적 로깅 없음**
 
 ```typescript
-// response.usage 데이터 현재 미저장
-{
-  input_tokens: 1200,
-  output_tokens: 350,
-  cache_read_input_tokens: 800,   // 캐시 히트
-  cache_creation_input_tokens: 400 // 캐시 생성
-}
-// → Supabase에 저장해 세션별 비용 집계 필요
+// 현재: console.error('[career-interview/chat] error:', e)
+// 필요: route + userId + anthropicRequestId + retryAttempt 포함한 구조적 로그
 ```
 
-#### 임베딩 / 벡터 검색 없음
+**지수 백오프 없음**
 
-- 현재: 하드코딩된 키워드 기반 역량 매칭
-- 필요: Supabase `pgvector` + 인터뷰 내러티브 임베딩 → 의미적 유사도 검색
+- 현재: 고정 3회 즉시 재시도 → Anthropic 429 상황 악화 가능
+- 필요: `min(1000 × 2^attempt + jitter, 10000)` ms 대기
+
+---
+
+### ❌ 미구현 (ralph_loop 하네스)
+
+- `churn_model.py` 공식 단위 테스트 없음
+- Method A ↔ Method B 불일치 자동 탐지 없음
+- 프롬프트 버전 헤더 미적용 (`ralph_loop/prompt/` 스냅샷과 실제 사용 파일 간 드리프트 위험)
+- 실제 사용자 데이터 수집 후 공식 재보정 파이프라인 없음
+
+---
+
+## 미구현 필수 요소 (제품 기능)
+
+### 🔴 Priority 1 — 사용자 경험 & AI 신뢰성
+
+**스트리밍 응답** — 현재 2~4초 공백 후 일괄 출력
+
+```typescript
+// 현재
+const response = await anthropic.messages.create({ ... })
+// 필요
+const stream = await anthropic.messages.stream({ ..., stream: true })
+return new Response(stream.toReadableStream())
+```
+
+**Tool Use / Function Calling** — 현재 수동 JSON 파싱 실패 위험
+
+```typescript
+tools: [{ name: "extract_career_insights", input_schema: { ... } }]
+```
+
+### 🟡 Priority 2 — 지능 고도화
+
+**크로스세션 패턴 감지**
+
+```
+Session 1~N → [패턴 분석 루프] → "3주 연속 실행력 이슈" 같은 장기 인사이트
+```
+
+**토큰 사용량 추적**
+
+```typescript
+// response.usage → Supabase 저장 → 세션별 비용 집계 대시보드
+```
+
+**임베딩 / 벡터 검색** — Supabase pgvector + 인터뷰 내러티브 의미적 유사도 검색
 
 ---
 
@@ -554,9 +409,9 @@ web/src/app/api/
 Phase 1 — 운영 안정화 (즉시)
   ① Zod 스키마로 LLM 출력 런타임 검증
   ② 구조적 로깅 (route + userId + requestId)
-  ③ 지수 백오프 재시도 (Anthropic API 과부하 대응)
+  ③ 지수 백오프 재시도
 
-Phase 2 — 품질 보증 (단기)
+Phase 2 — 품질 보증 연결 (단기)
   ④ 스트리밍 응답 (UX 직결)
   ⑤ Tool Use로 JSON 추출 안정화
   ⑥ API 라우트 유닛 테스트 + GitHub Actions CI
@@ -572,19 +427,29 @@ Phase 3 — 지능 고도화 (중기)
 
 ## 핵심 진단 요약
 
+### [A] AI-Native 제품 기능
+
 | 영역 | 현황 | 평가 |
 |------|------|------|
-| 대화 AI 기반 | 멀티턴, 상태관리, 위기감지 | ✅ 완성도 높음 |
+| 멀티턴 대화 AI | 상태관리, 위기감지 포함 | ✅ 완성도 높음 |
 | 프롬프트 엔지니어링 | 캐싱, Extended Thinking, 상태주입 | ✅ 완성도 높음 |
 | 개인화 파이프라인 | 하이브리드 매칭 + AI 개인화 | ✅ 양호 |
-| 평가 인프라 | 3-Layer Eval, 34페르소나 배터리 | ✅ 정교함 |
 | 스트리밍 | 미구현 | ❌ UX 직결 |
-| 런타임 검증 | Zod 없음, 수동 클리핑만 | ❌ 운영 위험 |
-| 테스트 커버리지 | API 라우트 전무 | ❌ 품질 보증 공백 |
-| CI/CD | 없음 | ❌ 수동 배포 |
-| 로깅/모니터링 | console.error만 | ❌ 운영 디버깅 불가 |
-| 멀티세션 분석 | 없음 | 🟡 장기 코칭 가치 |
+| Tool Use | 미구현 | ❌ 추출 안정성 |
+| 크로스세션 분석 | 미구현 | 🟡 장기 코칭 가치 |
 
-> **결론**: Ralph-loop의 평가 인프라(3-Layer Eval)는 매우 정교하게 설계되어 있으나,  
-> 그 결과가 웹 앱의 품질 게이트(CI, 테스트, 검증)와 연결되지 않는 구조적 공백이 존재합니다.  
-> Phase 1 운영 안정화 → Phase 2 품질 보증 연결 순서로 접근하는 것을 권장합니다.
+### [B] 개발 인프라 (Harness)
+
+| 영역 | 현황 | 평가 |
+|------|------|------|
+| careerpt_sim 평가 배터리 | 3-Layer Eval, 34페르소나 | ✅ 정교함 |
+| retention_sim 이탈 예측 | 수학 + AI 교차검증 | ✅ 정교함 |
+| 웹 앱 테스트 커버리지 | API 라우트 전무 | ❌ 품질 보증 공백 |
+| CI/CD | 없음 | ❌ 수동 배포 |
+| 런타임 검증 (Zod) | 없음 | ❌ 운영 위험 |
+| 로깅/모니터링 | console.error만 | ❌ 운영 디버깅 불가 |
+| 프롬프트 버전 관리 | 수동 스냅샷 | 🟡 드리프트 위험 |
+
+> **결론**: [B] 평가 인프라(careerpt_sim, retention_sim)는 매우 정교하게 설계되어 있으나,  
+> 그 결과가 [A] 웹 앱의 품질 게이트(CI, 테스트, 런타임 검증)와 **연결되지 않는 구조적 공백**이 존재합니다.  
+> Phase 1 운영 안정화 → Phase 2 두 레이어의 품질 게이트 연결 순서로 접근하는 것을 권장합니다.
