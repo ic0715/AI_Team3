@@ -29,15 +29,15 @@ CareerPT 시스템
 1. [프로젝트 개요](#프로젝트-개요)
 2. [A. AI-Native 제품 기능](#a-ai-native-제품-기능)
 3. [B. 개발 인프라 — Evaluation Harness](#b-개발-인프라--evaluation-harness)
-   - [ralph_loop — 전체 구조](#ralph_loop--전체-구조)
+   - [ralph\_loop — 전체 평가 프레임워크](#ralph_loop--전체-평가-프레임워크)
      - [멀티벤더 교차검증 설계 원칙](#멀티벤더-교차검증-설계-원칙)
      - [4단계 세션 파이프라인](#4단계-세션-파이프라인)
      - [3-Layer 평가 시스템](#3-layer-평가-시스템)
      - [34페르소나 설계](#34페르소나-설계)
      - [프롬프트 개선 루프](#프롬프트-개선-루프)
      - [비용 구조](#비용-구조)
-   - [careerpt_sim — 코칭 품질 평가 배터리](#careerpt_sim--코칭-품질-평가-배터리)
-   - [retention_sim — 12주 이탈 예측 연구](#retention_sim--12주-이탈-예측-연구)
+   - [careerpt\_sim — 코칭 품질 평가 배터리](#careerpt_sim--코칭-품질-평가-배터리)
+   - [retention\_sim — 12주 이탈 예측 연구](#retention_sim--12주-이탈-예측-연구)
 4. [Harness Engineering 구현 현황](#harness-engineering-구현-현황)
 
 ---
@@ -49,6 +49,8 @@ CareerPT 시스템
 - **스택**: Next.js 16 + Anthropic SDK (`claude-sonnet-4-6`) + Supabase
 - **핵심 플로우**: 커리어 인터뷰 (멀티턴 대화) → 역량 매칭 → 주간 리플렉션 코칭
 - **품질 보증**: `ralph_loop` — 34개 페르소나 시뮬레이션 기반 오프라인 평가 인프라
+
+---
 
 ---
 
@@ -125,6 +127,8 @@ session_duration: medium
 
 ---
 
+---
+
 ## B. 개발 인프라 — Evaluation Harness
 
 > **정의**: 팀이 로컬에서 실행하는 오프라인 도구.  
@@ -132,7 +136,7 @@ session_duration: medium
 
 ---
 
-### ralph_loop — 전체 구조
+### ralph_loop — 전체 평가 프레임워크
 
 `ralph_loop`는 CareerPT AI 코치의 **프롬프트 품질을 정량적으로 측정하고 반복 개선하는 자동화 평가 프레임워크**입니다.  
 단순한 테스트 도구가 아니라, 34개 심리적으로 다양한 페르소나를 실제 코칭 세션으로 시뮬레이션하고 3개 독립 모델이 교차 평가하는 **AI-Native 품질 보증 시스템**입니다.
@@ -146,8 +150,6 @@ ralph_loop/
                     → "사용자가 언제, 왜 떠나는가?"를 예측
 ```
 
----
-
 #### 멀티벤더 교차검증 설계 원칙
 
 > **코치(Claude) ≠ 페르소나(GPT-4o) ≠ 심판(Gemini/Haiku)**  
@@ -159,8 +161,6 @@ ralph_loop/
 | 페르소나 (시뮬레이션) | GPT-4o | 34가지 사용자 유형 역할 |
 | 심판 (평가) | Gemini / Claude Haiku | 턴별 코칭 품질 분류 |
 | 자기평가 (Layer C) | GPT-4o (페르소나 inline) | 세션 후 만족도 4축 평가 |
-
----
 
 #### 4단계 세션 파이프라인
 
@@ -181,8 +181,6 @@ Phase 3. 액션 아이템 생성 (#4)
 Phase 4. 3-Layer 자동 평가
   → 세션 점수 산출
 ```
-
----
 
 #### 3-Layer 평가 시스템
 
@@ -223,16 +221,12 @@ session_score = 10 × (0.5·LayerA + 0.3·LayerB + 0.2·LayerC)
            비정형 7개 모두 ≥ 8.0
 ```
 
----
-
 #### 34페르소나 설계
 
 - **23개 컬럼**: CliftonStrengths Top5 × 커리어 단계 × 성격 유형 × 트리거 유형 × 3개월 전 상황
 - **비정형 7개**: 단답형·비꼼·코드스위칭·단일 도메인 극단치 등 엣지케이스 의도 설계
 - **시크릿 골**: 페르소나가 숨기고 있는 목표 — 코치가 발설하면 해당 라운드 무효 처리
 - **목표 선택 규칙**: `specificity_level == "medium"` 우선 선택 → 라운드 간 재현성 보장
-
----
 
 #### 프롬프트 개선 루프
 
@@ -249,8 +243,6 @@ session_score = 10 × (0.5·LayerA + 0.3·LayerB + 0.2·LayerC)
 최대 10라운드 → 미달 시 가중치/임계값 재설계
 ```
 
----
-
 #### 비용 구조
 
 | 범위 | 비용 |
@@ -264,11 +256,11 @@ session_score = 10 × (0.5·LayerA + 0.3·LayerB + 0.2·LayerC)
 
 ---
 
-### careerpt_sim — 코칭 품질 평가 배터리
+#### careerpt_sim — 코칭 품질 평가 배터리
 
-**목적**: "프롬프트 변경이 코칭 품질을 실제로 향상시켰는가?"를 34개 페르소나 시뮬레이션으로 검증.
+> ralph_loop의 하위 모듈 — 1세션 코칭 품질을 평가하는 핵심 배터리
 
-#### 파이프라인
+##### 파이프라인
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -293,15 +285,15 @@ session_score = 10 × (0.5·LayerA + 0.3·LayerB + 0.2·LayerC)
 └──────────────────────────────────────────────────────────┘
 ```
 
-#### 3-Layer 평가 상세
+##### 3-Layer 평가 상세
 
 | Layer | 방법 | 평가 항목 | 모델 |
 |-------|------|----------|------|
-| A | LLM-as-Judge | 턴별 코칭 굿 5개 / 안티패턴 4개 분류 | Gemini / Claude Haiku |
+| A | LLM-as-Judge | 턴별 코칭 굿 4개 / 안티패턴 5개 분류 | Gemini / Claude Haiku |
 | B | 결정론적 | 카드 매칭 정확도, 텍스트 길이 범위 검증 | 없음 (순수 Python) |
 | C | 페르소나 자기평가 | overall_value, insight_novelty, emotional_safety, desire_to_return (1~10) | GPT-4o |
 
-#### 산출물 (세션당)
+##### 산출물 (세션당)
 
 ```
 round_{N}/persona_{NN}/
@@ -311,7 +303,7 @@ round_{N}/persona_{NN}/
 └── session_score.json          종합 점수 + 비용 ($0.50/세션, 캐싱 적용)
 ```
 
-#### 제품 기능과의 관계
+##### 제품 기능과의 관계
 
 ```
 careerpt_sim 배터리 실행
@@ -323,14 +315,11 @@ careerpt_sim 배터리 실행
 
 ---
 
-### retention_sim — 12주 이탈 예측 연구
+#### retention_sim — 12주 이탈 예측 연구
 
-**목적**: "출시 전, 어느 주차에 어떤 이유로 이탈이 발생하는가?"를 예측해 제품 Hook 전략 수립.
+> ralph_loop의 하위 모듈 — careerpt_sim 결과를 입력받아 12주 리텐션을 예측
 
-> careerpt_sim이 **코칭 품질**을 검증한다면,  
-> retention_sim은 **12주 리텐션**을 예측합니다.
-
-#### careerpt_sim과의 데이터 의존 관계
+##### careerpt_sim과의 데이터 의존 관계
 
 ```
 careerpt_sim Layer C 점수
@@ -339,7 +328,7 @@ careerpt_sim Layer C 점수
 retention_sim → 12주 이탈 곡선 + 훅 효과 분석
 ```
 
-#### 2개 병렬 트랙 파이프라인
+##### 2개 병렬 트랙 파이프라인
 
 ```
 Layer C 점수 + 페르소나 메타데이터
@@ -357,7 +346,7 @@ Layer C 점수 + 페르소나 메타데이터
                두 방법 불일치 지점 = 공식이 놓친 감정적 맥락
 ```
 
-#### Method A — 수학적 이탈 공식
+##### Method A — 수학적 이탈 공식
 
 | 시나리오 | score 배수 | dtr 조정 | 의미 |
 |----------|-----------|---------|------|
@@ -365,7 +354,7 @@ Layer C 점수 + 페르소나 메타데이터
 | current | 1.00× | 0.0 | 실제 careerpt_sim 결과 |
 | target | 1.00× | +1.8 | session_score ≥9 달성 시 |
 
-#### Method B — AI-Native 시나리오 생성 핵심 발견
+##### Method B — AI-Native 시나리오 생성 핵심 발견
 
 | 훅 | Method A 예측 | Method B 발견 |
 |----|-------------|--------------|
@@ -375,12 +364,14 @@ Layer C 점수 + 페르소나 메타데이터
 
 > **핵심 가치**: 수식이 놓친 감정적 맥락을 AI 내러티브가 포착. 두 방법의 **불일치 지점이 product insight**.
 
-#### 비용
+##### 비용
 
 | 항목 | 비용 |
 |------|------|
 | Method A (순수 Python) | $0 |
 | Method B 전체 (34페르소나, 캐싱 적용) | ~$1.00 |
+
+---
 
 ---
 
