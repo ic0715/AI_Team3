@@ -125,6 +125,27 @@ session_duration: medium
 
 ---
 
+### ralph_loop — 전체 구조
+
+`ralph_loop`는 careerpt_sim과 retention_sim을 포함하는 **상위 평가 프레임워크**입니다.
+
+```
+ralph_loop/
+├── careerpt_sim    1세션 코칭 품질 평가 배터리
+│                   → "프롬프트가 충분히 좋은가?"를 검증
+│
+└── retention_sim   12주 사용자 이탈 예측 연구
+                    → "사용자가 언제, 왜 떠나는가?"를 예측
+```
+
+**운영 방식**
+
+- 34개 페르소나 (CliftonStrengths × 커리어 단계 조합) + 비정형 7개 엣지케이스로 구성된 배터리
+- Claude Sonnet (코치) / GPT-4o (페르소나 시뮬레이터) / Gemini·Claude Haiku (평가 심판) 3개 모델 협업
+- 프롬프트 변경 시 배터리 재실행 → 점수 통과 후 `docs/ai_prompt/` PR 반영
+
+---
+
 ### careerpt_sim — 코칭 품질 평가 배터리
 
 **목적**: "프롬프트 변경이 코칭 품질을 실제로 향상시켰는가?"를 34개 페르소나 시뮬레이션으로 검증.
