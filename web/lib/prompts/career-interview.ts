@@ -37,6 +37,8 @@ export function buildSystemPrompt(opts: {
   // 세션 길이 한계(상한 60턴)에 근접했을 때 true. running-state 주입과 무관하게
   // §14 자연 종료를 확실히 트리거하기 위해 시스템 프롬프트 끝에 강한 종료 지시를 덧붙임.
   forceClose?: boolean;
+  // 이전 인터뷰 세션에서 생성된 요약 텍스트 (없으면 생략)
+  previousSummary?: string;
 }): string {
   const careerLevelLabel = ({
     junior_new: '주니어(신입)',
@@ -71,6 +73,12 @@ ${pairContext}
 ${pairBlock}
 응답은 반드시 한국어로, 사용자에게 그대로 보여줄 텍스트만. 메타 설명·태그·마크다운 펜스 금지.`;
 
+  // 이전 인터뷰 요약이 있으면 코치 전용 컨텍스트 블록으로 주입.
+  // 사용자에게 직접 언급하거나 확인받지 않도록 명시.
+  const prevSummaryBlock = opts.previousSummary
+    ? `\n\n## 이전 인터뷰 요약 (코치 참고용)\n\n※ 이전 인터뷰에서 이 사용자와 나눈 대화의 요약입니다.\n※ 사용자에게 직접 언급하거나 확인받지 마세요. 코치의 맥락 파악용으로만 사용하세요.\n※ 이전 주제를 강요하거나 반복하지 말고, 오늘 사용자가 꺼내는 이야기에 집중하세요.\n\n${opts.previousSummary}`
+    : '';
+
   // 대화가 충분히 길어진 턴: §14를 확실히 발동시키는 강한 마무리 유도 지시.
   const forceCloseBlock = opts.forceClose
     ? `
@@ -86,7 +94,7 @@ ${pairBlock}
 
 ---
 
-${userInfoBlock}
+${userInfoBlock}${prevSummaryBlock}
 
 ---
 
