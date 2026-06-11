@@ -81,7 +81,8 @@ interface FinalizeResult {
 async function finalizeInterview(
   messages: Message[],
   context: UserContext,
-  userId: string
+  userId: string,
+  rowId: string | null,
 ): Promise<FinalizeResult> {
   // 1) 서버 라우트에서 Claude로 인사이트 추출
   const res = await fetch('/api/career-interview/finalize', {
@@ -98,22 +99,37 @@ async function finalizeInterview(
   }
   const result = (await res.json()) as FinalizeResult;
 
-  // 2) 클라이언트(인증된 supabase)로 DB INSERT — RLS 통과
-  // conversation_messages: 대화 원문 저장 (백그라운드 요약에 사용)
-  const { data: insertedRow, error } = await supabase
-    .from('career_interview_results')
-    .insert({
-      user_id: userId,
-      key_insights: result.extraction,
-      session_duration_choice: result.session_duration_choice,
-      ai_summary: result.ai_summary,
-      conversation_messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    })
-    .select('id')
-    .single();
+  // 2) DB 저장 — in_progress 행이 있으면 UPDATE, 없으면 INSERT(예외 상황 fallback)
+  const payload = {
+    key_insights: result.extraction,
+    session_duration_choice: result.session_duration_choice,
+    ai_summary: result.ai_summary,
+    conversation_messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    status: 'completed',
+  };
 
-  if (error) throw error;
-  return { ...result, interviewId: insertedRow.id };
+  let finalId: string;
+  if (rowId) {
+    const { data: updatedRow, error } = await supabase
+      .from('career_interview_results')
+      .update(payload)
+      .eq('id', rowId)
+      .select('id')
+      .single();
+    if (error) throw error;
+    finalId = updatedRow.id;
+  } else {
+    // rowId 없는 예외 상황 — INSERT fallback
+    const { data: insertedRow, error } = await supabase
+      .from('career_interview_results')
+      .insert({ user_id: userId, ...payload })
+      .select('id')
+      .single();
+    if (error) throw error;
+    finalId = insertedRow.id;
+  }
+
+  return { ...result, interviewId: finalId };
 }
 // ─────────────────────────────────────────────────────────────
 
@@ -195,6 +211,9 @@ function CareerInterviewContent() {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const savedSessionRef = useRef<{ messages: Message[] } | null>(null);
 
+  // DB 행 ID — 인터뷰 시작 시 생성, 중간 자동 저장/finalize에 사용
+  const interviewRowIdRef = useRef<string | null>(null);
+
   // 인터뷰 이미 완료 여부 (뒤로가기 진입 시)
   const [interviewDone, setInterviewDone] = useState(false);
 
@@ -205,31 +224,35 @@ function CareerInterviewContent() {
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
 
-      // 인터뷰 이미 완료된 경우 — 뒤로가기로 진입했을 때 새 인터뷰 시작 방지
-      const { data: existingInterview } = await supabase
+      // 최근 인터뷰 행 조회 — completed: 진입 차단, in_progress: 복원 시도
+      const { data: latestRow } = await supabase
         .from('career_interview_results')
-        .select('id')
+        .select('id, status, conversation_messages, conversation_summary')
         .eq('user_id', user.id)
-        .limit(1);
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (existingInterview?.length) {
+      if (latestRow?.status === 'completed') {
         setInterviewDone(true);
         setLoadingContext(false);
         return;
       }
 
-      const [{ data: profile }, { data: strengthData }, { data: prevInterviews }] = await Promise.all([
+      const [{ data: profile }, { data: strengthData }] = await Promise.all([
         supabase.from('profiles').select('nickname, job_field, career_level, main_concern').eq('id', user.id).single(),
         supabase.from('strength_analyses').select('strengths').eq('user_id', user.id).eq('is_latest', true).limit(1),
-        // 이전 인터뷰의 요약 — 다음 인터뷰 시작 시 코치 컨텍스트로 주입됨
-        supabase
-          .from('career_interview_results')
-          .select('conversation_summary')
-          .eq('user_id', user.id)
-          .not('conversation_summary', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(1),
       ]);
+
+      // 이전 completed 인터뷰의 요약만 코치 컨텍스트로 사용 (in_progress 제외)
+      const { data: prevInterviews } = await supabase
+        .from('career_interview_results')
+        .select('conversation_summary')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .not('conversation_summary', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       const ctx: UserContext = {
         nickname: profile?.nickname ?? '친구',
@@ -241,14 +264,43 @@ function CareerInterviewContent() {
       };
       setContext(ctx);
 
-      // 세션 복원 확인 — 유저가 실제로 답변한 경우에만 복원 팝업 표시
-      const saved = loadSession();
-      const hasUserReply = saved?.messages.some((m) => m.role === 'user') ?? false;
-      if (saved && hasUserReply) {
-        savedSessionRef.current = saved;
-        setShowResumePrompt(true);
+      if (latestRow?.status === 'in_progress') {
+        // DB에 저장된 진행 중 세션 — 복원 팝업 표시
+        interviewRowIdRef.current = latestRow.id;
+        const dbMsgs = (latestRow.conversation_messages as Array<{ role: 'user' | 'assistant'; content: string }> | null) ?? [];
+        const hasUserReply = dbMsgs.some((m) => m.role === 'user');
+        if (hasUserReply) {
+          savedSessionRef.current = {
+            messages: dbMsgs.map((m) => ({
+              id: crypto.randomUUID(),
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(),
+            })),
+          };
+          setShowResumePrompt(true);
+        } else {
+          // in_progress 행은 있지만 대화 내용 없음 → 기존 행 재사용하며 새 시작
+          startNewInterview(ctx);
+        }
       } else {
-        startNewInterview(ctx);
+        // 새 인터뷰 — DB에 in_progress 행 미리 생성
+        const { data: newRow } = await supabase
+          .from('career_interview_results')
+          .insert({ user_id: user.id, status: 'in_progress' })
+          .select('id')
+          .single();
+        interviewRowIdRef.current = newRow?.id ?? null;
+
+        // sessionStorage 복원 확인 (브라우저 새로고침 대비)
+        const saved = loadSession();
+        const hasUserReply = saved?.messages.some((m) => m.role === 'user') ?? false;
+        if (saved && hasUserReply) {
+          savedSessionRef.current = saved;
+          setShowResumePrompt(true);
+        } else {
+          startNewInterview(ctx);
+        }
       }
 
       setLoadingContext(false);
@@ -287,8 +339,34 @@ function CareerInterviewContent() {
 
   const discardAndRestart = useCallback(() => {
     setShowResumePrompt(false);
-    if (context) startNewInterview(context);
-  }, [context, startNewInterview]);
+    if (!context || !userId) return;
+
+    // 이전 in_progress 행 버리기 (fire-and-forget)
+    const oldRowId = interviewRowIdRef.current;
+    if (oldRowId) {
+      void (async () => {
+        try {
+          await supabase.from('career_interview_results').update({ status: 'abandoned' }).eq('id', oldRowId);
+        } catch { /* ignore */ }
+      })();
+    }
+
+    // 새 in_progress 행 생성
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from('career_interview_results')
+          .insert({ user_id: userId, status: 'in_progress' })
+          .select('id')
+          .single();
+        interviewRowIdRef.current = data?.id ?? null;
+      } catch {
+        interviewRowIdRef.current = null;
+      }
+    })();
+
+    startNewInterview(context);
+  }, [context, userId, startNewInterview]);
 
   // ── 스크롤 헬퍼 ──────────────────────────────────────────
   // iOS Safari에서 scrollIntoView는 overflow 컨테이너가 아닌
@@ -360,7 +438,7 @@ function CareerInterviewContent() {
     setIsFinalizing(true);
 
     try {
-      const result = await finalizeInterview(msgs, context, userId);
+      const result = await finalizeInterview(msgs, context, userId, interviewRowIdRef.current);
       // CONTRACT_v2 §7: 세션 무효 — 신규 4키 중 핵심 3개가 모두 빈 문자열이면 결과 화면 진입 차단
       const invalid =
         !result.extraction.presenting_issue &&
@@ -393,16 +471,31 @@ function CareerInterviewContent() {
   const triggerCrisisFinalize = useCallback(async () => {
     if (!userId) return;
     try {
-      await supabase
-        .from('career_interview_results')
-        .insert({
-          user_id: userId,
-          key_insights: null,
-          session_duration_choice: sessionDuration,
-          ai_summary: '정서 위기 가드레일 작동으로 인터뷰 중단',
-        });
+      const rowId = interviewRowIdRef.current;
+      if (rowId) {
+        await supabase
+          .from('career_interview_results')
+          .update({
+            key_insights: null,
+            session_duration_choice: sessionDuration,
+            ai_summary: '정서 위기 가드레일 작동으로 인터뷰 중단',
+            status: 'completed',
+          })
+          .eq('id', rowId);
+      } else {
+        // rowId 없는 예외 상황 — INSERT fallback
+        await supabase
+          .from('career_interview_results')
+          .insert({
+            user_id: userId,
+            key_insights: null,
+            session_duration_choice: sessionDuration,
+            ai_summary: '정서 위기 가드레일 작동으로 인터뷰 중단',
+            status: 'completed',
+          });
+      }
     } catch {
-      // INSERT 실패해도 모달은 띄움 — 안전이 우선
+      // 실패해도 모달은 띄움 — 안전이 우선
     }
     clearSession();
     setShowCrisisModal(true);
@@ -439,6 +532,21 @@ function CareerInterviewContent() {
       const updatedMessages = [...msgs, assistantMessage];
       setMessages(updatedMessages);
       pendingTurnRef.current = null; // 성공 → 재전송 정보 해제
+
+      // 중간 자동 저장 (fire-and-forget) — 브라우저 닫아도 대화 복원 가능
+      const rowId = interviewRowIdRef.current;
+      if (rowId) {
+        void (async () => {
+          try {
+            await supabase
+              .from('career_interview_results')
+              .update({ conversation_messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })) })
+              .eq('id', rowId);
+          } catch (e) {
+            console.warn('[interview] auto-save failed:', e);
+          }
+        })();
+      }
 
       // Path C: 정서 위기 — 추출 스킵, DB 메타만 INSERT, Crisis 모달
       if (meta.isCrisis) {
