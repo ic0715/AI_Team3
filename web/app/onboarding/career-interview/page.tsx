@@ -220,9 +220,11 @@ function CareerInterviewContent() {
   // ── 컨텍스트 로드 (프로필 + 강점) ──────────────────────────
   useEffect(() => {
     const loadContext = async () => {
+      console.log('[interview] loadContext started');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
       setUserId(user.id);
+      console.log('[interview] user authenticated:', user.id);
 
       // 최근 인터뷰 행 조회 — completed: 진입 차단, in_progress: 복원 시도
       const { data: latestRow, error: latestRowError } = await supabase
