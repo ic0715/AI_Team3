@@ -276,12 +276,21 @@ function CareerInterviewContent() {
         const hasUserReply = dbMsgs.some((m) => m.role === 'user');
         if (hasUserReply) {
           savedSessionRef.current = {
-            messages: dbMsgs.map((m) => ({
-              id: crypto.randomUUID(),
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(),
-            })),
+            messages: dbMsgs.map((m) => {
+              // user 메시지의 <현재_상태>...</현재_상태> prefix는 AI 전송용이므로
+              // UI 렌더링용 displayContent에서는 제거
+              const displayContent =
+                m.role === 'user'
+                  ? m.content.replace(/^<현재_상태>[\s\S]*?<\/현재_상태>\n?/, '').trim()
+                  : undefined;
+              return {
+                id: crypto.randomUUID(),
+                role: m.role,
+                content: m.content,
+                ...(displayContent !== undefined && { displayContent }),
+                timestamp: new Date(),
+              };
+            }),
           };
           setShowResumePrompt(true);
         } else {
