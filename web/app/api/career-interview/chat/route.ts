@@ -12,6 +12,7 @@ interface ChatRequestBody {
     careerLevel: string;
     mainConcern?: string;
     strengths: Array<{ name_ko: string; name_en: string; domain: string }>;
+    previousSummary?: string;
   };
 }
 
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
       strengthsKo: context.strengths.map((s) => s.name_ko),
       strengthsEn: context.strengths.map((s) => s.name_en),
       forceClose,
+      previousSummary: context.previousSummary,
     });
 
     // 히스토리 캐시 breakpoint: 현재 user 입력 직전 메시지에 cache_control을 달아

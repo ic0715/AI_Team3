@@ -37,6 +37,7 @@ export interface UserContext {
   careerLevel: string;
   mainConcern: string;
   strengths: Array<{ name_ko: string; name_en: string; domain: string }>;
+  previousSummary?: string;
 }
 
 interface AIChatParams {
@@ -74,6 +75,7 @@ interface FinalizeResult {
   extraction: CareerInterviewKeyInsights;
   session_duration_choice: SessionDurationChoice;
   ai_summary: string;
+  interviewId: string;
 }
 
 async function finalizeInterview(
@@ -97,17 +99,21 @@ async function finalizeInterview(
   const result = (await res.json()) as FinalizeResult;
 
   // 2) 클라이언트(인증된 supabase)로 DB INSERT — RLS 통과
-  const { error } = await supabase
+  // conversation_messages: 대화 원문 저장 (백그라운드 요약에 사용)
+  const { data: insertedRow, error } = await supabase
     .from('career_interview_results')
     .insert({
       user_id: userId,
       key_insights: result.extraction,
       session_duration_choice: result.session_duration_choice,
       ai_summary: result.ai_summary,
-    });
+      conversation_messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    })
+    .select('id')
+    .single();
 
   if (error) throw error;
-  return result;
+  return { ...result, interviewId: insertedRow.id };
 }
 // ─────────────────────────────────────────────────────────────
 
@@ -212,9 +218,17 @@ function CareerInterviewContent() {
         return;
       }
 
-      const [{ data: profile }, { data: strengthData }] = await Promise.all([
+      const [{ data: profile }, { data: strengthData }, { data: prevInterviews }] = await Promise.all([
         supabase.from('profiles').select('nickname, job_field, career_level, main_concern').eq('id', user.id).single(),
         supabase.from('strength_analyses').select('strengths').eq('user_id', user.id).eq('is_latest', true).limit(1),
+        // 이전 인터뷰의 요약 — 다음 인터뷰 시작 시 코치 컨텍스트로 주입됨
+        supabase
+          .from('career_interview_results')
+          .select('conversation_summary')
+          .eq('user_id', user.id)
+          .not('conversation_summary', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1),
       ]);
 
       const ctx: UserContext = {
@@ -223,6 +237,7 @@ function CareerInterviewContent() {
         careerLevel: profile?.career_level ?? '',
         mainConcern: profile?.main_concern ?? '',
         strengths: strengthData?.[0]?.strengths ?? [],
+        previousSummary: prevInterviews?.[0]?.conversation_summary ?? undefined,
       };
       setContext(ctx);
 
@@ -357,6 +372,15 @@ function CareerInterviewContent() {
         return;
       }
       clearSession();
+      // 백그라운드 요약 생성 (fire-and-forget) — 사용자를 기다리게 하지 않음
+      fetch('/api/career-interview/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interviewId: result.interviewId,
+          messages: msgs.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      }).catch((e) => console.warn('[summarize] background call failed:', e));
       router.push('/onboarding/career-result');
     } catch {
       setFinalizeError('저장 중 오류가 발생했어요. 다시 시도해주세요.');
