@@ -225,13 +225,14 @@ function CareerInterviewContent() {
       setUserId(user.id);
 
       // 최근 인터뷰 행 조회 — completed: 진입 차단, in_progress: 복원 시도
-      const { data: latestRow } = await supabase
+      const { data: latestRow, error: latestRowError } = await supabase
         .from('career_interview_results')
         .select('id, status, conversation_messages, conversation_summary')
         .eq('user_id', user.id)
         .order('interviewed_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (latestRowError) console.error('[interview] latestRow query failed:', latestRowError);
 
       if (latestRow?.status === 'completed') {
         setInterviewDone(true);
@@ -285,12 +286,14 @@ function CareerInterviewContent() {
         }
       } else {
         // 새 인터뷰 — DB에 in_progress 행 미리 생성
-        const { data: newRow } = await supabase
+        const { data: newRow, error: insertError } = await supabase
           .from('career_interview_results')
           .insert({ user_id: user.id, status: 'in_progress' })
           .select('id')
           .single();
+        if (insertError) console.error('[interview] in_progress INSERT failed:', insertError);
         interviewRowIdRef.current = newRow?.id ?? null;
+        console.log('[interview] rowId set:', interviewRowIdRef.current);
 
         // sessionStorage 복원 확인 (브라우저 새로고침 대비)
         const saved = loadSession();
