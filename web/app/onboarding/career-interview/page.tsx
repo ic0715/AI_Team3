@@ -229,7 +229,7 @@ function CareerInterviewContent() {
         .from('career_interview_results')
         .select('id, status, conversation_messages, conversation_summary')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .order('interviewed_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -251,7 +251,7 @@ function CareerInterviewContent() {
         .eq('user_id', user.id)
         .eq('status', 'completed')
         .not('conversation_summary', 'is', null)
-        .order('created_at', { ascending: false })
+        .order('interviewed_at', { ascending: false })
         .limit(1);
 
       const ctx: UserContext = {
