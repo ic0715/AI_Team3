@@ -268,7 +268,9 @@ function CareerInterviewContent() {
       if (latestRow?.status === 'in_progress') {
         // DB에 저장된 진행 중 세션 — 복원 팝업 표시
         interviewRowIdRef.current = latestRow.id;
+        console.log('[interview] in_progress row found, rowId:', latestRow.id);
         const dbMsgs = (latestRow.conversation_messages as Array<{ role: 'user' | 'assistant'; content: string }> | null) ?? [];
+        console.log('[interview] dbMsgs count:', dbMsgs.length);
         const hasUserReply = dbMsgs.some((m) => m.role === 'user');
         if (hasUserReply) {
           savedSessionRef.current = {
@@ -545,10 +547,13 @@ function CareerInterviewContent() {
               .from('career_interview_results')
               .update({ conversation_messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })) })
               .eq('id', rowId);
+            console.log('[interview] auto-save ok, messages:', updatedMessages.length);
           } catch (e) {
             console.warn('[interview] auto-save failed:', e);
           }
         })();
+      } else {
+        console.warn('[interview] auto-save skipped — rowId is null');
       }
 
       // Path C: 정서 위기 — 추출 스킵, DB 메타만 INSERT, Crisis 모달
