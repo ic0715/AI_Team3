@@ -74,8 +74,9 @@
 
 | 기능 | 동작 | 구현 시점 |
 | --- | --- | --- |
-| 인터뷰 로드 | `career_interview_results` WHERE `status='completed'` 조회 (RLS로 본인 것만 자동 필터, `user_id`도 명시) | v2 |
-| 정렬 | `interviewed_at` 내림차순 | v2 |
+| 인터뷰 로드 | `career_interview_results` WHERE `status='completed'` AND `key_insights IS NOT NULL` 조회 (RLS로 본인 것만 자동 필터, `user_id`도 명시) | v2 |
+| Path C 제외 | 정서 위기 가드레일 완료행(`key_insights=null`) 제외 — 쿼리 `.not` + 클라이언트 `isDisplayableInterview` 이중 방어 | v2 |
+| 정렬 | `interviewed_at` 내림차순(= 인터뷰 시작 시각) | v2 |
 | 카드 요약 | `conversation_summary` ?? `ai_summary` | v2 |
 | 카드 인사이트 | `key_insights`의 `agreed_focus` / `user_takeaway` | v2 |
 | 카드 탭 → 대화 전문 모달 | `conversation_messages` 전체 표시 (상태 블록 제거) | v2 |
@@ -88,13 +89,41 @@
 
 ## 5. 데이터
 
-- 인터뷰 로그: **`career_interview_results`** (08 커리어 인터뷰 완료 시 저장)
-  - 조회 컬럼: `id`, `interviewed_at`, `ai_summary`, `conversation_summary`, `key_insights`(JSONB), `conversation_messages`(JSONB)
-  - `status` = `'in_progress' | 'completed' | 'abandoned'` — 히스토리는 `'completed'`만 표시
-  - `conversation_messages`: `{ role: 'user' | 'assistant'; content: string }[]`
-    - ⚠️ user `content`에는 AI 전송용 `<현재_상태>…</현재_상태>` prefix가 그대로 저장됨(저장 시 UI용 `displayContent`가 아니라 `content`를 넣음). 표시 전 정규식 `/^<현재_상태>[\s\S]*?<\/현재_상태>\n?/`로 제거 — 08 페이지 in_progress 복원 로직과 동일.
-  - `key_insights`(JSONB): `presenting_issue` / `agreed_focus` / `user_takeaway` 등. Path C(정서 위기) row는 `null`일 수 있음 → 빈 문자열 폴백.
+데이터 소스: **`career_interview_results`** (08 커리어 인터뷰). 히스토리에서 조회하는 컬럼:
+`id`, `interviewed_at`, `ai_summary`, `conversation_summary`, `key_insights`(JSONB), `conversation_messages`(JSONB).
+
+### 5.1 저장 라이프사이클 (08 인터뷰 화면이 기록하는 규칙)
+
+| 시점 | 동작 | 비고 |
+| --- | --- | --- |
+| 인터뷰 시작 | `INSERT { user_id, status:'in_progress' }` | `interviewed_at`=now() **(시작 시각)** |
+| 매 턴(코치 응답 후) | `UPDATE conversation_messages` (auto-save, fire-and-forget) | 브라우저 닫아도 복원 가능 |
+| 정상 완료 | `UPDATE { key_insights, session_duration_choice, ai_summary, conversation_messages, status:'completed' }` → 이후 백그라운드 `/summarize`가 `conversation_summary` UPDATE | `interviewed_at` **재기록 안 함** |
+| Path C(정서 위기) 완료 | `UPDATE { key_insights:null, ai_summary:'정서 위기 가드레일 작동으로 인터뷰 중단', status:'completed' }` | summarize 미호출 → `conversation_summary`=null |
+| 새 인터뷰 시작(기존 in_progress 존재) | 기존 row `status:'abandoned'` → 새 in_progress INSERT | 재인터뷰 시 이력 누적 |
+
+### 5.2 히스토리 노출 규칙 (위 라이프사이클의 귀결)
+
+- **status = 'completed'만 표시** — `in_progress`/`abandoned` 제외.
+- **`key_insights IS NOT NULL`만 표시 (Path C 제외)** — 정서 위기 가드레일 행은 내부 문구(`ai_summary`)가 그대로 노출되고 민감한 순간을 재노출하므로 제외. 쿼리 `.not('key_insights','is',null)` + 클라이언트 `isDisplayableInterview`(필수 3키 중 하나라도 존재)로 이중 방어.
+- **`interviewed_at` = 인터뷰 '시작' 시각** — in_progress INSERT 시 기록되고 완료 시 갱신하지 않음(스키마 문서 표기는 '완료 일시'). 같은 날 완료가 대부분이라 카드 날짜 영향은 작음. (완료 시각이 필요하면 완료 UPDATE에 `interviewed_at = now()` 추가 검토 — 별도 결정.)
+- **`conversation_summary`는 비동기**(fire-and-forget)라 정상 완료에도 일시적으로 null일 수 있음 → 카드 요약은 `conversation_summary` ?? `ai_summary` 폴백.
+- **`conversation_messages`의 user `content`에는 `<현재_상태>…</현재_상태>` 블록이 그대로 저장됨**(저장 시 UI용 `displayContent`가 아니라 `content`를 넣음). 표시 전 정규식 `/^<현재_상태>[\s\S]*?<\/현재_상태>\n?/`로 제거 — 08 in_progress 복원 로직과 동일.
 - 개인정보: 대화 원문은 본인 RLS 범위 내에서만 조회. 외부 노출 없음.
+
+### 5.3 ⚠️ 스키마 문서 불일치 (후속 정리 필요)
+
+`status` / `conversation_messages` / `conversation_summary` 컬럼은 **`docs/schema/spec-schema.md`·마이그레이션 어디에도 정의가 없다** (0613 "인터뷰 이어하기/auto-save" 작업이 Supabase에 직접 추가, 문서 미반영). 또한 in_progress INSERT가 `ai_summary` 없이 성공하므로 라이브 DB의 `ai_summary`는 사실상 **nullable**(스키마 문서는 NOT NULL). → 스키마 스펙 + 마이그레이션 SQL 문서화 권장(예시):
+
+```sql
+ALTER TABLE career_interview_results
+  ADD COLUMN status text NOT NULL DEFAULT 'completed'
+    CHECK (status IN ('in_progress','completed','abandoned')),
+  ADD COLUMN conversation_messages jsonb,
+  ADD COLUMN conversation_summary text;
+ALTER TABLE career_interview_results ALTER COLUMN ai_summary DROP NOT NULL;
+```
+> 위 DDL은 라이브 DB 실제 정의를 확인해 정합화할 것(컬럼명/타입/기본값은 실DB 기준 확정 필요).
 
 ---
 
@@ -104,7 +133,8 @@
 | --- | --- |
 | 데이터 없음 | Empty State 표시 |
 | 로드 실패 | 에러 alert + "다시 시도" 버튼(재조회) |
-| `key_insights` = null / 손상 | 해당 인사이트 줄 미표시, 카드/모달 자체는 노출 |
+| `key_insights` = null (Path C) / 필수 3키 모두 빈 값 | **행 자체를 히스토리에서 제외**(노출 안 함) |
+| `key_insights` 일부 키 누락 | 해당 인사이트 줄만 미표시, 카드/모달 자체는 노출 |
 | `conversation_messages` 비어있음/손상 | 손상 항목 필터링, 전부 비면 "저장된 대화 내용이 없어요." |
 | 상태 블록 노출 | user 메시지 표시 전 `<현재_상태>` 블록 제거 |
 | XSS | 메시지는 텍스트 노드로만 렌더(dangerouslySetInnerHTML 미사용) |
@@ -134,6 +164,7 @@
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v2.1 | 2026-06-13 | **DB 저장 규칙 정밀 확인 후 반영**: ① **Path C(정서 위기) 완료행 제외** — `key_insights IS NOT NULL` 쿼리 필터 + 클라이언트 `isDisplayableInterview` 이중 방어(내부 가드 문구 노출 방지). ② §5 저장 라이프사이클·노출 규칙 명문화(시작 시 in_progress INSERT, 매 턴 auto-save, 완료 시 UPDATE, `interviewed_at`=시작 시각, `conversation_summary` 비동기). ③ **스키마 문서 불일치 경고** — `status`/`conversation_messages`/`conversation_summary` 컬럼이 spec-schema·마이그레이션에 미정의(0613 직접 추가), `ai_summary` 사실상 nullable → 마이그레이션 SQL 문서화 권장. |
 | v2.0 | 2026-06-13 | **인터뷰 로그 기반으로 재구현(신규 화면 구현)**: 데이터 소스를 `coaching_insights`/`goals` → `career_interview_results`(status='completed')로 전환. ① 헤더 "인터뷰 보관함 📚" + 최신순 요약 카드(날짜/요약/다룬 주제/마무리 인사이트/내 답변 수) ② 카드 탭 → **대화 전문 바텀 시트 모달**(`conversation_messages`, `<현재_상태>` 블록 제거) ③ 탭바 4탭(홈/회고/**히스토리**/프로필) ④ Empty/에러+재시도. 순수 로직 `web/lib/history/interviewLog.ts`(+단위 테스트 21). 필터·코칭/목표 아카이브 통합·무한 스크롤은 v3 후속. (`_post_mvp_v1/14_history.md`에서 분기) |
 | v1.3 | 2026-05-09 | (v1) schema v0.7.2 정합성 정렬: 목표 이력 컬럼 `goal_category` 제거 → `competency_code` + `domain`(T/I/R/E) 추가. |
 | v1.2 | 2026-05-07 | (v1) 프로토타입 v6 대조 반영: 헤더 "인사이트 보관함 📚" 확정 / 필터·카드 탭 상세 모달 v2 대상 명시 / 기능 테이블 구현 시점 컬럼 추가. |

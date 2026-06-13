@@ -11,6 +11,7 @@ import {
   countUserMessages,
   pickInterviewSummary,
   extractInsightHighlights,
+  isDisplayableInterview,
   formatInterviewDate,
   type DisplayMessage,
 } from '@/lib/history/interviewLog';
@@ -68,17 +69,24 @@ function HistoryContent() {
         if (!user) return;
 
         // 완료된 인터뷰만, 최신순. RLS 로 본인 것만 자동 필터되지만 user_id 도 명시.
+        //  - status='completed': in_progress/abandoned 제외
+        //  - key_insights NOT NULL: Path C(정서 위기 가드레일) 행 제외(내부 문구 노출 방지)
         const { data, error: qErr } = await supabase
           .from('career_interview_results')
           .select('id, interviewed_at, ai_summary, conversation_summary, key_insights, conversation_messages')
           .eq('user_id', user.id)
           .eq('status', 'completed')
+          .not('key_insights', 'is', null)
           .order('interviewed_at', { ascending: false });
 
         if (cancelled) return;
         if (qErr) throw qErr;
 
-        setRows((data ?? []) as InterviewRow[]);
+        // 빈/손상 추출(필수 3키 모두 빈 값)도 클라이언트에서 한 번 더 방어 제외.
+        const meaningful = (data ?? []).filter((r) =>
+          isDisplayableInterview((r as InterviewRow).key_insights),
+        );
+        setRows(meaningful as InterviewRow[]);
         setLoading(false);
       } catch (e) {
         console.error('[14 history] load failed:', e);

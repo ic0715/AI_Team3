@@ -6,6 +6,7 @@ import {
   countUserMessages,
   pickInterviewSummary,
   extractInsightHighlights,
+  isDisplayableInterview,
   formatInterviewDate,
   type DisplayMessage,
 } from './interviewLog';
@@ -140,6 +141,36 @@ describe('extractInsightHighlights', () => {
     expect(
       extractInsightHighlights({ agreed_focus: '주제만 있음', user_takeaway: 42 }),
     ).toEqual({ presentingIssue: '', agreedFocus: '주제만 있음', takeaway: '' });
+  });
+});
+
+describe('isDisplayableInterview (Path C 제외)', () => {
+  it('정상 완료(필수 3키 존재)는 노출', () => {
+    expect(
+      isDisplayableInterview({
+        presenting_issue: '이직 고민',
+        agreed_focus: '리더십',
+        user_takeaway: '작게 시작',
+      }),
+    ).toBe(true);
+  });
+
+  it('3키 중 하나만 있어도 노출', () => {
+    expect(isDisplayableInterview({ agreed_focus: '주제' })).toBe(true);
+  });
+
+  it('Path C(key_insights=null)는 제외', () => {
+    expect(isDisplayableInterview(null)).toBe(false);
+    expect(isDisplayableInterview(undefined)).toBe(false);
+  });
+
+  it('빈 객체/빈 추출(손상)은 제외', () => {
+    expect(isDisplayableInterview({})).toBe(false);
+    expect(isDisplayableInterview({ presenting_issue: '   ', agreed_focus: '' })).toBe(false);
+  });
+
+  it('비객체는 제외', () => {
+    expect(isDisplayableInterview('정서 위기 가드레일 작동으로 인터뷰 중단')).toBe(false);
   });
 });
 

@@ -99,7 +99,29 @@ export function extractInsightHighlights(keyInsights: unknown): InsightHighlight
 }
 
 /**
+ * 히스토리에 노출할 '유의미한' 완료 인터뷰인지 판정.
+ *
+ * career_interview_results 저장 규칙상 status='completed' 행에는 두 종류가 섞인다:
+ *  - 정상 완료: key_insights에 필수 3키(presenting_issue/agreed_focus/user_takeaway)가 채워짐.
+ *  - Path C(정서 위기 가드레일): key_insights=null + ai_summary='정서 위기 가드레일 작동으로 인터뷰 중단'
+ *    + conversation_summary 미생성(summarize 미호출). → 내부 문구가 그대로 노출되고
+ *    민감한 정서 위기 순간을 리스트에 재노출하므로 히스토리에서 제외해야 한다.
+ *
+ * 핵심 3키 중 하나라도 비어 있지 않으면 노출(= !isExtractionInvalid 와 동치).
+ * null/빈 객체/빈 추출(Path C·손상)은 모두 false.
+ */
+export function isDisplayableInterview(keyInsights: unknown): boolean {
+  const h = extractInsightHighlights(keyInsights);
+  return Boolean(h.presentingIssue || h.agreedFocus || h.takeaway);
+}
+
+/**
  * ISO timestamp → 'YYYY.MM.DD' (로컬 기준).
+ *
+ * ⚠️ career_interview_results.interviewed_at 은 in_progress 행을 인터뷰 '시작' 시점에
+ *    INSERT(default now())하고 완료 시 UPDATE하지 않으므로, 사실상 '시작 일시'다
+ *    (스키마 문서 표기는 '완료 일시'). 같은 날 완료가 대부분이라 표시상 영향은 작음.
+ *
  * null/빈값/파싱 실패 시 '' 반환(호출부에서 폴백 처리).
  */
 export function formatInterviewDate(iso: string | null | undefined): string {
