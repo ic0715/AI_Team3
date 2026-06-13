@@ -664,7 +664,7 @@ function ActionItemsContent() {
 
 function ActionItemsAnalyzingScreen() {
   return (
-    <div style={wrapStyle}>
+    <div style={{ ...wrapStyle, position: 'relative', height: '100dvh', overflow: 'hidden' }}>
       <style>{`
         @keyframes action-analyzing-dot {
           0%, 60%, 100% { transform: translateY(0); opacity: .35; }
