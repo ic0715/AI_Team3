@@ -16,6 +16,47 @@ import {
 } from '@/lib/constants/career-interview';
 import { isReadyForResult as computeIsReadyForResult } from '@/lib/career-interview/resultReadiness';
 import { isExtractionInvalid } from '@/lib/career-interview/extractionValidity';
+import { computeInterviewProgress } from '@/lib/career-interview/interviewProgress';
+
+// ── 진행바 (phase 앵커 + exploration 턴 보간, 85% 상한) ──────────
+//   완료(코치 자연 종료) 전엔 절대 100%가 되지 않는다 — '정직한' 진행 표시.
+//   계산은 @/lib/career-interview/interviewProgress 로 분리(단위 테스트).
+function InterviewProgressBar({ phase, userTurnCount, sessionDuration, isComplete }: {
+  phase: Phase;
+  userTurnCount: number;
+  sessionDuration: SessionDurationLabel;
+  isComplete: boolean;
+}) {
+  const { percent, stageLabel, isNearEnd } = computeInterviewProgress({
+    phase, userTurnCount, sessionDuration, isComplete,
+  });
+  return (
+    <div style={{ padding: '0 4px 2px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '5px' }}>
+        <span style={{
+          fontSize: '11px', fontWeight: 700, letterSpacing: '-.01em',
+          color: isNearEnd ? 'var(--accent)' : 'var(--text-secondary)',
+        }}>
+          {stageLabel}{isNearEnd && !isComplete ? ' · 곧 마무리돼요' : ''}
+        </span>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-label={`인터뷰 진행도 ${percent}퍼센트, ${stageLabel}`}
+        style={{ height: '6px', borderRadius: '999px', background: 'var(--bg-soft)', overflow: 'hidden' }}
+      >
+        <div style={{
+          height: '100%', width: `${percent}%`,
+          background: 'var(--accent)', borderRadius: '999px',
+          transition: 'width .5s ease',
+        }} />
+      </div>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // AI 연동 인터페이스 (v2 자유 흐름)
@@ -946,6 +987,14 @@ function CareerInterviewContent() {
             <div style={{ width: '44px', flexShrink: 0 }} />
           )}
         </div>
+
+        {/* ── 진행바 (유저가 '언제 끝나는지' 가늠하도록) ── */}
+        <InterviewProgressBar
+          phase={phase}
+          userTurnCount={messages.filter((m) => m.role === 'user').length}
+          sessionDuration={sessionDuration}
+          isComplete={isComplete}
+        />
       </header>
 
       {/* ── 세션 복원 프롬프트 ────────────────────────────── */}
