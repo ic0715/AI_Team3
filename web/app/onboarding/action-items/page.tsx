@@ -407,7 +407,7 @@ function ActionItemsContent() {
     }
     return <LoadingScreen text={error ?? '목표를 찾을 수 없어요.'} />;
   }
-  if (aiLoading) return <LoadingScreen text="AI가 당신에게 맞는 액션을 만들고 있어요..." />;
+  if (aiLoading) return <ActionItemsAnalyzingScreen />;
 
   return (
     <div style={wrapStyle}>
@@ -661,6 +661,110 @@ function ActionItemsContent() {
 // ────────────────────────────────────────────────────────────
 // 서브 컴포넌트
 // ────────────────────────────────────────────────────────────
+
+function ActionItemsAnalyzingScreen() {
+  return (
+    <div style={wrapStyle}>
+      <style>{`
+        @keyframes action-analyzing-dot {
+          0%, 60%, 100% { transform: translateY(0); opacity: .35; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+        @keyframes action-progress-fill {
+          0%   { width: 2%; }
+          10%  { width: 15%; }
+          30%  { width: 38%; }
+          60%  { width: 62%; }
+          85%  { width: 82%; }
+          100% { width: 88%; }
+        }
+      `}</style>
+
+      {/* 배경: 역량 결과 카드 UI (희미하게) */}
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.15, pointerEvents: 'none', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)', gap: '8px' }}>
+          <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--border)' }} />
+          <div style={{ flex: 1, textAlign: 'center', fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>커리어 방향 결과</div>
+        </div>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ background: 'linear-gradient(135deg, #111827, #1f2f5a)', borderRadius: '16px', padding: '16px', color: '#fff' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, opacity: .7, marginBottom: '6px', letterSpacing: '.06em' }}>AI 분석 완료</div>
+            <div style={{ fontSize: '15px', fontWeight: 900, marginBottom: '4px', letterSpacing: '-.02em' }}>지금 집중해야 할 역량 목표예요</div>
+            <div style={{ fontSize: '11px', opacity: .7 }}>강점 · 가치관 · 현재 상황을 종합 분석한 결과예요</div>
+          </div>
+          {[
+            { num: 1, text: '팀 내 의사결정 주도하기', selected: true },
+            { num: 2, text: '데이터 기반 문제 해결력 키우기', selected: false },
+            { num: 3, text: '이해관계자와의 신뢰 구축하기', selected: false },
+          ].map(({ num, text, selected }) => (
+            <div key={num} style={{ border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '14px', padding: '14px', display: 'flex', gap: '10px', alignItems: 'center', background: selected ? 'var(--accent-light)' : 'transparent' }}>
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: '11px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{num}</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{text}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 오버레이 콘텐츠 */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.96)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '48px 28px 32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', marginBottom: '10px', marginTop: 'auto' }}>
+          <div style={{ fontSize: '36px' }}>⚡</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-.03em', lineHeight: 1.3, textAlign: 'center' }}>
+            액션 아이템을<br />도출 중이에요
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+            약 40초 정도 걸려요
+            <small style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>상황에 따라 조금 더 걸릴 수 있어요</small>
+          </div>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            {[0, 0.18, 0.36].map((delay, i) => (
+              <div key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', opacity: .45, animation: `action-analyzing-dot 1.3s ease-in-out ${delay}s infinite` }} />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ width: '100%', marginBottom: '28px' }}>
+          <div style={{ width: '100%', height: '4px', background: 'var(--border)', borderRadius: '999px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: 'linear-gradient(90deg, #93c5fd, var(--accent))', borderRadius: '999px', animation: 'action-progress-fill 45s cubic-bezier(.25,.1,.25,1) forwards' }} />
+          </div>
+          <div style={{ marginTop: '7px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right', letterSpacing: '-.01em' }}>
+            선택하신 역량을 바탕으로 분석 중이에요
+          </div>
+        </div>
+
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.08em', color: 'var(--text-muted)', alignSelf: 'flex-start', marginBottom: '14px', width: '100%' }}>
+          NEXT STEP
+        </div>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[
+            '액션 아이템 후보 확인하기',
+            '오늘 시작할 1개 선택하기',
+            '꾸준히 기록하고 성장 확인',
+          ].map((text, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {i + 1}
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.02em', lineHeight: 1.35 }}>
+                {text}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '16px', textAlign: 'center', marginTop: 'auto' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.07em', color: 'var(--accent)', marginBottom: '4px', opacity: .9 }}>CareerPT TIP</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.65, letterSpacing: '-.01em' }}>
+            작은 행동 하나가 습관이 되고,<br />습관이 쌓여 커리어 방향이 선명해져요.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function LoadingScreen({ text }: { text: string }) {
   return (
