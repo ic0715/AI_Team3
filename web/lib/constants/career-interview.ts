@@ -59,10 +59,10 @@ export type Phase = 'opening' | 'echo_agreement' | 'exploration' | 'closing';
  * echo_agreement → exploration 전환은 본래 코치 응답의 미러링 문구
  * ("그럼 오늘은 ○○를 다뤄볼게요") 정규식 매칭에만 의존한다. LLM이 합의를 다른
  * 문장으로 표현하면 매칭이 안 돼 phase 가 echo_agreement 에 갇히고, 진행바가 15%에
- * 멈춘다. 주제 합의는 보통 1~2턴이면 끝나므로, 그 이상 머물면 문구를 놓친 것으로
- * 보고 진행시켜 진행바가 갇히지 않게 한다.
+ * 멈춘다. 그래서 사용자 5턴을 넘도록 머물면 문구를 놓친 것으로 보고 진행시켜
+ * 진행바가 갇히지 않게 한다.
  */
-export const ECHO_AGREEMENT_FALLBACK_TURNS = 3;
+export const ECHO_AGREEMENT_FALLBACK_TURNS = 5;
 
 /** Running State <현재_상태> 블록 빌더 (CONTRACT_v2 §5).
  *  매 턴 user 메시지의 prefix로 붙임. */
