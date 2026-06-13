@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CareerPT — 유저 피드백 반영 히스토리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: #1a1a1a; background: #f5f5f5; padding: 32px 40px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 24px; color: #111; }
+
+  /* Summary cards */
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+  .sum-card { background: #fff; border-radius: 10px; padding: 16px 18px; border: 1px solid #e8e8e8; }
+  .sum-num { font-size: 28px; font-weight: 700; line-height: 1; }
+  .sum-label { font-size: 12px; color: #888; margin-top: 5px; }
+  .sum-card.done .sum-num { color: #1a1a1a; }
+  .sum-card.part .sum-num { color: #1a1a1a; }
+  .sum-card.no   .sum-num { color: #1a1a1a; }
+  .sum-card.post .sum-num { color: #1a1a1a; }
+
+  /* Section */
+  .section { background: #fff; border-radius: 12px; border: 1px solid #e8e8e8; margin-bottom: 24px; overflow: hidden; }
+  .section-header { padding: 14px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+  .round-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 5px; }
+  .r1 { background: #e8f0fe; color: #1a56db; }
+  .r2 { background: #e8f5e9; color: #2e7d32; }
+  .r3 { background: #fff3e0; color: #e65100; }
+  .section-title { font-size: 14px; font-weight: 600; color: #111; }
+  .section-sub { font-size: 12px; color: #999; margin-left: auto; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 12px; font-weight: 500; color: #999; text-align: left; padding: 9px 16px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+  td { padding: 11px 16px; border-bottom: 1px solid #f7f7f7; vertical-align: top; font-size: 13px; line-height: 1.55; color: #333; }
+  tr:last-child td { border-bottom: none; }
+  .col-topic { width: 18%; font-weight: 500; color: #111; }
+  .col-quote { width: 28%; color: #555; font-style: italic; }
+  .col-status { width: 10%; }
+  .col-impl { }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .b-done { background: #e8f5e9; color: #2e7d32; }
+  .b-verify { background: #e3f2fd; color: #1565c0; }
+  .b-part { background: #fff8e1; color: #f57f17; }
+  .b-no   { background: #fce4ec; color: #c62828; }
+  .b-post { background: #ede7f6; color: #4527a0; }
+  .b-urg  { background: #fce4ec; color: #c62828; border: 1px solid #f48fb1; }
+  .b-high { background: #fff8e1; color: #f57f17; }
+  .b-mid  { background: #e3f2fd; color: #1565c0; }
+  .b-low  { background: #f3e5f5; color: #6a1b9a; }
+
+  /* Commits */
+  .commits { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .commit { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11px; color: #555; background: #f5f5f5; padding: 1px 6px; border-radius: 4px; border: 1px solid #e0e0e0; }
+  .note { font-size: 12px; color: #999; margin-top: 4px; }
+
+  /* Positive table */
+  .pos-table th.col-pos1 { width: 30%; }
+  .pos-table th.col-pos2 { width: 50%; }
+  .pos-table th.col-pos3 { width: 20%; }
+
+  @media print {
+    body { background: #fff; padding: 16px; }
+    .section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>CareerPT — 유저 피드백 반영 히스토리</h1>
+
+<!-- Summary -->
+<div class="summary">
+  <div class="sum-card done">
+    <div class="sum-num">14</div>
+    <div class="sum-label">반영 완료</div>
+  </div>
+  <div class="sum-card part">
+    <div class="sum-num">3</div>
+    <div class="sum-label">일부 반영</div>
+  </div>
+  <div class="sum-card no">
+    <div class="sum-num">9</div>
+    <div class="sum-label">미처리</div>
+  </div>
+  <div class="sum-card post">
+    <div class="sum-num">3</div>
+    <div class="sum-label">Post-MVP</div>
+  </div>
+</div>
+
+<!-- 1차 -->
+<div class="section">
+  <div class="section-header">
+    <span class="round-badge r1">1차</span>
+    <span class="section-title">유저 인터뷰 (2026-05-25 · 4명 심층)</span>
+    <span class="section-sub">ms01(엔지니어) · ms02(PM) · wonsukster(연구원) · 8651(IT 시니어) | 인터뷰어: 김민선, 차재영, 이은상</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-topic">피드백 주제</th>
+        <th class="col-quote">원문 핵심</th>
+        <th class="col-status">상태</th>
+        <th class="col-impl">반영 내용 · 커밋</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="col-topic"><strong>P1</strong> AI 인터뷰 질문 폭탄</td>
+        <td class="col-quote">"물음표 살인마" "답은 안 주고 질문만"</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          능동 코칭 v3 프롬프트 추가 — 중간 요약·해석 삽입, 꼬리물기 금지 행동 4종 이식
+          <div class="commits">
+            <span class="commit">c5cd674</span>
+            <span class="commit">aa730c8</span>
+            <span class="commit">75dfe6e</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic"><strong>P2</strong> 액션아이템 맥락 단절</td>
+        <td class="col-quote">"인터뷰 내용과 무관" "직접 카드 만들었어요"</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          시드 풀 선택 → 인터뷰 기반 AI 생성+검증 게이트로 전환, 부족분 재작성 폴백 추가
+          <div class="commits">
+            <span class="commit">bf0868a</span>
+            <span class="commit">85c4253</span>
+            <span class="commit">b2d55a3</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic"><strong>P3</strong> 랜딩 흐름 예고 없음</td>
+        <td class="col-quote">"홈에서 인터뷰로 바로 넘어가 당황" "wiki 느낌"</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          랜딩 STEP 1/2/3 카드 형식 변경, swipe deck 개선, career-intro 플로우 예고 카드 추가
+          <div class="commits">
+            <span class="commit">01afd59</span>
+            <span class="commit">abe6a78</span>
+            <span class="commit">955f059</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic"><strong>P4</strong> ChatGPT 대비 차별점 불명확</td>
+        <td class="col-quote">"챗지피티 쓸 것 같다"</td>
+        <td class="col-status"><span class="badge b-part">일부반영</span></td>
+        <td>
+          랜딩 카피 수정 (JOURNEY 3단계·실천 근육 문구), 역량 도출 intent-first 전환
+          <div class="commits">
+            <span class="commit">51a2214</span>
+            <span class="commit">7dcd7f0</span>
+            <span class="commit">5b4b87e</span>
+          </div>
+          <div class="note">구조적 차별점 명시는 랜딩 전면 개편 필요 → 미완</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic"><strong>P5</strong> 로딩 시간·표시 미흡</td>
+        <td class="col-quote">"5~12초 소요" 현장 관찰</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          원형 스피너 추가, 분석·스켈레톤 로딩 UX 재설계, 생성 속도 36% 단축
+          <div class="commits">
+            <span class="commit">9122daf</span>
+            <span class="commit">c28d5fa</span>
+            <span class="commit">d819a04</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">과도한 이모지</td>
+        <td class="col-quote">현장 관찰</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          전체 페이지 이모지 일괄 제거
+          <div class="commits"><span class="commit">533710e</span></div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">역량 목표 카드 프리뷰 문구</td>
+        <td class="col-quote">"선택하면 무엇을 하는지 모름"</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          역량 목표 선택 화면 안내 문구 추가, 액션 설명 2줄 프리뷰·펼침 기능
+          <div class="commits">
+            <span class="commit">955f059</span>
+            <span class="commit">489b99c</span>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 2차 -->
+<div class="section">
+  <div class="section-header">
+    <span class="round-badge r2">2차</span>
+    <span class="section-title">피어 리뷰 (수업 발표 후 · 46명)</span>
+  </div>
+  <table class="pos-table">
+    <thead>
+      <tr>
+        <th class="col-pos1">피드백 주제</th>
+        <th class="col-pos2">원문 핵심</th>
+        <th class="col-status">상태</th>
+        <th class="col-impl">반영 내용 · 커밋</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="col-topic">코칭 전문성·프레임워크</td>
+        <td class="col-quote">"MCC+갤럽 결합 인상적" (9건 긍정)</td>
+        <td class="col-status"><span class="badge b-verify">설계검증</span></td>
+        <td>기존 설계 방향 확인 — 추가 구현 불필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">결과 실효성 부족</td>
+        <td class="col-quote">"뻔한 조언, 액션이 소프트" (5건)</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          intent-first 역량 도출, growth_competencies 앵커링 해소, 역량 추천 5→3개 축소
+          <div class="commits">
+            <span class="commit">5b4b87e</span>
+            <span class="commit">36d1dc3</span>
+            <span class="commit">974f925</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">인풋 부담·온보딩 진입장벽</td>
+        <td class="col-quote">"입력량 과다" "설문 길이 길다" (8건)</td>
+        <td class="col-status"><span class="badge b-part">일부반영</span></td>
+        <td>
+          UX 시연 피드백 반영 4종, 자동 advance 추가
+          <div class="commits"><span class="commit">35c62b9</span></div>
+          <div class="note">이력서/링크드인 자동 연동은 Post-MVP</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">강점 직접 선택 한계</td>
+        <td class="col-quote">"자기인식 편향 가능" "선택지 설명 부족" (6건)</td>
+        <td class="col-status"><span class="badge b-post">Post-MVP</span></td>
+        <td>대화 기반 강점 발견 플로우 설계 필요 — 미구현</td>
+      </tr>
+      <tr>
+        <td class="col-topic">지속성·리텐션</td>
+        <td class="col-quote">"일회성 탈피 장치 필요" (3건)</td>
+        <td class="col-status"><span class="badge b-part">일부반영</span></td>
+        <td>
+          서비스 피드백 수집 모달 추가, retention 시뮬레이션 분석 실시
+          <div class="commits">
+            <span class="commit">c24a02c</span>
+            <span class="commit">b610802</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">인터뷰 종료 방식</td>
+        <td class="col-quote">"고정 턴 강제 종료 어색"</td>
+        <td class="col-status"><span class="badge b-done">반영완료</span></td>
+        <td>
+          고정 턴 강제 종료 제거 → 목표 완결 기반 자연 종료 + 사용자 종료 버튼 추가
+          <div class="commits">
+            <span class="commit">3bb082d</span>
+            <span class="commit">850e12f</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">AI 차별성 불명확</td>
+        <td class="col-quote">"ChatGPT에 갤럽 넣으면 동일?" (6건)</td>
+        <td class="col-status"><span class="badge b-part">일부반영</span></td>
+        <td>
+          랜딩 카피 강화, 구조화 플로우 시각화 추가
+          <div class="note">구조적 해답은 향후 마케팅/랜딩 전면 개편 필요</div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 3차 -->
+<div class="section">
+  <div class="section-header">
+    <span class="round-badge r3">3차</span>
+    <span class="section-title">실사용 피드백 (2026-06-10 · 11명)</span>
+    <span class="section-sub">F1~F3 개별 · N1~N5 앱 · M1~M3 개별</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th class="col-topic">피드백 주제</th>
+        <th style="width:10%">우선순위</th>
+        <th class="col-status">상태</th>
+        <th class="col-impl">내용 · 처리 계획</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="col-topic">질문 반복·대화 순환</td>
+        <td><span class="badge b-urg">긴급</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>3명 공통 — "1시간 대화 후 처음으로 돌아옴" Phase 전환 감지·agreed_focus 고정 로직 점검 필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">분석 대기 시간 과다</td>
+        <td><span class="badge b-urg">긴급</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>
+          "2분 이상 → 테스트 중단" — 스트리밍 또는 중간 피드백 추가 필요
+          <div class="commits"><span class="commit">d819a04</span></div>
+          <div class="note">36% 단축 선행 완료, 추가 최적화 필요</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="col-topic">AI 응답 후 스크롤 미이동</td>
+        <td><span class="badge b-urg">긴급</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>메시지 전송 후 AI 응답이 뷰포트 아래로 밀림 — 자동 스크롤 추가 필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">'나의 강점 5가지' 표현 오해</td>
+        <td><span class="badge b-urg">긴급</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>갤럽 전문가 지적 — "나머지 29개가 약점으로 오인" → '최상위 강점 Top5'로 표현 변경 필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">코칭 단계 전환 없음</td>
+        <td><span class="badge b-high">높음</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>탐색 → 통합 단계 전환 로직 필요, 두루뭉술한 사용자에게 선택지 제시형 경로 추가</td>
+      </tr>
+      <tr>
+        <td class="col-topic">최종 결과 개인화 안 됨</td>
+        <td><span class="badge b-high">높음</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>"제시된 역량이 일반적" — 대화 내 핵심 갈등·가치 우선순위를 결과에 반영하는 로직 보강</td>
+      </tr>
+      <tr>
+        <td class="col-topic">강점 선택 어려움·기준 불명확</td>
+        <td><span class="badge b-high">높음</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>"이게 강점인지 나조차 확신 없어" — 선택 가이드·강점 개념 설명 힌트, 강점 강화 프레이밍 명확화 필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">대화 기록 히스토리 조회</td>
+        <td><span class="badge b-high">높음</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>"AI가 해준 좋은 말 다시 보고 싶다" — ai_summary를 결과 화면에 노출하는 방향 검토 필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">AI 질문 책임 회피</td>
+        <td><span class="badge b-high">높음</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>"그건 내가 생각해보라고 함" — 코치가 직접 제안을 회피하는 순간 프롬프트 패치 필요</td>
+      </tr>
+      <tr>
+        <td class="col-topic">대화 진행 상황 표시</td>
+        <td><span class="badge b-high">높음</span></td>
+        <td><span class="badge b-no">미처리</span></td>
+        <td>"남은 대화량 알 수 없어 불안" — 진행률 바 또는 턴 카운터 표시 추가</td>
+      </tr>
+      <tr>
+        <td class="col-topic">캐릭터 칭찬 카드</td>
+        <td><span class="badge b-low">낮음</span></td>
+        <td><span class="badge b-post">Post-MVP</span></td>
+        <td>"듀오링고처럼 굿잡! 해주면 지속 동기 생길 것" — Post-MVP 게이미피케이션</td>
+      </tr>
+      <tr>
+        <td class="col-topic">LinkedIn 연동 강점 자동 추출</td>
+        <td><span class="badge b-low">낮음</span></td>
+        <td><span class="badge b-post">Post-MVP</span></td>
+        <td>프로필 기반 강점 도출 → 온보딩 마찰 감소 — Post-MVP</td>
+      </tr>
+      <tr>
+        <td class="col-topic">복수 선택·유료 BM</td>
+        <td><span class="badge b-low">낮음</span></td>
+        <td><span class="badge b-post">Post-MVP</span></td>
+        <td>역량 2개 이상 선택을 프리미엄 기능으로 설계하는 수익화 방안 검토 중</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

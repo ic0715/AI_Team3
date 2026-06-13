@@ -1149,36 +1149,8 @@ function CareerInterviewContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── 분석 로딩 오버레이 (인사이트 3 대응: 시간 현실화 + 변동 안내) ─── */}
-      {isFinalizing && (
-        <div style={{
-          position: 'absolute', inset: 0, top: 0, left: '50%',
-          transform: 'translateX(-50%)', width: 'min(430px, 100vw)',
-          background: 'rgba(255,255,255,.95)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '14px',
-          zIndex: 50,
-          padding: '0 24px',
-        }}>
-          <div style={{ fontSize: '36px' }}>🔍</div>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            커리어 방향을 분석 중이에요
-          </div>
-          <div style={{
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-            textAlign: 'center',
-            lineHeight: 1.55,
-          }}>
-            약 20초 정도 걸려요
-            <br />
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              상황에 따라 조금 더 걸릴 수 있어요
-            </span>
-          </div>
-          <LoadingDots />
-        </div>
-      )}
+      {/* ── 분석 로딩 오버레이 ─── */}
+      {isFinalizing && <CareerAnalyzingOverlay />}
 
       {/* ── 하단 입력 영역 ──────────────────────────────── */}
       {/* flex-shrink:0 → 컨테이너 높이가 줄어들면 메시지 영역이 줄고, composer는 맨 아래 유지 */}
@@ -1399,6 +1371,105 @@ const btnOutline: React.CSSProperties = {
   border: '1.5px solid var(--accent)', fontSize: '14px', fontWeight: 600,
   fontFamily: 'inherit', cursor: 'pointer',
 };
+
+// ── 커리어 분석 로딩 오버레이 (AI 인터뷰 종료 후) ────────────────
+function CareerAnalyzingOverlay() {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'rgba(255,255,255,.96)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'flex-start',
+      padding: '48px 28px 32px',
+      zIndex: 50,
+    }}>
+      <style>{`
+        @keyframes career-analyzing-dot {
+          0%, 60%, 100% { transform: translateY(0); opacity: .35; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+      `}</style>
+
+      {/* 배경: 채팅 UI (희미하게) */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        opacity: 0.15,
+        pointerEvents: 'none',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', fontSize: '15px', fontWeight: 700, textAlign: 'center', color: 'var(--text-primary)' }}>
+          커리어 인터뷰
+        </div>
+        <div style={{ flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+            <div style={{ maxWidth: '76%', padding: '10px 14px', borderRadius: '18px 18px 18px 4px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '13px', lineHeight: 1.6, color: 'var(--text-primary)' }}>
+              강점을 바탕으로 커리어 방향을 함께 찾아볼게요. 오늘 시간은 어느 정도 되세요?
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'row-reverse' }}>
+            <div style={{ maxWidth: '76%', padding: '10px 14px', borderRadius: '18px 18px 4px 18px', background: 'var(--accent)', fontSize: '13px', lineHeight: 1.6, color: '#fff' }}>
+              30분 정도 여유 있어요!
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+            <div style={{ maxWidth: '76%', padding: '10px 14px', borderRadius: '18px 18px 18px 4px', background: 'var(--bg)', border: '1px solid var(--border)', fontSize: '13px', lineHeight: 1.6, color: 'var(--text-primary)' }}>
+              요즘 커리어에서 가장 마음에 걸리는 게 있다면 어떤 건가요?
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 오버레이 콘텐츠 */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', marginBottom: '10px', marginTop: 'auto' }}>
+        <div style={{ fontSize: '36px' }}>🔍</div>
+        <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-.03em', lineHeight: 1.3, textAlign: 'center' }}>
+          커리어 방향을<br />분석 중이에요
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginBottom: '36px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+          약 30초 정도 걸려요
+          <small style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>상황에 따라 조금 더 걸릴 수 있어요</small>
+        </div>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          {[0, 0.18, 0.36].map((delay, i) => (
+            <div key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', opacity: .45, animation: `career-analyzing-dot 1.3s ease-in-out ${delay}s infinite` }} />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.08em', color: 'var(--text-muted)', alignSelf: 'flex-start', marginBottom: '14px', width: '100%' }}>
+        NEXT STEP
+      </div>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {[
+          '역량 목표 후보 중 1개 선택',
+          '맞춤 액션 아이템 받기',
+          '꾸준히 기록하고 성장 확인',
+        ].map((text, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {i + 1}
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-.02em', lineHeight: 1.35 }}>
+              {text}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '16px', textAlign: 'center', marginTop: 'auto' }}>
+        <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '.07em', color: 'var(--accent)', marginBottom: '4px', opacity: .9 }}>CareerPT TIP</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.65, letterSpacing: '-.01em' }}>
+          핵심 역량 하나에 집중하고 반복적으로 개선할 때<br />더 빠른 학습과 성과 향상이 발생해요.
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Path C 정서 위기 모달 ─────────────────────────────────────
 function CrisisModal({ open, onClose }: { open: boolean; onClose: () => void }) {
