@@ -57,7 +57,8 @@
 - 상단: 날짜 + "인터뷰 대화 전문"
 - 인사이트 박스: 요약 + 처음 가져온 고민(`presenting_issue`) / 다룬 주제(`agreed_focus`) / 마무리 인사이트(`user_takeaway`) — 있는 항목만
 - 대화: `conversation_messages`를 말풍선으로 렌더(user 우측 accent / assistant 좌측). **user 메시지의 `<현재_상태>…</현재_상태>` 블록은 표시 전 제거.**
-- 대화 없음: "저장된 대화 내용이 없어요." 안내
+- 대화 로그 없음: **"과거 인터뷰는 요약 내용으로만 제공돼요."** (부정형 "저장된 대화 내용이 없어요" 대신 긍정형 안내)
+  - 대화 전문(`conversation_messages`)은 최신 인터뷰부터 로그로 쌓이므로, 로그가 있는 인터뷰(최신)는 대화 전문이 그대로 보이고, 로그가 없는 과거 인터뷰는 위 안내 + 요약(인사이트 박스)만 제공.
 
 ### 3.5 빈 상태
 
@@ -135,7 +136,7 @@ ALTER TABLE career_interview_results ALTER COLUMN ai_summary DROP NOT NULL;
 | 로드 실패 | 에러 alert + "다시 시도" 버튼(재조회) |
 | `key_insights` = null (Path C) / 필수 3키 모두 빈 값 | **행 자체를 히스토리에서 제외**(노출 안 함) |
 | `key_insights` 일부 키 누락 | 해당 인사이트 줄만 미표시, 카드/모달 자체는 노출 |
-| `conversation_messages` 비어있음/손상 | 손상 항목 필터링, 전부 비면 "저장된 대화 내용이 없어요." |
+| `conversation_messages` 비어있음/손상 | 손상 항목 필터링, 전부 비면 "과거 인터뷰는 요약 내용으로만 제공돼요." (요약·인사이트는 그대로 노출) |
 | 상태 블록 노출 | user 메시지 표시 전 `<현재_상태>` 블록 제거 |
 | XSS | 메시지는 텍스트 노드로만 렌더(dangerouslySetInnerHTML 미사용) |
 
@@ -164,6 +165,7 @@ ALTER TABLE career_interview_results ALTER COLUMN ai_summary DROP NOT NULL;
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v2.2 | 2026-06-13 | **대화 전문 모달 빈 상태 문구 긍정형 전환**: 대화 로그가 없는 과거 인터뷰에서 "저장된 대화 내용이 없어요" → **"과거 인터뷰는 요약 내용으로만 제공돼요."** 대화 전문(`conversation_messages`)은 최신 인터뷰부터 로그로 쌓이므로, 로그가 있는(최신) 인터뷰는 대화 전문을 그대로 표시하고 과거 인터뷰는 요약(인사이트 박스)만 제공한다는 규칙 명시. |
 | v2.1 | 2026-06-13 | **DB 저장 규칙 정밀 확인 후 반영**: ① **Path C(정서 위기) 완료행 제외** — `key_insights IS NOT NULL` 쿼리 필터 + 클라이언트 `isDisplayableInterview` 이중 방어(내부 가드 문구 노출 방지). ② §5 저장 라이프사이클·노출 규칙 명문화(시작 시 in_progress INSERT, 매 턴 auto-save, 완료 시 UPDATE, `interviewed_at`=시작 시각, `conversation_summary` 비동기). ③ **스키마 문서 불일치 경고** — `status`/`conversation_messages`/`conversation_summary` 컬럼이 spec-schema·마이그레이션에 미정의(0613 직접 추가), `ai_summary` 사실상 nullable → 마이그레이션 SQL 문서화 권장. |
 | v2.0 | 2026-06-13 | **인터뷰 로그 기반으로 재구현(신규 화면 구현)**: 데이터 소스를 `coaching_insights`/`goals` → `career_interview_results`(status='completed')로 전환. ① 헤더 "인터뷰 보관함 📚" + 최신순 요약 카드(날짜/요약/다룬 주제/마무리 인사이트/내 답변 수) ② 카드 탭 → **대화 전문 바텀 시트 모달**(`conversation_messages`, `<현재_상태>` 블록 제거) ③ 탭바 4탭(홈/회고/**히스토리**/프로필) ④ Empty/에러+재시도. 순수 로직 `web/lib/history/interviewLog.ts`(+단위 테스트 21). 필터·코칭/목표 아카이브 통합·무한 스크롤은 v3 후속. (`_post_mvp_v1/14_history.md`에서 분기) |
 | v1.3 | 2026-05-09 | (v1) schema v0.7.2 정합성 정렬: 목표 이력 컬럼 `goal_category` 제거 → `competency_code` + `domain`(T/I/R/E) 추가. |

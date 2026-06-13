@@ -253,7 +253,7 @@ function TranscriptModal({ row, onClose }: { row: InterviewRow; onClose: () => v
           )}
 
           {messages.length === 0 ? (
-            <p style={modalEmptyStyle}>저장된 대화 내용이 없어요.</p>
+            <p style={modalEmptyStyle}>과거 인터뷰는 요약 내용으로만 제공돼요.</p>
           ) : (
             <div style={chatColStyle}>
               {messages.map((m, i) => (
