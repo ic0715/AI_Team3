@@ -52,6 +52,18 @@ export function classifySessionDuration(userFirstAnswer: string): SessionDuratio
 
 export type Phase = 'opening' | 'echo_agreement' | 'exploration' | 'closing';
 
+/**
+ * echo_agreement(주제 합의) 단계가 이 사용자 턴 수를 넘으면, 코치 미러링 문구를
+ * 못 잡아도 exploration 으로 강제 전환한다.
+ *
+ * echo_agreement → exploration 전환은 본래 코치 응답의 미러링 문구
+ * ("그럼 오늘은 ○○를 다뤄볼게요") 정규식 매칭에만 의존한다. LLM이 합의를 다른
+ * 문장으로 표현하면 매칭이 안 돼 phase 가 echo_agreement 에 갇히고, 진행바가 15%에
+ * 멈춘다. 주제 합의는 보통 1~2턴이면 끝나므로, 그 이상 머물면 문구를 놓친 것으로
+ * 보고 진행시켜 진행바가 갇히지 않게 한다.
+ */
+export const ECHO_AGREEMENT_FALLBACK_TURNS = 3;
+
 /** Running State <현재_상태> 블록 빌더 (CONTRACT_v2 §5).
  *  매 턴 user 메시지의 prefix로 붙임. */
 export function buildRunningStatePrefix(opts: {
@@ -86,6 +98,11 @@ export function inferPhase(
     const mirrorMatch = coachResponseText.match(/그럼 오늘은\s+([^"]{2,80}?)[을를]\s*(?:같이\s*)?(?:다뤄|봐볼게요|볼게요)/);
     if (mirrorMatch) {
       return { phase: 'exploration', agreedFocus: mirrorMatch[1].trim() };
+    }
+    // 턴 폴백: 미러링 문구를 못 잡아도 합의 단계가 길어지면(사용자 N턴+) 탐색으로 진행.
+    // 진행바가 echo_agreement(15%)에 갇히는 것 방지. (agreedFocus 는 미캡처)
+    if (userMsgCount >= ECHO_AGREEMENT_FALLBACK_TURNS) {
+      return { phase: 'exploration' };
     }
   }
 
