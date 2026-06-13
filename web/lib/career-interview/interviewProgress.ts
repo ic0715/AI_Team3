@@ -21,11 +21,14 @@ import type { Phase, SessionDurationLabel } from '@/lib/constants/career-intervi
 /**
  * session_duration 별, exploration 진행바가 상한(EXPLORATION_CAP)에 도달하는 기준 턴 수.
  * 종료 강제가 아니라 '보간 속도'. short 는 빨리 차고 long 은 천천히 찬다.
+ *
+ * 기준: 실제 인터뷰는 꽤 길다(코치가 turn 63부터 마무리를 유도 — FORCE_CLOSE_FROM).
+ * 그래서 일반(medium)은 ~20턴에 상한(85%)에 닿도록 잡고, short/long을 비례 조정.
  */
 export const EXPECTED_TURNS: Record<SessionDurationLabel, number> = {
-  short: 6,
-  medium: 10,
-  long: 16,
+  short: 12,
+  medium: 20,
+  long: 32,
 };
 
 /** 각 phase 진입 시의 진행률 앵커(%). 단계가 올라갈수록 커진다. */
