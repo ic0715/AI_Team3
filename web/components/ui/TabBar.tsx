@@ -5,16 +5,17 @@ import type { CSSProperties } from 'react';
 
 /**
  * MAINTAIN 페이즈 공용 하단 탭바.
- * 홈(11) / 회고(12) / 프로필(14) 3개 탭.
+ * 홈(11) / 회고(12) / 히스토리(14) / 프로필(15) 4개 탭.
  * 13 AI 코칭, NEW07 비밀번호 변경에는 탭바 없음.
  *
  * 사용 예:
  *   <TabBar active="home" />
  *   <TabBar active="reflect" />
+ *   <TabBar active="history" />
  *   <TabBar active="profile" />
  */
 
-export type TabKey = 'home' | 'reflect' | 'profile';
+export type TabKey = 'home' | 'reflect' | 'history' | 'profile';
 
 interface TabConfig {
   key: TabKey;
@@ -26,6 +27,7 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   { key: 'home',    href: '/home',    icon: '🏠', label: '홈' },
   { key: 'reflect', href: '/reflect', icon: '📝', label: '회고' },
+  { key: 'history', href: '/history', icon: '📚', label: '히스토리' },
   { key: 'profile', href: '/profile', icon: '👤', label: '프로필' },
 ];
 
@@ -79,7 +81,7 @@ const navStyle: CSSProperties = {
   background: '#fff',
   borderTop: '1px solid var(--line)',
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr 1fr',
+  gridTemplateColumns: '1fr 1fr 1fr 1fr',
   paddingBottom: 'env(safe-area-inset-bottom, 0)',
   boxShadow: '0 -2px 12px -8px rgba(17,20,24,.08)',
 };
