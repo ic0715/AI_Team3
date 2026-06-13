@@ -714,15 +714,10 @@ function ActionItemsAnalyzingScreen() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '28px' }}>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
             약 40초 정도 걸려요
             <small style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>상황에 따라 조금 더 걸릴 수 있어요</small>
-          </div>
-          <div style={{ display: 'flex', gap: '5px' }}>
-            {[0, 0.18, 0.36].map((delay, i) => (
-              <div key={i} style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', opacity: .45, animation: `action-analyzing-dot 1.3s ease-in-out ${delay}s infinite` }} />
-            ))}
           </div>
         </div>
 
