@@ -22,7 +22,7 @@
 ## 2. 진입 조건
 
 - 07에서 "시작하기" 클릭
-- 또는 sessionStorage에 진행 중인 대화가 남아 있고 이어하기 선택 (브라우저 내에서만 복원 가능)
+- 또는 진행 중(`status='in_progress'`)인 인터뷰가 있으면 이어하기 선택 (**update0613: DB 기반 복원** — `conversation_messages`로 복원하므로 기기/브라우저가 바뀌어도 가능. sessionStorage는 새로고침 대비 보조)
 
 ---
 
@@ -64,11 +64,26 @@
 - 페이즈 전환은 AI 자율 판단 (시간 예산 강제 X)
 - 클라이언트는 `inferPhase()` 함수로 코치 응답에서 페이즈 전환 추론 (`web/lib/constants/career-interview.ts`)
 
-### 3.3 진행률 표시
+### 3.3 진행률 표시 — 진행바 (phase 앵커) `update0613 신규`
 
-- 4-Phase 기반 단순 인디케이터 (Phase X/4)
-- ~~"Q3 / 6 + Progress Bar"~~ **v1 코어 질문 기반 표시는 v2에서 폐기**
-- follow-up은 카운트 무의미 (자유 흐름)
+헤더에 항상 노출되는 **연속 진행바 + 현재 단계 라벨**. 유저가 "인터뷰가 언제 끝나는지" 가늠하도록 추가(사용자 피드백 반영).
+
+인터뷰는 고정 턴 수로 끝나지 않고 코치 자연 종료(Path A)로만 완료되므로, "턴 ÷ 목표" 식 단순 진행바는 부정확하다(바가 100%인데 대화가 계속되거나, 깊은데 멈춰 보임). 그래서 **실제 진행 신호인 phase에 앵커링**하고 가장 긴 exploration 구간만 턴으로 보간:
+
+| phase | 진행률 | 단계 라벨 |
+| --- | --- | --- |
+| opening | 5% | 인터뷰 시작 |
+| echo_agreement | 15% | 다룰 주제 찾는 중 |
+| exploration | 30~85% (턴 보간, **85% 상한**) | 깊이 탐색 중 |
+| closing | 90% | 마무리하는 중 · "곧 마무리돼요" |
+| 완료(isComplete) | 100% | 인터뷰 완료 |
+
+- **85% 상한**: 코치가 실제 마무리(closing)에 들어가기 전엔 90%를 넘지 않음 → "바는 다 됐는데 안 끝남" 방지. **100%는 오직 코치 자연 종료 시.** (closing 진입 시 90%로 점프 — 코치 마무리가 가장 정직한 "거의 끝" 신호.)
+- **session_duration별 보간 속도**: `short` 20 / `medium` 30 / `long` 40턴에 85% 상한 도달(`EXPECTED_TURNS`).
+- **echo_agreement 폴백**: 코치 미러링 문구를 못 잡아도 사용자 5턴 초과 시 exploration으로 전환(`ECHO_AGREEMENT_FALLBACK_TURNS`) → 진행바가 15%에 갇히는 것 방지.
+- 접근성: `role="progressbar"` + `aria-valuenow`.
+- ~~"Q3 / 6 + Progress Bar"~~ v1 코어 질문 기반 표시는 v2에서 폐기(follow-up 카운트는 자유 흐름이라 무의미).
+- 구현: `web/lib/career-interview/interviewProgress.ts`(순수 계산 + 단위 테스트) / `web/app/onboarding/career-interview/page.tsx`(InterviewProgressBar, 헤더 렌더).
 
 ### 3.4 Running State 블록 (`<현재_상태>` prefix) `v2 신규`
 
@@ -208,9 +223,9 @@ Path A 또는 B 종료 감지 시 finalize API 호출 → AI가 대화 전체를
 
 ## 7. 그 외 동작
 
-자동 저장(sessionStorage), 재개, PII 검출, 분석 이벤트, 접근성, 성능은 v1과 동일.
+PII 검출, 분석 이벤트, 접근성, 성능은 v1과 동일.
 
-대화 원문은 DB 저장하지 않음. sessionStorage에서만 관리 후 finalize 시 추출 결과만 DB 저장.
+> **update0613 변경 — 대화 원문 DB 영속**: 대화 저장이 sessionStorage 전용 → **DB 영속(`career_interview_results`)** 으로 바뀜. 인터뷰 시작 시 `status='in_progress'` 행 INSERT, 매 턴 `conversation_messages` auto-save(fire-and-forget), 완료 시 `status='completed'` + 백그라운드 `/summarize`로 `conversation_summary` 생성. 이어하기(재개)도 DB의 in_progress 행 기준(sessionStorage는 새로고침 대비 보조). 저장된 대화 로그는 **14 히스토리**가 소비한다. → 상세 라이프사이클: `_post_mvp_v2/14_history.md` §5.1.
 
 ---
 
@@ -223,13 +238,16 @@ Path A 또는 B 종료 감지 시 finalize API 호출 → AI가 대화 전체를
 | `strength_analyses` (is_latest=true) | `strengths` (JSONB) | Top 5 강점 컨텍스트, 페어 슬라이스 lookup |
 | `profiles` | `nickname`, `job_field`, `career_level`, `main_concern` | 사용자 정보 컨텍스트 |
 
-### 8.2 쓰기
+### 8.2 쓰기 `update0613 — DB 영속 반영`
 
 | 테이블 | 동작 | 시점 |
 | --- | --- | --- |
-| `career_interview_results` | INSERT | Path A/B 종료 시 (Path C 시 `key_insights=NULL`로 저장) |
+| `career_interview_results` | INSERT (`status='in_progress'`) | 인터뷰 시작 시 |
+| `career_interview_results` | UPDATE (`conversation_messages`) | 매 턴 auto-save (fire-and-forget) |
+| `career_interview_results` | UPDATE (`status='completed'`, `key_insights`, `ai_summary`, `session_duration_choice`) | Path A/B 종료 시 (Path C 시 `key_insights=NULL`) |
+| `career_interview_results` | UPDATE (`conversation_summary`) | 완료 후 백그라운드 `/summarize` |
 
-대화 원문은 sessionStorage에만 (브라우저 메모리), DB 미저장.
+> ⚠️ `status` / `conversation_messages` / `conversation_summary` 컬럼은 `docs/schema/spec-schema.md`·마이그레이션에 **아직 미반영**(update0613이 Supabase에 직접 추가, 문서 정리 보류). `ai_summary`도 in_progress INSERT를 위해 사실상 nullable. → `14_history.md` §5.3 참조.
 
 ---
 
@@ -264,6 +282,7 @@ Path A 또는 B 종료 감지 시 finalize API 호출 → AI가 대화 전체를
 
 | 버전 | 날짜 | 변경 내용 |
 | --- | --- | --- |
+| v2.2 | 2026-06-13 | **[update0613 반영]** ① **3.3 진행률 표시 재작성** — "Phase X/4 단순 인디케이터" → 헤더 상시 노출 **연속 진행바 + 단계 라벨**(phase 앵커 5/15/30~85/90, exploration 턴 보간 **85% 상한**, 완료 시에만 100%, session_duration별 기대 턴 short20/med30/long40, echo_agreement 5턴 폴백). 구현 `web/lib/career-interview/interviewProgress.ts`. ② **대화 원문 DB 영속 반영** — §2 진입(DB 기반 이어하기) / §7 / §8.2 쓰기 테이블을 sessionStorage 전용 → `career_interview_results`에 `status`·`conversation_messages`·`conversation_summary` 영속(매 턴 auto-save)으로 정정. 저장 로그는 14 히스토리가 소비. ⚠️ 해당 신규 컬럼은 spec-schema 미반영(보류) — 14_history §5.3 교차참조. |
 | v2.1 | 2026-05-26 | **3.6 분석 대기 화면(loading overlay) 신규** — 사용자 조사 인사이트 3 대응. 이전 카피 "약 5~12초 정도 걸려요" 실측 12초 이상 초과로 신뢰 손실 → 시간 카피 "약 20초 정도 걸려요"로 현실화 + "상황에 따라 조금 더 걸릴 수 있어요" 변동 안내 추가. UI 요소 표(아이콘/메인 카피/시간 안내/변동 안내/진행 표시/인터랙션 차단) 명세 및 변경 배경 명시. 코드 구현 참조: `web/app/onboarding/career-interview/page.tsx`. |
 | v2.0 | 2026-05-23 | **[전면 재작성 — schema v0.9 / 커리어 인터뷰 v2 개편 반영]** v1.4의 고정 6질문 모델을 폐기하고 v2 자유 흐름 4-Phase 구조로 전면 재작성. 신규 항목: **3.1 시간 선택** (session_duration_choice, v0.9 신규 컬럼), **3.2 4-Phase 흐름** (Opening/Echo & Agreement/Exploration/Closing), **3.4 Running State 블록** (매 턴 prefix 주입), **3.5 종료 분기** Path A(코치 자연 종료)/B(사용자 주도)/C(정서 위기 redirect), **4.2 key_insights JSONB** v0.9 신규 4키(presenting_issue/agreed_focus/agreement_evolution/user_takeaway) + 기존 7키 중첩 구조. **10번 코드 구현 참조** 섹션 신규 추가(실제 구현 파일 매핑). 기존 §3.2 코어 질문 Q1~Q6, §3.3 "Q3/6" 진행률, §3.5 인터뷰 더하기 모드, Option B 미결 섹션 모두 제거. |
 | v1.4 | 2026-05-10 | NEW 프로토타입 v1 정합성 정렬: **3.5 인터뷰 완료 후 버튼 패턴** — 인터뷰 더하기 모드의 동작 정의 명확화. (1) "💬 인터뷰 더하기" 클릭 시 입력창을 enable + focus 처리해야 한다는 원칙 명시 (단순 display 토글로는 disabled 상태가 풀리지 않는 버그 방지). (2) 추가 입력 모드에서는 코어 질문 흐름이 종료된 상태이므로 매 메시지 전송 시 짧은 ack만 응답. (3) 추가 모드 진입 후에는 "💬 인터뷰 더하기" 버튼을 숨기고 "진단 완료하기" 버튼만 유지하여 사용자가 마무리할 수 있는 단일 진로 제공. 상태 표에 "인터뷰 더하기 모드 진입" / "추가 입력 후" 두 행 신규 추가. |
