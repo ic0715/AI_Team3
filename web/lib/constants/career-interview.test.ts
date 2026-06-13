@@ -7,6 +7,7 @@ import {
   detectCoachClosing,
   detectCrisisRed,
   detectUserExit,
+  ECHO_AGREEMENT_FALLBACK_TURNS,
   inferPhase,
   USER_EXIT_KEYWORDS,
 } from './career-interview';
@@ -214,9 +215,19 @@ describe('inferPhase', () => {
     expect(r.agreedFocus).toBe('성장 방향');
   });
 
-  it('echo_agreement인데 mirror 패턴이 없으면 phase 유지', () => {
+  it('echo_agreement인데 mirror 패턴이 없으면 phase 유지 (폴백 임계 미만)', () => {
     const r = inferPhase('echo_agreement', '조금 더 들려주시겠어요?', 1);
     expect(r.phase).toBe('echo_agreement');
+    expect(r.agreedFocus).toBeUndefined();
+  });
+
+  it('echo_agreement + mirror 없이 폴백 임계 턴 이상 → exploration 강제 전환 (agreedFocus 미캡처)', () => {
+    // 임계 직전(2턴)까지는 유지
+    expect(inferPhase('echo_agreement', '조금 더 들려주시겠어요?', ECHO_AGREEMENT_FALLBACK_TURNS - 1).phase)
+      .toBe('echo_agreement');
+    // 임계(3턴) 이상이면 미러링 문구가 없어도 exploration 으로 전환
+    const r = inferPhase('echo_agreement', '조금 더 들려주시겠어요?', ECHO_AGREEMENT_FALLBACK_TURNS);
+    expect(r.phase).toBe('exploration');
     expect(r.agreedFocus).toBeUndefined();
   });
 
